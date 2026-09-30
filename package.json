@@ -1,0 +1,14 @@
+{
+  "name": "dsh-ssh-desktop-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A thin Windows desktop shell for a DSH that runs on a server over system ssh.",
+  "type": "module",
+  "scripts": {
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

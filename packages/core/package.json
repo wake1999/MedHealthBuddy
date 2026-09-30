@@ -1,0 +1,19 @@
+{
+  "name": "@dsh-ssh/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Connection engine for dsh-ssh-desktop: starts or reuses a remote `dsh web` over system ssh and forwards its loopback port. Pure Node, no Electron.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js"
+  ],
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "license": "MIT"
+}

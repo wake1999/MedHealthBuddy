@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>连接管理</title>
+  <link rel="stylesheet" href="connection.css">
+</head>
+<body>
+  <!-- Laid out like DSH's own settings dialog (upstream ui-settings-general SettingsRoot):
+       the left column lists servers, the tabs switch what is shown about the selected one. -->
+  <div class="overlay">
+    <div class="mask" id="scrim"></div>
+    <section class="panel" role="dialog" aria-modal="true" aria-labelledby="nav-title" tabindex="-1">
+      <nav class="nav">
+        <div class="nav-title" id="nav-title">连接管理</div>
+        <div class="nav-section" id="servers-label">服务器</div>
+        <div class="nav-list" id="servers" role="listbox" aria-labelledby="servers-label"></div>
+        <button type="button" class="nav-cell nav-add" id="btn-add">
+          <svg class="nav-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <span class="nav-label">添加服务器</span>
+        </button>
+      </nav>
+
+      <div class="content">
+        <header class="header">
+          <div class="tabs" role="tablist" id="tabs">
+            <button type="button" class="tab" role="tab" data-page="session">会话</button>
+            <button type="button" class="tab" role="tab" data-page="server">服务器</button>
+            <button type="button" class="tab" role="tab" data-page="install">安装与升级</button>
+            <button type="button" class="tab" role="tab" data-page="settings">连接设置</button>
+            <button type="button" class="tab" role="tab" data-page="log">诊断日志</button>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn small" id="btn-export" title="把各连接的状态和日志导出成一个文本文件（令牌和密钥已去除）">导出诊断</button>
+            <button type="button" class="close" id="btn-close" aria-label="关闭" title="关闭（Esc）">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="options">
+          <!-- 会话 -->
+          <section class="page" data-page="session">
+            <h2 class="heading"><span id="session-name"></span> <span class="chip" id="chip" data-phase="idle">未连接</span></h2>
+            <p class="intro" id="destination"></p>
+            <div class="banner" data-kind="warn" id="sandbox-warning" hidden>应用正以 --no-sandbox 运行：远端页面仍启用了上下文隔离、禁用了 Node，但没有进程沙箱。请改用 start-desktop.cmd 启动（首次先运行 setup-electron-runtime.cmd）。</div>
+            <p class="msg" id="message"></p>
+            <div id="session-extra"></div>
+            <div class="banner" id="note" hidden></div>
+
+            <div class="rows">
+              <div class="row">
+                <div class="row-text">
+                  <div class="row-title">连接</div>
+                  <div class="row-desc">经系统 ssh 启动或复用服务器上的 DSH，就绪后在窗口里打开。首次启动约需 1–3 分钟。</div>
+                </div>
+                <button type="button" class="btn primary" id="btn-connect">连接</button>
+              </div>
+              <div class="row">
+                <div class="row-text">
+                  <div class="row-title">断开</div>
+                  <div class="row-desc">只关闭本地转发，服务器上的 DSH 继续运行，下次连接直接复用。</div>
+                </div>
+                <button type="button" class="btn" id="btn-disconnect">断开</button>
+              </div>
+              <div class="row">
+                <div class="row-text">
+                  <div class="row-title">重启远端</div>
+                  <div class="row-desc">停止服务器上的 DSH 并启动一个新的。正在运行的任务会被中断。</div>
+                </div>
+                <button type="button" class="btn" id="btn-restart">重启远端</button>
+              </div>
+              <div class="row">
+                <div class="row-text">
+                  <div class="row-title">停止远端</div>
+                  <div class="row-desc">结束服务器上的 DSH 进程并关闭本地转发。会话数据保留在服务器上。</div>
+                </div>
+                <button type="button" class="btn danger" id="btn-stop">停止远端</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 服务器 -->
+          <section class="page" data-page="server" hidden>
+            <h2 class="heading">服务器</h2>
+            <p class="intro">ssh 实际连到哪里（由 <span class="mono">~/.ssh/config</span> 解析），以及最近一次连接时探测到的情况。</p>
+            <div class="rows" id="facts"></div>
+          </section>
+
+          <!-- 安装与升级 -->
+          <section class="page" data-page="install" hidden>
+            <h2 class="heading">安装与升级</h2>
+            <p class="intro">检查服务器上的 Node.js、DSH 和配套插件 dsh-desktop-link，按需安装或升级。只写你的家目录（<span class="mono">~/.local/opt</span>、<span class="mono">~/.dsh</span>），不需要 root，不改动系统里已有的软件。</p>
+            <div class="rows">
+              <div class="row">
+                <span class="row-text"><span class="row-title" id="tag-title">DSH 版本渠道</span><span class="row-desc">latest 是正式版；next 是预览版。</span></span>
+                <select class="picker-source" id="dsh-tag" aria-labelledby="tag-title">
+                  <option value="latest">latest（正式版）</option>
+                  <option value="next">next（预览版）</option>
+                </select>
+              </div>
+              <div class="row">
+                <span class="row-text"><span class="row-title" id="source-title">下载源</span><span class="row-desc">自动：选服务器上连得更快的那个。</span></span>
+                <select class="picker-source" id="source" aria-labelledby="source-title">
+                  <option value="auto">自动</option>
+                  <option value="mirror">国内镜像（npmmirror）</option>
+                  <option value="official">官方源</option>
+                </select>
+              </div>
+            </div>
+            <div class="footer">
+              <span class="hint" id="inspect-note"></span>
+              <button type="button" class="btn" id="btn-inspect">检查服务器</button>
+            </div>
+            <div id="install-result"></div>
+          </section>
+
+          <!-- 连接设置 -->
+          <section class="page" data-page="settings" hidden>
+            <h2 class="heading" id="settings-heading">连接设置</h2>
+            <p class="intro">身份、端口、跳板机都由 <span class="mono">~/.ssh/config</span> 决定，本机不保存任何密钥。</p>
+            <form class="rows" id="form" autocomplete="off">
+              <label class="row">
+                <span class="row-text"><span class="row-title">名称</span><span class="row-desc">显示用，留空则用 ssh 别名。</span></span>
+                <input class="input" name="name" placeholder="例如：开发服务器">
+              </label>
+              <label class="row">
+                <span class="row-text"><span class="row-title">ssh 别名</span><span class="row-desc"><span class="mono">~/.ssh/config</span> 里的 Host，或 user@host。</span></span>
+                <input class="input mono" name="target" placeholder="my-server 或 user@host" required>
+              </label>
+              <label class="row">
+                <span class="row-text"><span class="row-title">远端 profile</span><span class="row-desc">服务器上的 DSH profile，不能是 desktop。web 会在首次启动时自动创建。</span></span>
+                <input class="input mono" name="remoteProfile" placeholder="web">
+              </label>
+              <label class="row">
+                <span class="row-text"><span class="row-title">远端工作区</span><span class="row-desc">DSH 在服务器上的工作目录。</span></span>
+                <input class="input mono" name="remoteWorkspace" placeholder="/home/user/work" required>
+              </label>
+              <label class="row">
+                <span class="row-text"><span class="row-title">远端端口</span><span class="row-desc">服务器上 dsh web 监听的回环端口。</span></span>
+                <input class="input mono narrow" name="remotePort" inputmode="numeric">
+              </label>
+              <label class="row">
+                <span class="row-text"><span class="row-title">本地端口</span><span class="row-desc">本机转发端口，建议与远端端口一致；每台服务器各用一个。</span></span>
+                <input class="input mono narrow" name="localPort" inputmode="numeric">
+              </label>
+              <div class="row">
+                <span class="row-text"><span class="row-title" id="close-policy-title">退出应用时</span><span class="row-desc">关闭窗口后服务器上的 DSH 如何处理。</span></span>
+                <!-- Holds the value for the form; connection.js draws DSH's selector pill and menu over it. -->
+                <select class="picker-source" name="closePolicy" aria-labelledby="close-policy-title">
+                  <option value="keep">保持远端运行</option>
+                  <option value="stop">停止远端</option>
+                </select>
+              </div>
+            </form>
+            <div class="footer">
+              <span class="hint" id="save-note"></span>
+              <button type="button" class="btn primary" id="btn-save">保存</button>
+            </div>
+            <div class="rows danger-zone" id="danger-zone">
+              <div class="row">
+                <div class="row-text">
+                  <div class="row-title">删除这台服务器</div>
+                  <div class="row-desc">断开并从列表中移除，同时清除本机为它保存的登录状态。服务器上的 DSH 和数据不受影响。</div>
+                </div>
+                <button type="button" class="btn danger" id="btn-remove">删除</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 诊断日志 -->
+          <section class="page page-fill" data-page="log" hidden>
+            <h2 class="heading">诊断日志</h2>
+            <p class="intro">这台服务器本次运行的连接过程，同时写入日志文件（logs\main.log，保留约 2 MB）。启动链接里的令牌已隐去。<span class="mono" id="userdata"></span></p>
+            <div class="footer">
+              <button type="button" class="btn small" id="btn-logs">打开日志目录</button>
+              <button type="button" class="btn small" id="btn-userdata">打开数据目录</button>
+            </div>
+            <pre class="log" id="log">（暂无）</pre>
+          </section>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script src="connection.js"></script>
+</body>
+</html>

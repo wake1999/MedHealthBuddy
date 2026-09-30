@@ -1,0 +1,11 @@
+# dsh-desktop-link bundle patch.
+#
+# Applied as a profile bundle layer: `dsh.bundle.patch` in package.json points
+# here. The row is a bare plugin by package name. Its node half (exports ".")
+# registers the /api/dsh-desktop-link routes on the shared web server and
+# watches session events for the finished-task feed; the `dsh.client`
+# declaration in package.json loads its browser half (exports "./client") in
+# the web GUI, where it only acts inside dsh-ssh-desktop.
+- insert:
+    - id: desktop-link
+      name: dsh-desktop-link

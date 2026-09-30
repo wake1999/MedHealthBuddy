@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+
+# Electron's postinstall downloads the platform binary; nothing else may run
+# install scripts.
+allowBuilds:
+  electron: true
+  # Only the Squirrel target uses it; the installer is NSIS.
+  electron-winstaller: false

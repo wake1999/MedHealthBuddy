@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.test-tmp/
+.stage/
+.cache/
+debug-launch.log
+
+# Local working notes: they name the author's servers and paths.
+交接.md
+规划书.md
+
+# A separate project (promo video), not part of the app.
+promo-video/

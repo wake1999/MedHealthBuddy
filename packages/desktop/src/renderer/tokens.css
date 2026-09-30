@@ -1,0 +1,93 @@
+/*
+ * Shared tokens for the shell's own pages. Palette and type follow the official
+ * desktop's welcome window (upstream apps/desktop/renderer/welcome.css).
+ */
+:root {
+  --label-1: #0f1115;
+  --label-2: #61666b;
+  --label-3: #81858c;
+  --caption: #adb2b8;
+  --border-1: #0000000f;
+  --border-2: #0000001a;
+  --border-4: #00000029;
+  --tint: color-mix(in srgb, rgb(255 255 255) 40%, transparent);
+  --surface: #ffffff;
+  --panel: #f9fafb;
+  --field: #ffffff;
+  --hover: #0000000d;
+  --primary: #0f1115;
+  --primary-hover: #43454a;
+  --on-primary: #ffffff;
+  --focus: #3b6cf6;
+  --ok: #17864a;
+  --warn: #b26a00;
+  --err: #d0342c;
+  --scrim: rgb(15 17 21 / 32%);
+  --titlebar: 40px;
+  --font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", Consolas, ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --label-1: #f9fafb;
+    --label-2: #cfd3d6;
+    --label-3: #adb2b8;
+    --caption: #81858c;
+    --border-1: #ffffff14;
+    --border-2: #ffffff1f;
+    --border-4: #ffffff33;
+    --tint: color-mix(in srgb, rgb(24 25 28) 50%, transparent);
+    --surface: #26272a;
+    --panel: #1f2023;
+    --field: #1b1b1c;
+    --hover: #ffffff14;
+    --primary: #f9fafb;
+    --primary-hover: #ebeef2;
+    --on-primary: #0f1115;
+    --focus: #6d94ff;
+    --ok: #4cc27f;
+    --warn: #e0a236;
+    --err: #ff6b62;
+    --scrim: rgb(0 0 0 / 48%);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+/* The caption menubar, shared by every page that sits under the native caption. */
+.menubar { display: flex; gap: 2px; app-region: no-drag; }
+.menubar button {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--label-2);
+  font: inherit;
+  font-size: 14px;
+  cursor: default;
+}
+.menubar button:hover, .menubar button[aria-expanded='true'] { background: var(--hover); color: var(--label-1); }
+.menubar button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 14px; border-radius: 8px;
+  border: 1px solid var(--border-2); background: transparent; color: var(--label-1);
+  font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.btn.primary { background: var(--primary); border-color: transparent; color: var(--on-primary); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn.danger:hover:not(:disabled) { color: var(--err); border-color: var(--err); background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

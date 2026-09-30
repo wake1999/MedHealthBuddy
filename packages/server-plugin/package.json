@@ -1,0 +1,41 @@
+{
+  "name": "dsh-desktop-link",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Server-side companion of dsh-ssh-desktop: handshake, a lease that stops this DSH when the desktop that started it is gone (under its 'stop on exit' policy), a finished-task feed for desktop notifications, and an 'open in VS Code' header button. Inert unless that desktop started the process or shows the page.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.7-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-session"
+      ],
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib/**/*.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "license": "MIT"
+}

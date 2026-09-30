@@ -16,6 +16,29 @@
 - 能在服务器上一键安装或升级 DSH 和配套插件，只写入你的家目录，不需要 root
 - 断线或电脑睡眠唤醒后自动重连；可以选择退出应用时是否停止远端 DSH
 
+## 截图
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/sessions.png" alt="连接管理：多台服务器，一键连接、断开、重启或停止远端"></td>
+    <td width="50%"><img src="docs/screenshots/install.png" alt="安装与升级：安装前列出每一步要执行的命令"></td>
+  </tr>
+  <tr>
+    <td align="center">多台服务器，状态一目了然</td>
+    <td align="center">一键安装 Node.js、DSH 和配套插件，每一步先列出来再执行</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/server.png" alt="服务器：ssh 目标、dsh 路径、Node 版本和插件状态"></td>
+    <td width="50%"><img src="docs/screenshots/settings.png" alt="连接设置：ssh 别名、工作区、端口和退出策略"></td>
+  </tr>
+  <tr>
+    <td align="center">连接前自动探测服务器环境和插件状态</td>
+    <td align="center">每台服务器单独设置，身份和跳板机交给 ~/.ssh/config</td>
+  </tr>
+</table>
+
+*截图中的服务器名和地址均为示例。*
+
 ## 安装
 
 运行 `DSH-SSH-Desktop-Setup-<版本>.exe`。默认只为当前用户安装，不需要管理员权限，也可以在安装时更改安装位置。

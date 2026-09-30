@@ -1,0 +1,14 @@
+DSH SSH Desktop
+Copyright (c) 2026 yybai25 — code licensed under the MIT License (see LICENSE).
+
+This is an unofficial, community-made tool. It is not affiliated with or
+endorsed by DeepSeek.
+
+The whale logo in packages/desktop/assets (icon-base.png and every icon made
+from it) and the DeepSeek name belong to DeepSeek. They are used only to
+identify the software this app connects to, and are not covered by the MIT
+License.
+
+本项目为社区开发的非官方工具，与 DeepSeek 无隶属或背书关系。
+packages/desktop/assets 中的鲸鱼标志（icon-base.png 及由其生成的各尺寸图标）与
+「DeepSeek」名称归 DeepSeek 所有，仅用于标明本应用所连接的软件，不在 MIT 许可范围内。

@@ -1,7 +1,7 @@
 /**
- * dsh-desktop-link — the server-side companion of dsh-ssh-desktop.
+ * dsh-desktop-link — the server-side companion of medhealthbuddy-desktop.
  *
- * Installed into the DSH profile that dsh-ssh-desktop starts on a server. It
+ * Installed into the DSH profile that medhealthbuddy-desktop starts on a server. It
  * lets the desktop that started this harness shake hands with it and hold a
  * lease on it (see ./link.js). It is an enhancement, never a requirement: the
  * desktop works against a server without it, and this plugin does nothing

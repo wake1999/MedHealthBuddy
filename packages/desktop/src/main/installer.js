@@ -7,7 +7,7 @@
  *
  * Free of Electron, so it can be tested with a fake transport.
  *
- * @module dsh-ssh-desktop/installer
+ * @module medhealthbuddy-desktop/installer
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'

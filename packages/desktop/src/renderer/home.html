@@ -4,10 +4,20 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DSH</title>
+  <title>MedHealthBuddy</title>
   <link rel="stylesheet" href="home.css">
 </head>
 <body>
+  <div class="intro" id="intro" role="presentation">
+    <canvas class="intro-canvas" id="intro-canvas"></canvas>
+    <div class="intro-bpm">
+      <svg id="intro-bpm-heart" viewBox="0 0 48 24" width="58" height="29" aria-hidden="true">
+        <polyline points="2,12 14,12 18,4 24,20 28,8 31,12 46,12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="intro-brand">MedHealthBuddy</div>
+    <div class="intro-hint">点击任意处跳过</div>
+  </div>
   <header class="titlebar">
     <nav class="menubar" role="menubar" aria-label="应用菜单">
       <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false" data-menu="application" tabindex="0">应用</button>
@@ -15,7 +25,7 @@
     </nav>
   </header>
   <main class="home">
-    <h1 class="brand">DSH</h1>
+    <h1 class="brand">MedHealthBuddy</h1>
     <p class="status" id="status">尚未连接到服务器</p>
     <button type="button" class="btn primary" id="btn-manager">连接管理</button>
   </main>

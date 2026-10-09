@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('dshSsh', {
   openLogs: call('dsh:openLogs'),
   /** Hide the dialog; connections are unaffected. */
   close: call('dsh:close'),
+  /** Change the app-level options (auto-connect and friends). */
+  saveSettings: call('dsh:saveSettings'),
   /** @param {(state: unknown) => void} listener */
   onState(listener) {
     const wrapped = (_event, state) => { listener(state) }

@@ -1,5 +1,5 @@
 /**
- * @dsh-ssh/core — the connection engine behind dsh-ssh-desktop.
+ * @dsh-ssh/core — the connection engine behind medhealthbuddy-desktop.
  *
  * Pure Node: no Electron, no ssh library. Everything reaches the server through
  * the system `ssh` client and the user's own `~/.ssh/config`.

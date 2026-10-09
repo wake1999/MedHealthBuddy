@@ -1,5 +1,5 @@
 /**
- * dsh-ssh-desktop main process.
+ * medhealthbuddy-desktop main process.
  *
  * One window, three layers, each its own web contents:
  *
@@ -14,10 +14,10 @@
  *
  * Nothing here runs DSH: the harness lives on the server.
  *
- * @module dsh-ssh-desktop/main
+ * @module medhealthbuddy-desktop/main
  */
 
-import { cpSync, existsSync, renameSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -44,13 +44,36 @@ const HOME_PRELOAD = join(here, '..', 'preload', 'home.cjs')
 const MANAGER_PAGE = join(here, '..', 'renderer', 'connection.html')
 const MANAGER_PAGE_URL = pathToFileURL(MANAGER_PAGE).href
 const MANAGER_PRELOAD = join(here, '..', 'preload', 'connection.cjs')
-/** The app icon (scripts/make-icon.mjs): the window, the taskbar and the dev Start Menu shortcut. */
-const APP_ICON = join(here, '..', '..', 'assets', 'icon.ico')
+/** The app icon (scripts/make-icon.mjs): the window, the taskbar and the dev Start Menu shortcut.
+ * Named app.ico rather than icon.ico: Windows caches taskbar icons by path, and a
+ * renamed file always reads fresh. */
+const APP_ICON = join(here, '..', '..', 'assets', 'app.ico')
+/**
+ * The tray icon: the emblem alone, zoomed to fill — the full badge is mostly
+ * white margin and reads as a tiny dot in the notification area.
+ */
+const TRAY_ICON = join(here, '..', '..', 'assets', 'tray.png')
 
 /** The app's data directory name under %APPDATA%. */
-const DATA_DIR_NAME = 'DSH SSH Desktop'
-/** What builds up to 0.1.0 called it. */
-const LEGACY_DATA_DIR_NAME = 'dsh-ssh-desktop'
+const DATA_DIR_NAME = 'MedHealthBuddy'
+/** What earlier builds called it, in the order they shipped. */
+const LEGACY_DATA_DIR_NAMES = ['DSH SSH Desktop', 'dsh-ssh-desktop']
+/** The app-level options file, next to connections.json. */
+const SETTINGS_FILE = 'settings.json'
+
+/**
+ * Read the app-level options. A missing or damaged file yields the defaults,
+ * like the connection store does.
+ * @param {string} dir
+ */
+function loadSettings(dir) {
+  try {
+    const parsed = JSON.parse(readFileSync(join(dir, SETTINGS_FILE), 'utf8'))
+    return { autoConnectFirst: parsed?.autoConnectFirst === true }
+  } catch {
+    return { autoConnectFirst: false }
+  }
+}
 
 /**
  * Carry the saved connections, login cookies and logs over from the old data
@@ -87,16 +110,17 @@ function adoptLegacyDataDir(legacy, target) {
 const dev = !app.isPackaged
 const smoke = dev && process.env.DSH_SSH_DESKTOP_SMOKE === '1'
 // One data directory for every build, named after the product like every
-// folder the app owns: %APPDATA%\DSH SSH Desktop.
+// folder the app owns: %APPDATA%\MedHealthBuddy.
 if (dev && process.env.DSH_SSH_DESKTOP_USER_DATA) {
   app.setPath('userData', resolve(process.env.DSH_SSH_DESKTOP_USER_DATA))
 } else {
   const dataDir = join(app.getPath('appData'), DATA_DIR_NAME)
-  adoptLegacyDataDir(join(app.getPath('appData'), LEGACY_DATA_DIR_NAME), dataDir)
+  for (const legacy of LEGACY_DATA_DIR_NAMES) adoptLegacyDataDir(join(app.getPath('appData'), legacy), dataDir)
   app.setPath('userData', dataDir)
 }
 const capturePath = smoke ? process.env.DSH_SSH_DESKTOP_CAPTURE : undefined
 const fileLog = new FileLog(join(app.getPath('userData'), 'logs'))
+const settings = loadSettings(app.getPath('userData'))
 const trace = smoke
   ? (line) => {
       process.stdout.write(`[smoke] ${line}\n`)
@@ -199,7 +223,7 @@ let managerView
 let managerOpen = false
 
 async function start() {
-  fileLog.write('app', `start: dsh-ssh-desktop ${app.getVersion()}${dev ? ' (development)' : ''} · Electron ${process.versions.electron} · ${process.platform} ${process.getSystemVersion()}`)
+  fileLog.write('app', `start: medhealthbuddy-desktop ${app.getVersion()}${dev ? ' (development)' : ''} · Electron ${process.versions.electron} · ${process.platform} ${process.getSystemVersion()}`)
   const store = createStore({ dir: app.getPath('userData') })
   manager = new ConnectionManager({
     store,
@@ -273,8 +297,15 @@ async function start() {
   registerIpc()
   createMainWindow()
   if (!smoke) createTray()
-  // Nothing on screen yet but the home page: start in the manager.
-  openManager()
+  // Nothing on screen yet but the home page: it plays the heartbeat intro,
+  // then asks for the manager itself unless auto-connect is bringing a
+  // server up (dsh-home:introDone).
+
+  // Auto-connect the first saved server when the user asked for it.
+  if (!smoke && settings.autoConnectFirst) {
+    const first = manager.list()[0]
+    if (first !== undefined) void connectAndShow(first.id)
+  }
 
   if (smoke) {
     const first = manager.list()[0]
@@ -293,31 +324,23 @@ async function start() {
 /**
  * Windows shows an app's toasts only when a Start Menu shortcut carries the
  * same AppUserModelID; without one they are dropped silently (the taskbar
- * badge still works, which is how this was found). The installer will create
- * that shortcut; a dev run creates its own, pointing at the runtime it runs
- * from. Smoke runs leave the Start Menu alone.
+ * badge still works, which is how this was found). The installer creates that
+ * shortcut and the packaged app claims its ID here.
+ *
+ * A dev run claims the ID too — but Electron's writeShortcutLink cannot
+ * persist the AUMID property, so the dev shortcut must be created once by
+ * scripts/dev-shortcut.ps1 (which writes the property through the shell's
+ * property store). The app never rewrites that shortcut, or it would lose
+ * the property again and the taskbar would fall back to the runtime's icon.
  */
 function registerNotificationIdentity() {
   if (process.platform !== 'win32') return
-  const id = dev ? 'dsh-ssh-desktop.dev' : 'dsh-ssh-desktop'
+  const id = dev ? 'medhealthbuddy-desktop.dev' : 'medhealthbuddy-desktop'
   app.setAppUserModelId(id)
   if (!dev || smoke) return
-  const link = join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'DSH SSH Desktop (dev).lnk')
-  const options = {
-    target: process.execPath,
-    args: `"${app.getAppPath()}"`,
-    description: 'dsh-ssh-desktop (development build)',
-    icon: existsSync(APP_ICON) ? APP_ICON : process.execPath,
-    iconIndex: 0,
-    appUserModelId: id,
-  }
-  try {
-    const current = existsSync(link) ? shell.readShortcutLink(link) : undefined
-    const same = current !== undefined && current.target === options.target && current.args === options.args
-      && current.appUserModelId === id && current.icon === options.icon
-    if (!same) shell.writeShortcutLink(link, current === undefined ? 'create' : 'replace', options)
-  } catch (error) {
-    process.stderr.write(`warning: could not register the Start Menu shortcut notifications need: ${String(error)}\n`)
+  const link = join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'MedHealthBuddy (dev).lnk')
+  if (!existsSync(link)) {
+    process.stderr.write('hint: run scripts/dev-shortcut.ps1 once so the taskbar and toasts use the app icon\n')
   }
 }
 
@@ -387,7 +410,7 @@ function createMainWindow() {
     height: 820,
     minWidth: 860,
     minHeight: 560,
-    title: 'DSH',
+    title: 'MedHealthBuddy',
     icon: APP_ICON,
     show: !smoke || Boolean(capturePath),
     // The official desktop's Windows caption: no system title bar, native
@@ -404,6 +427,9 @@ function createMainWindow() {
       nodeIntegration: false,
       webviewTag: false,
       spellcheck: false,
+      // The intro animation must keep sweeping while a remote view covers this
+      // page (auto-connect), which marks the page hidden and would throttle it.
+      backgroundThrottling: false,
     },
   })
   mainWindow = win
@@ -445,7 +471,7 @@ function createMainWindow() {
       trayHintShown = true
       tray.displayBalloon({
         iconType: 'info',
-        title: 'DSH SSH Desktop 仍在运行',
+        title: 'MedHealthBuddy 仍在运行',
         content: '已收起到托盘，连接和任务通知照常。要退出，请在托盘图标的右键菜单里选「退出」。',
       })
     }
@@ -481,11 +507,11 @@ let trayHintShown = false
 
 /** The notification-area icon: bring the window back, or quit for real. */
 function createTray() {
-  tray = new Tray(nativeImage.createFromPath(APP_ICON))
-  tray.setToolTip('DSH SSH Desktop')
+  tray = new Tray(nativeImage.createFromPath(existsSync(TRAY_ICON) ? TRAY_ICON : APP_ICON))
+  tray.setToolTip('MedHealthBuddy')
   tray.on('click', () => { focusMainWindow() })
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '显示 DSH SSH Desktop', click: () => { focusMainWindow() } },
+    { label: '显示 MedHealthBuddy', click: () => { focusMainWindow() } },
     { label: messages().connections, click: () => { openManager() } },
     { type: 'separator' },
     { label: messages().exit, click: () => { app.quit() } },
@@ -498,7 +524,7 @@ function createTray() {
  * @param {number} count
  */
 function updateTray(count) {
-  tray?.setToolTip(count === 0 ? 'DSH SSH Desktop' : `DSH SSH Desktop · ${String(count)} 条未读`)
+  tray?.setToolTip(count === 0 ? 'MedHealthBuddy' : `MedHealthBuddy · ${String(count)} 条未读`)
 }
 
 /** Keep the manager dialog above every remote view. */
@@ -539,7 +565,7 @@ function showHomeCaption() {
   const win = mainWindow
   if (win === undefined || win.isDestroyed()) return
   win.setTitleBarOverlay({ ...homeCaption(), height: TITLEBAR_HEIGHT })
-  win.setTitle('DSH')
+  win.setTitle('MedHealthBuddy')
 }
 
 nativeTheme.on('updated', () => {
@@ -550,8 +576,8 @@ nativeTheme.on('updated', () => {
 
 function showAbout() {
   const m = messages()
-  const detail = `dsh-ssh-desktop ${app.getVersion()}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome}`
-  const options = { type: 'none', title: m.about, message: 'DSH 连接', detail, buttons: ['OK'], noLink: true }
+  const detail = `medhealthbuddy-desktop ${app.getVersion()}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome}`
+  const options = { type: 'none', title: m.about, message: 'MedHealthBuddy', detail, buttons: ['OK'], noLink: true }
   void (mainWindow === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(mainWindow, options))
 }
 
@@ -588,7 +614,7 @@ function testNotification(id) {
     void (mainWindow === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(mainWindow, options))
   }
   const outcome = attention.test(id, name, (reason) => {
-    explain(`Windows 拒绝了通知：${reason}\n请在「设置 → 系统 → 通知」里确认通知已打开、没有开启勿扰，并允许「DSH SSH Desktop (dev)」发送通知。`)
+    explain(`Windows 拒绝了通知：${reason}\n请在「设置 → 系统 → 通知」里确认通知已打开、没有开启勿扰，并允许「MedHealthBuddy (dev)」发送通知。`)
   })
   if (outcome === 'unsupported') explain('这台电脑不支持系统通知。')
 }
@@ -603,13 +629,13 @@ async function exportDiagnostics() {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
   const options = {
     title: '导出诊断信息',
-    defaultPath: join(app.getPath('downloads'), `dsh-ssh-desktop-diagnostics-${stamp}.txt`),
+    defaultPath: join(app.getPath('downloads'), `medhealthbuddy-diagnostics-${stamp}.txt`),
     filters: [{ name: '文本文件', extensions: ['txt'] }],
   }
   const choice = mainWindow === undefined ? await dialog.showSaveDialog(options) : await dialog.showSaveDialog(mainWindow, options)
   if (choice.canceled || choice.filePath === undefined) return { saved: false }
   const lines = [
-    `dsh-ssh-desktop ${app.getVersion()} · Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
+    `medhealthbuddy-desktop ${app.getVersion()} · Electron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`,
     `${process.platform} ${process.arch} ${process.getSystemVersion()} · sandbox ${sandboxDisabled ? 'OFF' : 'on'} · exported ${new Date().toISOString()}`,
     '',
   ]
@@ -655,6 +681,7 @@ function fullState() {
     freePort: manager.freePort(),
     userData: app.getPath('userData'),
     sandboxDisabled,
+    settings: { ...settings },
   }
 }
 
@@ -824,10 +851,22 @@ function registerIpc() {
     return shell.openPath(fileLog.dir)
   })
   handle('dsh:close', () => { closeManager() })
+  handle('dsh:saveSettings', (patch) => {
+    if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) throw new Error('invalid settings')
+    if ('autoConnectFirst' in patch) settings.autoConnectFirst = patch.autoConnectFirst === true
+    writeFileSync(join(app.getPath('userData'), SETTINGS_FILE), `${JSON.stringify(settings, null, 2)}\n`)
+    pushState()
+  })
 
   // The home page: open the manager and the caption menus, nothing more.
   const homeContents = () => mainWindow?.webContents
   handleFrom('dsh-home:openManager', homeContents, HOME_PAGE_URL, () => { openManager() }, false)
+  // The start-up intro has faded. Hand the screen to the manager only when
+  // nothing is auto-connecting; otherwise the home status line stays visible
+  // until the remote view takes over.
+  handleFrom('dsh-home:introDone', homeContents, HOME_PAGE_URL, () => {
+    if (!(settings.autoConnectFirst && manager.list().length > 0)) openManager()
+  }, false)
   handleFrom('dsh-home:menu', homeContents, HOME_PAGE_URL, (name, x, y) => {
     if (!isMenuRequest(name, x, y)) throw new Error('invalid menu request')
     const win = mainWindow

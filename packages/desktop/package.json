@@ -1,8 +1,8 @@
 {
-  "name": "dsh-ssh-desktop",
+  "name": "medhealthbuddy-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "A thin Windows desktop shell for a DSH that runs on a server over system ssh.",
+  "description": "A thin Windows desktop shell (MedHealthBuddy) for a DSH that runs on a server over system ssh.",
   "type": "module",
   "main": "src/main/index.js",
   "scripts": {

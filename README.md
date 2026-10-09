@@ -1,12 +1,12 @@
-# DSH SSH Desktop
+# MedHealthBuddy
 
 在 Windows 上使用**运行在服务器上的** DeepSeek Harness（DSH）。
 
 *A Windows desktop shell for a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) that runs on a remote server: it starts or reuses `dsh web` there over the system ssh, forwards its port, and shows the remote UI in its own window — with multi-server support, desktop notifications, one-click server install and a companion DSH plugin (`dsh-desktop-link`).*
 
-> **非官方项目。** 本项目是社区开发的第三方工具，与 DeepSeek 没有隶属或背书关系。应用图标中的鲸鱼标志及「DeepSeek」名称归 DeepSeek 所有，这里仅用于标明所连接的软件；如权利人有异议，请提 issue，我会替换。
+> **非官方项目。** 本项目是社区开发的第三方工具，与 DeepSeek 没有隶属或背书关系。应用图标中的合肥工业大学校徽归合肥工业大学所有；「DeepSeek」名称归 DeepSeek 所有，这里仅用于标明所连接的软件；如权利人有异议，请提 issue，我会替换。
 >
-> *Unofficial, community-made tool, not affiliated with or endorsed by DeepSeek. The whale logo in the app icon and the DeepSeek name belong to DeepSeek and are used only to identify the software this connects to.*
+> *Unofficial, community-made tool, not affiliated with or endorsed by DeepSeek. The emblem in the app icon belongs to Hefei University of Technology, and the DeepSeek name belongs to DeepSeek; both are used only to identify the software this connects to.*
 
 应用通过系统自带的 ssh 登录服务器，启动或复用那里的 `dsh web`，把它的端口转发到本机，再在自己的窗口里显示 DSH 的界面。DSH、它的 profile、会话和工作区都留在服务器上；本机只负责显示，不运行 DSH，也不保存任何密钥。
 
@@ -41,7 +41,7 @@
 
 ## 安装
 
-运行 `DSH-SSH-Desktop-Setup-<版本>.exe`。默认只为当前用户安装，不需要管理员权限，也可以在安装时更改安装位置。
+运行 `MedHealthBuddy-Setup-<版本>.exe`。默认只为当前用户安装，不需要管理员权限，也可以在安装时更改安装位置。
 
 安装包**没有数字签名**，第一次运行时 Windows SmartScreen 可能提示「Windows 已保护你的电脑」。点「更多信息」，再点「仍要运行」即可。
 
@@ -68,21 +68,21 @@
 
 | 内容 | 位置 |
 |---|---|
-| 服务器列表 | `%APPDATA%\DSH SSH Desktop\connections.json` |
-| 各服务器的登录状态（cookie） | `%APPDATA%\DSH SSH Desktop\Partitions\` |
-| 日志 | `%APPDATA%\DSH SSH Desktop\logs\main.log`（超过 1 MB 轮换为 `main.old.log`） |
+| 服务器列表 | `%APPDATA%\MedHealthBuddy\connections.json` |
+| 各服务器的登录状态（cookie） | `%APPDATA%\MedHealthBuddy\Partitions\` |
+| 日志 | `%APPDATA%\MedHealthBuddy\logs\main.log`（超过 1 MB 轮换为 `main.old.log`） |
 
-所有目录都叫 DSH SSH Desktop：默认安装位置是 `%LOCALAPPDATA%\Programs\DSH SSH Desktop`，安装程序自己的副本放在 `%LOCALAPPDATA%\DSH SSH Desktop\updater`。0.1.0 用的旧目录 `%APPDATA%\dsh-ssh-desktop` 会在第一次启动时自动搬到新位置。
+所有目录都叫 MedHealthBuddy：默认安装位置是 `%LOCALAPPDATA%\Programs\MedHealthBuddy`，安装程序自己的副本放在 `%LOCALAPPDATA%\MedHealthBuddy\updater`。更早版本的旧目录（`%APPDATA%\dsh-ssh-desktop` 和 `%APPDATA%\DSH SSH Desktop`）会在第一次启动时自动搬到新位置。
 
-日志和「连接管理 → 导出诊断」生成的文件都会去掉启动令牌和连接密钥，可以直接附在问题报告里。卸载时这些数据会保留；如果不再需要，删除 `%APPDATA%\DSH SSH Desktop` 即可。
+日志和「连接管理 → 导出诊断」生成的文件都会去掉启动令牌和连接密钥，可以直接附在问题报告里。卸载时这些数据会保留；如果不再需要，删除 `%APPDATA%\MedHealthBuddy` 即可。
 
 ## 开发
 
 ```sh
 pnpm install
 pnpm test                                        # 三个包的全部测试
-pnpm --filter dsh-ssh-desktop run package        # 生成安装包，输出到 dist/installer/
-pnpm --filter dsh-ssh-desktop run icon           # 重新生成图标（assets/）
+pnpm --filter medhealthbuddy-desktop run package        # 生成安装包，输出到 dist/installer/
+pnpm --filter medhealthbuddy-desktop run icon           # 重新生成图标（assets/）
 ```
 
 仓库结构：

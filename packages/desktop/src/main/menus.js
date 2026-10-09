@@ -5,7 +5,7 @@
  * (upstream apps/desktop/src/main.ts): Windows shows no menu bar; the caption
  * buttons pop these menus instead.
  *
- * @module dsh-ssh-desktop/menus
+ * @module medhealthbuddy-desktop/menus
  */
 
 import { Menu, app } from 'electron'

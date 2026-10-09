@@ -128,7 +128,9 @@ check('IPC is served only to the connection page in the connection window', () =
   // Right window, wrong page (a navigation or an injected frame).
   assert.equal(isConnectionWindowCaller({ senderId: 7, frameUrl: 'http://127.0.0.1:3080/' }, expected), false)
   assert.equal(isConnectionWindowCaller({ senderId: 7, frameUrl: 'file:///C:/other.html' }, expected), false)
-  assert.equal(isConnectionWindowCaller({ senderId: 7, frameUrl: undefined }, expected), false)
+  // The webContents matches and the frame is briefly unreported (in flight
+  // around a native dialog): the sender gate alone must let it through.
+  assert.equal(isConnectionWindowCaller({ senderId: 7, frameUrl: undefined }, expected), true)
   // No connection window at all.
   assert.equal(isConnectionWindowCaller({ senderId: 7, frameUrl: expected.pageUrl }, { ...expected, windowId: undefined }), false)
 })

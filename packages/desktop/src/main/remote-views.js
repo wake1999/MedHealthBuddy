@@ -22,7 +22,7 @@
  * survives an app restart; the view loads the clean root first and escalates to
  * a token URL only on a 401 (see `policy.nextAuthStep`).
  *
- * @module dsh-ssh-desktop/remote-views
+ * @module medhealthbuddy-desktop/remote-views
  */
 
 import { dirname, join } from 'node:path'

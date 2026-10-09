@@ -87,6 +87,12 @@
             <h2 class="heading">服务器</h2>
             <p class="intro">ssh 实际连到哪里（由 <span class="mono">~/.ssh/config</span> 解析），以及最近一次连接时探测到的情况。</p>
             <div class="rows" id="facts"></div>
+            <div class="rows">
+              <label class="row" for="auto-connect">
+                <span class="row-text"><span class="row-title">启动时自动连接</span><span class="row-desc">应用启动后自动连接列表里的第一台服务器，就绪后直接进入它的界面。</span></span>
+                <input type="checkbox" class="check" id="auto-connect">
+              </label>
+            </div>
           </section>
 
           <!-- 安装与升级 -->

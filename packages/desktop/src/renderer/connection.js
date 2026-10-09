@@ -288,6 +288,7 @@ function render() {
   renderLog(session?.log ?? [])
   $('userdata').textContent = state?.userData ?? ''
   $('sandbox-warning').hidden = state?.sandboxDisabled !== true
+  $('auto-connect').checked = state?.settings?.autoConnectFirst === true
 }
 
 function renderExtra(session, phase) {
@@ -593,6 +594,12 @@ $('btn-remove').addEventListener('click', () => {
   installs.delete(config.id)
   void run('remove', () => api.remove(config.id))
 })
+$('auto-connect').addEventListener('change', (event) => {
+  void api.saveSettings({ autoConnectFirst: /** @type {HTMLInputElement} */ (event.target).checked }).then((reply) => {
+    applyState(reply.state)
+  })
+})
+
 $('btn-userdata').addEventListener('click', () => { void api.openUserData() })
 $('btn-logs').addEventListener('click', () => { void api.openLogs() })
 $('btn-export').addEventListener('click', () => {

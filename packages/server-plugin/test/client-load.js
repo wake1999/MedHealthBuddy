@@ -1,6 +1,6 @@
 /**
  * Load the browser half against a fake slot registry, with and without the
- * dsh-ssh-desktop bridge.
+ * medhealthbuddy-desktop bridge.
  *
  * Not a browser: it catches a bundle that throws at load, requires something
  * the loader does not supply, registers against the wrong slot, or renders

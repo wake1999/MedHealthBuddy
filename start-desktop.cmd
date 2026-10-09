@@ -1,10 +1,14 @@
 @echo off
-rem Launch dsh-ssh-desktop from the source tree (development build), using the
+rem Launch medhealthbuddy-desktop from the source tree (development build), using the
 rem Electron runtime copied out of the project by setup-electron-runtime.cmd
 rem (see that file for why it cannot run from inside the project).
 setlocal
-set "RUNTIME=%LOCALAPPDATA%\dsh-ssh-desktop-dev\electron"
+set "RUNTIME=%LOCALAPPDATA%\medhealthbuddy-dev\electron"
 set "PROJECT_DIST=%~dp0packages\desktop\node_modules\electron\dist"
+rem The branded copy (scripts\dev-runtime-icon.ps1) carries the app icon, which
+rem is what the taskbar shows. Fall back to electron.exe before it exists.
+set "LAUNCHER=%RUNTIME%\MedHealthBuddy.exe"
+if not exist "%LAUNCHER%" set "LAUNCHER=%RUNTIME%\electron.exe"
 
 if not exist "%RUNTIME%\electron.exe" (
   echo The Electron runtime has not been set up yet.
@@ -22,4 +26,4 @@ if errorlevel 1 (
   exit /b 1
 )
 
-start "" "%RUNTIME%\electron.exe" "%~dp0packages\desktop" %*
+start "" "%LAUNCHER%" "%~dp0packages\desktop" %*

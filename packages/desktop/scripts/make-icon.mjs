@@ -1,16 +1,11 @@
 /**
- * Build the app icon: the base artwork (assets/icon-base.png) with "SSH" set
- * in its bottom-right corner, so the app is told apart from the official DSH
- * desktop at a glance.
- *
- * The lettering follows the artwork: the whale's own slate gradient (#2d313a
- * at the core to #3c434f at the lit edges), a heavy geometric sans with the
- * same soft rounded feel, and the same faint drop shadow.
+ * Build the app icon from the base artwork (assets/icon-base.png), a square
+ * emblem fitted onto a transparent 1024 × 1024 canvas.
  *
  * Output (assets/):
  *   icon.png            1024 × 1024
  *   icon-<n>.png        256, 128, 64, 48, 32, 24, 16
- *   icon.ico            every size above, PNG-encoded (Windows Vista and later)
+ *   app.ico             every size above, PNG-encoded (Windows Vista and later)
  *
  * Drawn in an offscreen Electron page with a 2D canvas, so no image library is
  * needed. Run from packages/desktop:
@@ -31,35 +26,16 @@ function draw(baseUrl, sizes) {
     const base = new Image()
     base.onerror = () => { reject(new Error('the base image did not load')) }
     base.onload = async () => {
-      await document.fonts.ready
       const canvas = document.createElement('canvas')
       canvas.width = 1024
       canvas.height = 1024
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(base, 0, 0, 1024, 1024)
-
-      const text = 'SSH'
-      ctx.font = "700 152px 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif"
-      ctx.letterSpacing = '2px'
-      ctx.textBaseline = 'alphabetic'
-      const metrics = ctx.measureText(text)
-      // Right edge and baseline inside the rounded square (opaque 32–991),
-      // clear of the whale's lower fin.
-      const right = 920
-      const baseline = 934
-      const left = right - metrics.actualBoundingBoxRight
-      const top = baseline - metrics.actualBoundingBoxAscent
-      const gradient = ctx.createLinearGradient(left, top, right, baseline)
-      gradient.addColorStop(0, '#2d313a')
-      gradient.addColorStop(0.55, '#343841')
-      gradient.addColorStop(1, '#3f4551')
-      ctx.save()
-      ctx.shadowColor = 'rgba(15, 17, 21, 0.18)'
-      ctx.shadowBlur = 10
-      ctx.shadowOffsetY = 3
-      ctx.fillStyle = gradient
-      ctx.fillText(text, left, baseline)
-      ctx.restore()
+      // Fit the artwork whole into the square, centred, nothing cropped.
+      const scale = Math.min(1024 / base.width, 1024 / base.height)
+      const width = Math.round(base.width * scale)
+      const height = Math.round(base.height * scale)
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(base, (1024 - width) / 2, (1024 - height) / 2, width, height)
 
       /** Downscale in halving steps: one big jump would alias the edges. */
       const scaled = (size) => {
@@ -85,7 +61,6 @@ function draw(baseUrl, sizes) {
       resolve({
         full: canvas.toDataURL('image/png'),
         sizes: Object.fromEntries(sizes.map((s) => [s, scaled(s)])),
-        box: { left: Math.round(left), top: Math.round(top), right, baseline },
       })
     }
     base.src = baseUrl
@@ -129,8 +104,10 @@ app.whenReady().then(async () => {
   writeFileSync(join(assets, 'icon.png'), fromDataUrl(result.full))
   const images = SIZES.map((size) => ({ size, png: fromDataUrl(result.sizes[size]) }))
   for (const { size, png } of images) writeFileSync(join(assets, `icon-${String(size)}.png`), png)
-  writeFileSync(join(assets, 'icon.ico'), ico(images))
-  console.log(`icon written; text box ${JSON.stringify(result.box)}`)
+  // app.ico, not icon.ico: Windows caches taskbar icons by path, so the file
+  // was renamed once and must keep that name to read fresh.
+  writeFileSync(join(assets, 'app.ico'), ico(images))
+  console.log('icon written')
   app.quit()
 }).catch((error) => {
   console.error(error)

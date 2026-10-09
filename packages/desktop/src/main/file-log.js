@@ -10,7 +10,7 @@
  * Bounded: past 1 MB the file rotates to `main.old.log`, so at most two files
  * of about 1 MB each are kept.
  *
- * @module dsh-ssh-desktop/file-log
+ * @module medhealthbuddy-desktop/file-log
  */
 
 import { appendFileSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'

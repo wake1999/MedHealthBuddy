@@ -2,7 +2,7 @@
   "name": "dsh-desktop-link",
   "version": "0.2.0",
   "private": true,
-  "description": "Server-side companion of dsh-ssh-desktop: handshake, a lease that stops this DSH when the desktop that started it is gone (under its 'stop on exit' policy), a finished-task feed for desktop notifications, and an 'open in VS Code' header button. Inert unless that desktop started the process or shows the page.",
+  "description": "Server-side companion of medhealthbuddy-desktop: handshake, a lease that stops this DSH when the desktop that started it is gone (under its 'stop on exit' policy), a finished-task feed for desktop notifications, and an 'open in VS Code' header button. Inert unless that desktop started the process or shows the page.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

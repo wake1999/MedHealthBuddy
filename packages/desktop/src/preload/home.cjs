@@ -8,6 +8,8 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('dshHome', {
   openManager: () => ipcRenderer.invoke('dsh-home:openManager'),
   showMenu: (name, x, y) => ipcRenderer.invoke('dsh-home:menu', name, x, y),
+  /** The start-up intro has ended; the main process decides what shows next. */
+  introDone: () => ipcRenderer.invoke('dsh-home:introDone'),
   /** @param {(text: string) => void} listener */
   onStatus(listener) {
     const wrapped = (_event, text) => { listener(String(text)) }

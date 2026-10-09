@@ -299,6 +299,14 @@ body {
  * under the pill.
  */
 .picker-source { display: none; }
+
+.check {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--focus);
+  cursor: pointer;
+}
 .selector {
   flex: none;
   display: inline-flex;

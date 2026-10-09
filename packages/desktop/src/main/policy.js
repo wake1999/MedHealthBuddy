@@ -7,7 +7,7 @@
  * backoff) live here, free of Electron, so they are unit-tested directly
  * rather than trusted.
  *
- * @module dsh-ssh-desktop/policy
+ * @module medhealthbuddy-desktop/policy
  */
 
 /** Connection ids are `[A-Za-z0-9_-]{1,64}` (see @dsh-ssh/core/config). */
@@ -317,12 +317,19 @@ export function rateLimiter(limit, windowMs, now = Date.now) {
 
 /**
  * Whether an IPC call comes from the local connection window and nothing else.
+ *
+ * The sender webContents matching is the real gate: the manager page cannot
+ * navigate (will-navigate is prevented) and its CSP allows no frames, so
+ * nothing else can speak from that webContents. The frame URL is checked as
+ * extra evidence when Chromium reports one — but around a native dialog the
+ * frame can briefly be reported as gone (frameUrl undefined) while an invoke
+ * is in flight, and that must not lock the user out of their own buttons.
  * @param {{ senderId: number, frameUrl: string | undefined }} caller
  * @param {{ windowId: number | undefined, pageUrl: string }} expected
  */
 export function isConnectionWindowCaller(caller, expected) {
   if (expected.windowId === undefined || caller.senderId !== expected.windowId) return false
-  if (typeof caller.frameUrl !== 'string') return false
+  if (typeof caller.frameUrl !== 'string') return true
   // Compare without a fragment; the page never navigates anywhere else.
   return caller.frameUrl.split('#')[0] === expected.pageUrl
 }

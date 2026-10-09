@@ -1,7 +1,7 @@
 /**
  * Build the Windows installer (NSIS, per user, unsigned).
  *
- *   pnpm --filter dsh-ssh-desktop run package
+ *   pnpm --filter medhealthbuddy-desktop run package
  *
  * Steps:
  *  1. Make sure the server plugin tarball for the current dsh-desktop-link
@@ -13,16 +13,17 @@
  *  3. Run electron-builder on the stage, with the Electron already installed
  *     here (no second download of the runtime).
  *
- * Output: dist/installer/DSH-SSH-Desktop-Setup-<version>.exe
+ * Output: dist/installer/MedHealthBuddy-Setup-<version>.exe
+ *         dist/installer/MedHealthBuddy-<version>-portable.zip (unpack and run)
  *
  * electron-builder downloads its NSIS and resource-editing tools once, into
  * ELECTRON_BUILDER_CACHE (default: .cache/electron-builder in this repo, so a
  * confined build that cannot write %LOCALAPPDATA% still works).
  */
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
@@ -64,20 +65,20 @@ rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
 cpSync(join(desktop, 'src'), join(stage, 'src'), { recursive: true })
 mkdirSync(join(stage, 'assets'))
-for (const file of ['icon.ico', 'icon.png', 'icon-256.png', 'installer.nsh']) cpSync(join(desktop, 'assets', file), join(stage, 'assets', file))
+for (const file of ['app.ico', 'icon.png', 'icon-256.png', 'tray.png', 'installer.nsh']) cpSync(join(desktop, 'assets', file), join(stage, 'assets', file))
 const coreTarget = join(stage, 'node_modules', '@dsh-ssh', 'core')
 mkdirSync(coreTarget, { recursive: true })
 cpSync(join(core, 'lib'), join(coreTarget, 'lib'), { recursive: true })
 cpSync(join(core, 'package.json'), join(coreTarget, 'package.json'))
 writeFileSync(join(stage, 'package.json'), `${JSON.stringify({
   name: manifest.name,
-  productName: 'DSH SSH Desktop',
+  productName: 'MedHealthBuddy',
   version: manifest.version,
   description: manifest.description,
   type: 'module',
   main: manifest.main,
   license: manifest.license,
-  author: 'DSH SSH Desktop',
+  author: 'MedHealthBuddy',
   dependencies: { '@dsh-ssh/core': readJson(join(core, 'package.json')).version },
   // A plain folder, not a pnpm project: electron-builder must read its
   // node_modules as they lie, not ask a package manager (pnpm's `list` fails
@@ -90,14 +91,19 @@ const electronPackage = dirname(require.resolve('electron/package.json'))
 const electronVersion = readJson(join(electronPackage, 'package.json')).version
 const { build, Platform } = require('electron-builder')
 
+// PACKAGE_TARGETS picks the artifact kinds (default: installer and portable
+// zip). On a machine where the NSIS tools cannot be downloaded or extracted,
+// `PACKAGE_TARGETS=zip` still gives the portable build.
+const targets = (process.env.PACKAGE_TARGETS ?? 'nsis,zip').split(',')
+
 const result = await build({
-  targets: Platform.WINDOWS.createTarget(['nsis'], 1 /* x64 */),
+  targets: Platform.WINDOWS.createTarget(targets, 1 /* x64 */),
   projectDir: stage,
   config: {
-    appId: 'dsh-ssh-desktop',
-    productName: 'DSH SSH Desktop',
-    executableName: 'DSH SSH Desktop',
-    copyright: 'DSH SSH Desktop',
+    appId: 'medhealthbuddy-desktop',
+    productName: 'MedHealthBuddy',
+    executableName: 'MedHealthBuddy',
+    copyright: 'MedHealthBuddy',
     electronVersion,
     electronDist: realpathSync(join(electronPackage, 'dist')),
     directories: { output: join(dist, 'installer'), buildResources: 'assets' },
@@ -117,8 +123,8 @@ const result = await build({
     },
     publish: null,
     win: {
-      icon: 'assets/icon.ico',
-      artifactName: 'DSH-SSH-Desktop-Setup-${version}.${ext}',
+      icon: 'assets/app.ico',
+      artifactName: 'MedHealthBuddy-Setup-${version}.${ext}',
     },
     nsis: {
       oneClick: false,
@@ -126,9 +132,9 @@ const result = await build({
       allowToChangeInstallationDirectory: true,
       createDesktopShortcut: true,
       createStartMenuShortcut: true,
-      shortcutName: 'DSH SSH Desktop',
-      installerIcon: 'assets/icon.ico',
-      uninstallerIcon: 'assets/icon.ico',
+      shortcutName: 'MedHealthBuddy',
+      installerIcon: 'assets/app.ico',
+      uninstallerIcon: 'assets/app.ico',
       // Names the updater folder after the product (see the file).
       include: 'assets/installer.nsh',
       installerLanguages: ['zh_CN'],
@@ -142,3 +148,11 @@ const result = await build({
 
 console.log('\nbuilt:')
 for (const file of result) console.log(`  ${file}`)
+
+// The zip rides on the installer's artifact name; give the portable copy its own.
+const zipArtifact = result.find((file) => file.endsWith('.zip'))
+if (zipArtifact !== undefined) {
+  const portable = join(dirname(zipArtifact), `MedHealthBuddy-${manifest.version}-portable.zip`)
+  renameSync(zipArtifact, portable)
+  console.log(`  ${portable} (renamed from ${basename(zipArtifact)})`)
+}

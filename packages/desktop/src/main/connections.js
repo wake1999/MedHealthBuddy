@@ -11,7 +11,7 @@
  * Free of Electron: the app wires `resume()` to `powerMonitor`, and tests drive
  * the manager with fake sessions and fake timers.
  *
- * @module dsh-ssh-desktop/connections
+ * @module medhealthbuddy-desktop/connections
  */
 
 import { EventEmitter } from 'node:events'

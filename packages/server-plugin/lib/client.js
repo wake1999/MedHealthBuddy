@@ -5,7 +5,7 @@
  * in, so the package needs no build step: plain JavaScript, no JSX (hence
  * `React.createElement`), and no imports beyond what the loader supplies.
  *
- * It only does something inside dsh-ssh-desktop, which exposes
+ * It only does something inside medhealthbuddy-desktop, which exposes
  * `window.dshSshDesktop` (protocol 1) to the pages it shows. In an ordinary
  * browser, or in the official desktop app, the bridge is absent and this
  * plugin registers nothing.
@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
     const SLOT = 'conversation.session.header.utilities'
     const STYLE_ATTR = 'data-dsh-desktop-link-style'
 
-    /** The desktop bridge, when this page is shown by a compatible dsh-ssh-desktop. */
+    /** The desktop bridge, when this page is shown by a compatible medhealthbuddy-desktop. */
     function bridge() {
       const candidate = typeof window === 'undefined' ? undefined : window.dshSshDesktop
       if (candidate === null || typeof candidate !== 'object') return undefined

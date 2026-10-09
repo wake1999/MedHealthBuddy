@@ -143,7 +143,7 @@ await check('first launch logs in with the launch token and lands on the UI', as
   const logFile = join(userData, 'logs', 'main.log')
   assert.ok(existsSync(logFile), 'logs/main.log is written')
   const logText = readFileSync(logFile, 'utf8')
-  assert.match(logText, /\[app\] start: dsh-ssh-desktop/)
+  assert.match(logText, /\[app\] start: medhealthbuddy-desktop/)
   assert.match(logText, /\[smoke\] \[ready\] ready at/)
   assert.match(logText, /\[app\] exit/)
   assert.equal(logText.includes('fake-launch-token'), false, 'no token in the log file')

@@ -5,7 +5,7 @@
 # registers the /api/dsh-desktop-link routes on the shared web server and
 # watches session events for the finished-task feed; the `dsh.client`
 # declaration in package.json loads its browser half (exports "./client") in
-# the web GUI, where it only acts inside dsh-ssh-desktop.
+# the web GUI, where it only acts inside medhealthbuddy-desktop.
 - insert:
     - id: desktop-link
       name: dsh-desktop-link

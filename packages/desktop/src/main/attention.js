@@ -11,7 +11,7 @@
  * the count is drawn as a taskbar overlay icon: a red disc with a digit, or
  * "+" past nine. The window also flashes its taskbar button until focused.
  *
- * @module dsh-ssh-desktop/attention
+ * @module medhealthbuddy-desktop/attention
  */
 
 import { existsSync } from 'node:fs'

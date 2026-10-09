@@ -4,9 +4,9 @@
 
 *A Windows desktop shell for a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) that runs on a remote server: it starts or reuses `dsh web` there over the system ssh, forwards its port, and shows the remote UI in its own window — with multi-server support, desktop notifications, one-click server install and a companion DSH plugin (`dsh-desktop-link`).*
 
-> **非官方项目。** 本项目是社区开发的第三方工具，与 DeepSeek 没有隶属或背书关系。应用图标中的合肥工业大学校徽归合肥工业大学所有；「DeepSeek」名称归 DeepSeek 所有，这里仅用于标明所连接的软件；如权利人有异议，请提 issue，我会替换。
+> **非官方项目。** 本项目是社区开发的第三方工具，与 DeepSeek 没有隶属或背书关系。「DeepSeek」名称归 DeepSeek 所有，这里仅用于标明所连接的软件；如权利人有异议，请提 issue，我会替换。
 >
-> *Unofficial, community-made tool, not affiliated with or endorsed by DeepSeek. The emblem in the app icon belongs to Hefei University of Technology, and the DeepSeek name belongs to DeepSeek; both are used only to identify the software this connects to.*
+> *Unofficial, community-made tool, not affiliated with or endorsed by DeepSeek. The DeepSeek name belongs to DeepSeek and is used only to identify the software this connects to.*
 
 应用通过系统自带的 ssh 登录服务器，启动或复用那里的 `dsh web`，把它的端口转发到本机，再在自己的窗口里显示 DSH 的界面。DSH、它的 profile、会话和工作区都留在服务器上；本机只负责显示，不运行 DSH，也不保存任何密钥。
 

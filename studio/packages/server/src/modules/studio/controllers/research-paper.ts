@@ -379,7 +379,12 @@ export async function translatePaperPdfHandler(ctx: any) {
       return row
     }).catch(() => null)
     ctx.set('Content-Type', 'application/pdf')
-    ctx.set('Content-Disposition', `inline; filename="${path.basename(target)}"`)
+    /*
+     * Do not set `Content-Disposition: inline` here. Chrome treats a fetched
+     * inline PDF as a PDF-viewer navigation, answers the fetch with 204 and
+     * aborts the request; the reader fetches these bytes via fetch/XHR, so the
+     * header is both unnecessary and harmful.
+     */
     ctx.set('Cache-Control', 'no-store')
     ctx.body = bytes
   } catch (error: any) {

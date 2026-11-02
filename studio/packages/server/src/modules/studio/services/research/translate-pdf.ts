@@ -216,22 +216,29 @@ async function runPdf2zh(
   }
 
   let lastError = ''
+  const allowLayoutFallback = ['1', 'true', 'on', 'yes'].includes(
+    (process.env.PDF2ZH_ALLOW_LAYOUT_FALLBACK || '').trim().toLowerCase(),
+  )
   for (const bin of PDF2ZH_CANDIDATES) {
     /*
-     * Prefer babeldoc's layout-aware backend, then fall back to pdf2zh's
-     * standard backend. Some local Python environments make babeldoc exit
-     * successfully without writing any PDF (e.g. NumPy 2 removed
-     * `np.fromstring`); an exit code alone is not proof of success.
+     * Prefer babeldoc's layout-aware backend. The standard backend replaces
+     * glyph boxes and makes Chinese text overlap formulas and columns, so it
+     * is only used when explicitly opted in for troubleshooting.
+     *
+     * Some local Python environments make babeldoc exit successfully without
+     * writing any PDF; an exit code alone is not proof of success.
      */
     const modes = [
       {
         label: 'babeldoc',
         args: ['-li', sourceLang, '-lo', targetLang, '-s', service, '--babeldoc', '-o', outDir, inputPath],
       },
-      {
-        label: 'standard',
-        args: ['-li', sourceLang, '-lo', targetLang, '-s', service, '-o', outDir, inputPath],
-      },
+      ...(allowLayoutFallback
+        ? [{
+            label: 'standard',
+            args: ['-li', sourceLang, '-lo', targetLang, '-s', service, '-o', outDir, inputPath],
+          }]
+        : []),
     ]
     for (const mode of modes) {
       const result = await run(bin, mode.args, { env, timeoutMs: 30 * 60 * 1000, signal: options.signal })

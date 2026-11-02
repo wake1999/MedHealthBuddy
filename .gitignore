@@ -14,3 +14,7 @@ promo-video/
 
 # deploy-studio.ps1 的本地配置：里面是服务器地址
 .deploy.local
+
+# Desktop installer output: local build artifacts, never deploy them.
+studio/packages/desktop/release/
+studio/packages/desktop/release-*/

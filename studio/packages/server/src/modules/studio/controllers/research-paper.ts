@@ -341,6 +341,15 @@ export async function translatePaperPdfHandler(ctx: any) {
   const requested = String(ctx.query?.variant ?? 'compare').trim()
   const variant: PdfVariant = requested === 'mono' || requested === 'dual' ? requested : 'compare'
   const target = variantPdfPathFor(source, outDir, variant)
+  const abort = new AbortController()
+  const onRequestAborted = (): void => { abort.abort() }
+  const onResponseClosed = (): void => {
+    // A normal response close has writableEnded=true; only a client-side
+    // disconnect should stop the pdf2zh process tree.
+    if (!ctx.res.writableEnded) abort.abort()
+  }
+  ctx.req?.once('aborted', onRequestAborted)
+  ctx.res?.once('close', onResponseClosed)
 
   try {
     // Reuse a cached translation when it is at least as new as the source.
@@ -355,8 +364,12 @@ export async function translatePaperPdfHandler(ctx: any) {
       const model = llm !== null && llm.apiKey !== ''
         ? { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model }
         : undefined
-      await translatePdf(source, outDir, variant, model === undefined ? {} : { model })
+      await translatePdf(source, outDir, variant, {
+        ...(model === undefined ? {} : { model }),
+        signal: abort.signal,
+      })
     }
+    if (abort.signal.aborted) return
     const bytes = await fs.readFile(target)
     // 记下翻译时间：卡片据此显示「已翻译」徽章，菜单也能避免重复翻译。
     await updateStore(profile, 'papers.translated', draft => {
@@ -370,7 +383,13 @@ export async function translatePaperPdfHandler(ctx: any) {
     ctx.set('Cache-Control', 'no-store')
     ctx.body = bytes
   } catch (error: any) {
+    // The reader already disconnected; there is no response to write. Keep any
+    // earlier completed translation on disk instead of deleting it.
+    if (abort.signal.aborted || /translation_aborted/.test(String(error?.message || ''))) return
     return fail(ctx, 500, String(error?.message || '整篇翻译失败'), 'translate_pdf_failed')
+  } finally {
+    ctx.req?.removeListener('aborted', onRequestAborted)
+    ctx.res?.removeListener('close', onResponseClosed)
   }
 }
 

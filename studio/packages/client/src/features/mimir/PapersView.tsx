@@ -4419,6 +4419,15 @@ export function PapersView({
   /** 正在整篇翻译 / 生成摘要的卡片：徽章据此显示「翻译中」「摘要中」。 */
   const [translatingIds, setTranslatingIds] = useState<ReadonlySet<string>>(new Set())
   const [summarizingIds, setSummarizingIds] = useState<ReadonlySet<string>>(new Set())
+  /** One AbortController per running whole-paper translation. */
+  const translationControllersRef = useRef(new Map<string, AbortController>())
+  const [translationStartedAt, setTranslationStartedAt] = useState<Record<string, number>>({})
+  const [translationNotice, setTranslationNotice] = useState<{
+    key: string
+    title: string
+    status: 'cancelled'
+  } | null>(null)
+  const [translationClock, setTranslationClock] = useState(Date.now())
   /** 正在查看的已生成摘要（null = 弹窗关闭）。 */
   const [summaryView, setSummaryView] = useState<PaperRecord | null>(null)
   /** 文献文件夹：列表、当前筛选、新建弹窗。 */
@@ -4515,6 +4524,10 @@ export function PapersView({
     ...ordered.filter(paper => extraOf(paper).pinned === true),
     ...ordered.filter(paper => extraOf(paper).pinned !== true),
   ]
+  const activeTranslations = papers.list.filter(paper => translatingIds.has(paperKey(paper)))
+  const noticePaper = translationNotice === null
+    ? undefined
+    : papers.list.find(paper => paperKey(paper) === translationNotice.key)
   const selectedProject = projects.find(project => project.id === selectedProjectId) ?? null
   /**
    * AI 的作用范围：勾选过的文献优先（可以只针对一两篇），
@@ -4779,13 +4792,19 @@ export function PapersView({
 
   const startTranslate = (paper: PaperRecord): void => {
     const key = paperKey(paper)
-    if (translatingIds.has(key)) return
+    if (translatingIds.has(key) || translationControllersRef.current.has(key)) return
     setCardMenuId(null)
     setActionError(null)
+    setTranslationNotice(null)
+    const controller = new AbortController()
+    translationControllersRef.current.set(key, controller)
+    setTranslationStartedAt(prev => ({ ...prev, [key]: Date.now() }))
     setTranslatingIds(prev => new Set(prev).add(key))
+    let succeeded = false
     void fetch(`/api/studio/research/papers/${encodeURIComponent(key)}/translate-pdf?variant=mono`, {
       method: 'POST',
       headers: researchApiHeaders(),
+      signal: controller.signal,
     })
       .then(async (response) => {
         if (!response.ok) {
@@ -4794,19 +4813,67 @@ export function PapersView({
         }
         // 只要状态码 200 就说明译本已生成；字节不用读进内存。
         await response.body?.cancel().catch(() => {})
+        succeeded = true
         await refreshPapers()
       })
-      .catch((error: Error) => { setActionError(`${t('papers.dualFailed')}：${error.message}`) })
+      .catch((error: Error) => {
+        // 用户主动中止不是失败，也不删除服务端已经写出的译本文件。
+        if (controller.signal.aborted || error.name === 'AbortError') {
+          setTranslationNotice({ key, title: paper.title, status: 'cancelled' })
+          return
+        }
+        setActionError(`${t('papers.dualFailed')}：${error.message}`)
+      })
       .finally(() => {
+        translationControllersRef.current.delete(key)
+        setTranslationStartedAt(prev => {
+          const next = { ...prev }
+          delete next[key]
+          return next
+        })
         setTranslatingIds(prev => {
           const next = new Set(prev)
           next.delete(key)
           return next
         })
-        // 与上传一致：完成后让宿主重挂一次，徽章立即变「已翻译」。
-        window.setTimeout(() => { window.dispatchEvent(new CustomEvent('mimir:remount')) }, 400)
+        if (succeeded) {
+          // 与上传一致：完成后让宿主重挂一次，徽章立即变「已翻译」。
+          window.setTimeout(() => { window.dispatchEvent(new CustomEvent('mimir:remount')) }, 400)
+        }
       })
   }
+
+  /** 中止整篇翻译：先断开浏览器请求，服务端收到 close 后终止 pdf2zh 进程树。 */
+  const cancelTranslate = (paper: PaperRecord): void => {
+    const key = paperKey(paper)
+    const controller = translationControllersRef.current.get(key)
+    if (!controller) return
+    controller.abort()
+    translationControllersRef.current.delete(key)
+    setTranslationStartedAt(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+    setTranslatingIds(prev => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+    setTranslationNotice({ key, title: paper.title, status: 'cancelled' })
+  }
+
+  useEffect(() => {
+    if (translatingIds.size === 0) return undefined
+    setTranslationClock(Date.now())
+    const timer = window.setInterval(() => { setTranslationClock(Date.now()) }, 1000)
+    return () => { window.clearInterval(timer) }
+  }, [translatingIds.size])
+
+  useEffect(() => () => {
+    for (const controller of translationControllersRef.current.values()) controller.abort()
+    translationControllersRef.current.clear()
+  }, [])
 
   /** 菜单「AI 摘要」与徽章共用同一条链路。 */
   const summarizeFromMenu = (paper: PaperRecord): void => {
@@ -5568,6 +5635,60 @@ export function PapersView({
               </span>
             ))}
           </div>
+          {(activeTranslations.length > 0 || translationNotice !== null) && (
+            <section className={css.translationStatusPanel} aria-live="polite">
+              {activeTranslations.map((paper) => {
+                const key = paperKey(paper)
+                const startedAt = translationStartedAt[key] ?? translationClock
+                const seconds = Math.max(0, Math.floor((translationClock - startedAt) / 1000))
+                return (
+                  <div key={key} className={css.translationProgressItem}>
+                    <div className={css.translationProgressHead}>
+                      <strong title={paper.title}>{paper.title}</strong>
+                      <span>{t('papers.translationRunning')} · {t('papers.translationElapsed', { seconds })}</span>
+                    </div>
+                    <div className={css.translationProgressTrack} aria-hidden="true">
+                      <span className={css.translationProgressBar} />
+                    </div>
+                    <button
+                      type="button"
+                      className={css.translationCancelButton}
+                      onClick={() => { cancelTranslate(paper) }}
+                    >
+                      {t('papers.cancelTranslation')}
+                    </button>
+                  </div>
+                )
+              })}
+              {translationNotice !== null && (
+                <div className={css.translationNotice} data-status={translationNotice.status}>
+                  <div className={css.translationNoticeText}>
+                    <strong>{translationNotice.title}</strong>
+                    <span>{t('papers.translationCancelled')}</span>
+                  </div>
+                  <div className={css.translationNoticeActions}>
+                    {noticePaper !== undefined && (
+                      <button
+                        type="button"
+                        className={css.translationCancelButton}
+                        onClick={() => { startTranslate(noticePaper) }}
+                      >
+                        {t('papers.restartTranslation')}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={css.translationDismissButton}
+                      aria-label={t('papers.translationDismiss')}
+                      onClick={() => { setTranslationNotice(null) }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
           {visible.length === 0 ? (
             <p className={css.hint}>{t('papers.noMatch')}</p>
           ) : (

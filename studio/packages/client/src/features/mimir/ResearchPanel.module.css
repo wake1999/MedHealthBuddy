@@ -2121,6 +2121,146 @@ li.dropIndicator {
   max-width: none;
 }
 
+/*
+ * 全文翻译的浮动状态条：固定在右下角，翻译中随时可以中止。
+ * 进度条是 indeterminate，因为 pdf2zh 不在请求中途返回页级进度。
+ */
+.translationStatusPanel {
+  position: fixed;
+  right: 28px;
+  bottom: 24px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(430px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--mimir-line, rgb(120 92 32 / 16%));
+  border-radius: 14px;
+  background: var(--mimir-sheet, #fffdf8);
+  box-shadow: 0 18px 48px rgb(33 30 25 / 22%), var(--mimir-edge);
+}
+
+.translationProgressItem,
+.translationNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 10%));
+  border-radius: 10px;
+  background: var(--mimir-paper, #fffaf0);
+}
+
+.translationProgressHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.translationProgressHead strong,
+.translationNoticeText strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--mimir-ink, #211e19);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.translationProgressHead span,
+.translationNoticeText span {
+  flex: none;
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 11px;
+}
+
+.translationProgressTrack {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(120 92 32 / 12%);
+}
+
+.translationProgressBar {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--mimir-accent, #9a6a2f);
+  animation: translationSweep 1.2s ease-in-out infinite;
+}
+
+@keyframes translationSweep {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(280%); }
+}
+
+.translationCancelButton {
+  align-self: flex-start;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--mimir-line, rgb(120 92 32 / 18%));
+  border-radius: 7px;
+  background: transparent;
+  color: var(--mimir-ink, #211e19);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.translationCancelButton:hover {
+  background: rgb(120 92 32 / 8%);
+}
+
+.translationNotice {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.translationNotice[data-status='cancelled'] {
+  border-color: rgb(180 130 60 / 22%);
+  background: rgb(255 247 230 / 86%);
+}
+
+.translationNoticeText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.translationNoticeActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.translationDismissButton {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.translationDismissButton:hover {
+  background: rgb(120 92 32 / 8%);
+  color: var(--mimir-ink, #211e19);
+}
+
 
 .papersGrid {
   display: grid;

@@ -52,6 +52,8 @@ export interface TranslateOptions {
   readonly model?: TranslateModel
   readonly sourceLang?: string
   readonly targetLang?: string
+  /** Aborted when the reader clicks "stop translation". */
+  readonly signal?: AbortSignal
 }
 
 /**
@@ -70,30 +72,61 @@ export function variantPdfPathFor(inputPath: string, outDir: string, variant: Pd
   return path.join(outDir, `${base}-${variant}.pdf`)
 }
 
+/**
+ * pdf2zh spawns Python children. A plain child.kill() on Windows leaves those
+ * descendants running, so terminate the whole tree when the reader aborts.
+ */
+function killProcessTree(child: ReturnType<typeof spawn>): void {
+  if (!child.pid) return
+  if (process.platform === 'win32') {
+    try {
+      spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true })
+    } catch { /* already gone */ }
+    return
+  }
+  try { child.kill('SIGTERM') } catch { /* already gone */ }
+}
+
 function run(
   command: string,
   args: readonly string[],
-  options: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
+  options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
+    if (options.signal?.aborted) {
+      resolve({ code: -1, stdout: '', stderr: 'translation_aborted' })
+      return
+    }
     const child = spawn(command, args, {
       windowsHide: true,
       env: options.env ? { ...process.env, ...options.env } : process.env,
     })
     let stdout = ''
     let stderr = ''
+    let settled = false
+    const finish = (code: number): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      options.signal?.removeEventListener('abort', onAbort)
+      resolve({ code, stdout, stderr })
+    }
+    const onAbort = (): void => {
+      stderr += '\ntranslation_aborted'
+      killProcessTree(child)
+    }
     const timer = setTimeout(() => {
-      try { child.kill() } catch { /* already gone */ }
+      killProcessTree(child)
     }, options.timeoutMs ?? TRANSLATE_TIMEOUT_MS)
+    options.signal?.addEventListener('abort', onAbort, { once: true })
     child.stdout?.on('data', (chunk) => { stdout += String(chunk) })
     child.stderr?.on('data', (chunk) => { stderr += String(chunk) })
     child.on('error', (error) => {
-      clearTimeout(timer)
-      resolve({ code: -1, stdout, stderr: String(error?.message || error) })
+      stderr += String(error?.message || error)
+      finish(-1)
     })
     child.on('close', (code) => {
-      clearTimeout(timer)
-      resolve({ code: code ?? -1, stdout, stderr })
+      finish(code ?? -1)
     })
   })
 }
@@ -128,6 +161,7 @@ async function buildComparePdf(
   sourcePath: string,
   translatedPath: string,
   outPath: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const scriptPath = path.join(os.tmpdir(), `mimir-compare-${process.pid}.py`)
   await fs.writeFile(scriptPath, COMPARE_SCRIPT, 'utf-8')
@@ -137,8 +171,9 @@ async function buildComparePdf(
       const result = await run(
         bin,
         [scriptPath, sourcePath, translatedPath, outPath],
-        { timeoutMs: COMPARE_TIMEOUT_MS },
+        { timeoutMs: COMPARE_TIMEOUT_MS, signal },
       )
+      if (signal?.aborted) throw new Error('translation_aborted')
       if (result.code === 0) return outPath
       lastError = `${bin}: exit ${String(result.code)} — ${(result.stderr || result.stdout).trim().slice(-400)}`
       if (result.code !== -1) break
@@ -195,7 +230,8 @@ async function runPdf2zh(
       '--babeldoc',
       '-o', outDir, inputPath,
     ]
-    const result = await run(bin, args, { env, timeoutMs: 30 * 60 * 1000 })
+    const result = await run(bin, args, { env, timeoutMs: 30 * 60 * 1000, signal: options.signal })
+    if (options.signal?.aborted) throw new Error('translation_aborted')
     if (result.code === 0) {
       await relocateProducts(inputPath, outDir, targetLang)
       return mono
@@ -253,5 +289,6 @@ export async function translatePdf(
   const mono = variantPdfPathFor(inputPath, outDir, 'mono')
   const monoExists = await fs.stat(mono).then(() => true).catch(() => false)
   if (!monoExists) await runPdf2zh(inputPath, outDir, options)
-  return buildComparePdf(inputPath, mono, target)
+  if (options.signal?.aborted) throw new Error('translation_aborted')
+  return buildComparePdf(inputPath, mono, target, options.signal)
 }

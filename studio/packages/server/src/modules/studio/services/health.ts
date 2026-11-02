@@ -4,8 +4,15 @@ import type { StudioHealthDependencies } from '../contracts/health'
 declare const __APP_VERSION__: string
 
 function isUpdateCheckDisabled(): boolean {
-  const raw = (process.env.HERMES_WEB_UI_DISABLE_UPDATE_CHECK || '').trim().toLowerCase()
-  return raw === 'true' || raw === '1' || raw === 'on' || raw === 'yes'
+  /*
+   * Product builds do not surface upstream Web UI update notices. Keep the
+   * network check opt-in instead of opt-out; the old disable variable still
+   * forces it off for compatibility.
+   */
+  const disabled = (process.env.HERMES_WEB_UI_DISABLE_UPDATE_CHECK || '').trim().toLowerCase()
+  if (disabled === 'true' || disabled === '1' || disabled === 'on' || disabled === 'yes') return true
+  const enabled = (process.env.HERMES_WEB_UI_ENABLE_UPDATE_CHECK || '').trim().toLowerCase()
+  return enabled !== 'true' && enabled !== '1' && enabled !== 'on' && enabled !== 'yes'
 }
 
 function compareVersions(left: string, right: string): number {

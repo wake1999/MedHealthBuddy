@@ -401,7 +401,9 @@ export function initAutoUpdater(nextOptions: AutoUpdaterOptions = {}) {
     publishUpdateState({ status: 'preparing', percent: 100, bytesPerSecond: 0 })
   })
 
-  if (process.env.HERMES_DESKTOP_ENABLE_AUTO_UPDATE !== 'false') {
+  // Automatic update prompts are opt-in for this product build. The tray's
+  // explicit "check for updates" action still works when a feed is configured.
+  if (process.env.HERMES_DESKTOP_ENABLE_AUTO_UPDATE === 'true') {
     checkForDesktopUpdates(false).catch(err => {
       console.error('[updater] initial check failed:', err)
     })

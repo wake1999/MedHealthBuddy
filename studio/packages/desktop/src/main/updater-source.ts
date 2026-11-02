@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isLegacyUpstreamUrl, resolveUpdateFeed } from './release-sources'
 
+export function desktopUpdateChannel(platform = process.platform, arch = process.arch): string {
+  return platform === 'win32' && arch === 'arm64' ? 'latest-arm64' : 'latest'
+}
+
 export type DesktopUpdateSource =
   | { channel: 'stable'; url: string; fallbackUrl: string | null }
   | { channel: 'test'; url: string }

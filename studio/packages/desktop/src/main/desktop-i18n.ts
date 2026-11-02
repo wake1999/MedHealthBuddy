@@ -11,6 +11,14 @@ type TranslationKey =
   | 'tray.openAtLoginFailedTitle'
   | 'tray.openAtLoginFailedMessage'
   | 'tray.quit'
+  | 'update.interrupted'
+  | 'update.recoverInterrupted'
+  | 'browser.profileOutsideStorage'
+  | 'browser.profileInUse'
+  | 'browser.trashDownloadTitle'
+  | 'browser.trashDownloadMessage'
+  | 'browser.trashDownloadConfirm'
+  | 'update.otherDevicesOpen'
   | 'update.upToDateTitle'
   | 'update.upToDateMessage'
   | 'update.checkingTitle'
@@ -33,15 +41,15 @@ type TranslationKey =
   | 'update.installFailedMessage'
   | 'update.noUpdateInfoMessage'
   | 'update.packagedOnlyMessage'
-  | 'update.notConfiguredMessage'
   | 'desktop.startingLocalServices'
   | 'desktop.connectingRemoteServices'
   | 'desktop.failedConnectRemote'
+  | 'desktop.returnLocal'
+  | 'desktop.switchDeviceFailed'
   | 'desktop.selectRuntimeSource'
-  | 'desktop.runtimeSourceMissing'
   | 'desktop.downloadFailed'
-  | 'desktop.downloadMirrorTitle'
-  | 'desktop.downloadMirrorDetail'
+  | 'desktop.downloadCloudflareTitle'
+  | 'desktop.downloadCloudflareDetail'
   | 'desktop.downloadGithubTitle'
   | 'desktop.downloadGithubDetail'
   | 'desktop.failedPrepareRuntime'
@@ -56,6 +64,9 @@ type TranslationKey =
   | 'runtime.ready'
   | 'common.ok'
   | 'common.cancel'
+  | 'browser.remoteControl'
+  | 'browser.remoteControlAllow'
+  | 'browser.remoteControlWarning'
   | 'browser.selectElement'
   | 'browser.selectRegion'
   | 'loginReset.confirmTitle'
@@ -66,11 +77,24 @@ type TranslationKey =
   | 'loginReset.successMessage'
   | 'loginReset.failedTitle'
   | 'loginReset.failedMessage'
+  | 'desktop.runtimeSourceMissing'
+  | 'desktop.downloadMirrorTitle'
+  | 'desktop.downloadMirrorDetail'
+  | 'update.notConfiguredMessage'
 
 const supportedLocales: DesktopLocale[] = ['en', 'zh', 'zh-TW', 'ja', 'ko', 'fr', 'es', 'de', 'pt']
 
 const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
   en: {
+    'browser.trashDownloadTitle': "Move downloaded file to Trash / Recycle Bin?",
+    'browser.trashDownloadMessage': "Move “{name}” to the Trash / Recycle Bin? This also removes its download record.",
+    'browser.trashDownloadConfirm': "Move to Trash / Recycle Bin",
+
+    "update.interrupted": "A previous Desktop update may still be running. Only recover after confirming no installer is active.",
+    "update.recoverInterrupted": "Recover interrupted update",
+    "browser.profileOutsideStorage": "On macOS, select a browser directory inside this device storage folder: {root}",
+    'browser.profileInUse': "This browser profile is open in another Desktop instance. Close that instance first.",
+    'update.otherDevicesOpen': "Close other device windows before installing the Desktop update.",
     'tray.show': 'Show MedHealthBuddy',
     'tray.hide': 'Hide MedHealthBuddy',
     'tray.checkForUpdates': 'Check for Updates',
@@ -101,15 +125,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "Could not install the update. MedHealthBuddy will restart so you can try again.",
     'update.noUpdateInfoMessage': 'Update information is not available for this platform yet.',
     'update.packagedOnlyMessage': 'Automatic updates are only available in the packaged desktop app.',
-    'update.notConfiguredMessage': 'Automatic updates are off for this build: no update feed is configured.',
     'desktop.startingLocalServices': 'Starting local services...',
     'desktop.connectingRemoteServices': 'Connecting to the remote server...',
     'desktop.failedConnectRemote': 'Could not connect to the remote server',
+    'desktop.returnLocal': "Switch to this computer (restart)",
+    'desktop.switchDeviceFailed': "Could not switch devices. Please try again.",
     'desktop.selectRuntimeSource': 'Select a runtime download source to start local services.',
-    'desktop.runtimeSourceMissing': 'No runtime download source is configured for this build. Install the runtime locally, or set MEDHEALTHBUDDY_RUNTIME_BASE_URL and try again.',
     'desktop.downloadFailed': 'Download failed',
-    'desktop.downloadMirrorTitle': 'Download from mirror',
-    'desktop.downloadMirrorDetail': 'Use the runtime mirror configured for this build.',
+    'desktop.downloadCloudflareTitle': 'Download from Cloudflare',
+    'desktop.downloadCloudflareDetail': 'Use the MedHealthBuddy download proxy.',
     'desktop.downloadGithubTitle': 'Download from GitHub',
     'desktop.downloadGithubDetail': 'Use the release asset directly from GitHub.',
     'desktop.failedPrepareRuntime': 'Failed to prepare Hermes runtime',
@@ -124,6 +148,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Hermes runtime ready.',
     'common.ok': 'OK',
     'common.cancel': 'Cancel',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': 'Select DOM element',
     'browser.selectRegion': 'Select region',
     'loginReset.confirmTitle': 'Reset login',
@@ -134,8 +161,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': 'Login has been reset to {username} / {password}.',
     'loginReset.failedTitle': 'Login reset failed',
     'loginReset.failedMessage': 'Could not reset the desktop login.',
+    'desktop.runtimeSourceMissing': 'No runtime download source is configured for this build. Install the runtime locally, or set MEDHEALTHBUDDY_RUNTIME_BASE_URL and try again.',
+    'desktop.downloadMirrorTitle': 'Download from mirror',
+    'desktop.downloadMirrorDetail': 'Use the runtime mirror configured for this build.',
+    'update.notConfiguredMessage': 'Automatic updates are off for this build: no update feed is configured.',
   },
   zh: {
+    'browser.trashDownloadTitle': "移除下载文件",
+    'browser.trashDownloadMessage': "将“{name}”移到废纸篓 / 回收站？同时移除此下载记录。",
+    'browser.trashDownloadConfirm': "移到废纸篓 / 回收站",
+
+    "update.interrupted": "上次 Desktop 更新可能仍在运行。仅在确认安装程序已结束后恢复。",
+    "update.recoverInterrupted": "恢复中断的更新",
+    "browser.profileOutsideStorage": "macOS 浏览器目录必须位于此设备的数据目录内：{root}",
+    'browser.profileInUse': "此浏览器配置正被其他 Desktop 实例使用，请先退出该实例。",
+    'update.otherDevicesOpen': "请先退出其他设备窗口，再安装 Desktop 更新。",
     'tray.show': '显示 MedHealthBuddy',
     'tray.hide': '隐藏 MedHealthBuddy',
     'tray.checkForUpdates': '检查更新',
@@ -166,15 +206,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "无法安装更新，MedHealthBuddy 将重新启动，请稍后重试。",
     'update.noUpdateInfoMessage': '当前平台的更新信息暂不可用。',
     'update.packagedOnlyMessage': '自动更新仅在打包后的桌面应用中可用。',
-    'update.notConfiguredMessage': '此版本未配置更新源，自动更新已关闭。',
     'desktop.startingLocalServices': '正在启动本地服务...',
     'desktop.connectingRemoteServices': '正在连接远程服务器...',
     'desktop.failedConnectRemote': '无法连接远程服务器',
+    'desktop.returnLocal': "切换回本机（重启）",
+    'desktop.switchDeviceFailed': "切换设备失败，请重试。",
     'desktop.selectRuntimeSource': '请选择运行时下载源以启动本地服务。',
-    'desktop.runtimeSourceMissing': '此版本未配置运行时下载源。请在本地安装运行时，或设置 MEDHEALTHBUDDY_RUNTIME_BASE_URL 后重试。',
     'desktop.downloadFailed': '下载失败',
-    'desktop.downloadMirrorTitle': '从镜像下载',
-    'desktop.downloadMirrorDetail': '使用为当前版本配置的运行时镜像源。',
+    'desktop.downloadCloudflareTitle': '从 Cloudflare 下载',
+    'desktop.downloadCloudflareDetail': '使用 MedHealthBuddy 下载代理。',
     'desktop.downloadGithubTitle': '从 GitHub 下载',
     'desktop.downloadGithubDetail': '直接使用 GitHub Release 资源。',
     'desktop.failedPrepareRuntime': '准备 Hermes 运行时失败',
@@ -189,6 +229,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Hermes 运行时已就绪。',
     'common.ok': '确定',
     'common.cancel': '取消',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': '选择 DOM 元素',
     'browser.selectRegion': '框选区域',
     'loginReset.confirmTitle': '重置登录',
@@ -199,8 +242,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': '登录已重置为 {username} / {password}。',
     'loginReset.failedTitle': '重置登录失败',
     'loginReset.failedMessage': '无法重置桌面端登录。',
+    'desktop.runtimeSourceMissing': '此版本未配置运行时下载源。请在本地安装运行时，或设置 MEDHEALTHBUDDY_RUNTIME_BASE_URL 后重试。',
+    'desktop.downloadMirrorTitle': '从镜像下载',
+    'desktop.downloadMirrorDetail': '使用为当前版本配置的运行时镜像源。',
+    'update.notConfiguredMessage': '此版本未配置更新源，自动更新已关闭。',
   },
   'zh-TW': {
+    'browser.trashDownloadTitle': "移除下載檔案",
+    'browser.trashDownloadMessage': "要將「{name}」移至垃圾桶 / 資源回收筒嗎？同時移除此下載記錄。",
+    'browser.trashDownloadConfirm': "移至垃圾桶 / 資源回收筒",
+
+    "update.interrupted": "上次 Desktop 更新可能仍在執行。僅在確認安裝程式已結束後恢復。",
+    "update.recoverInterrupted": "恢復中斷的更新",
+    "browser.profileOutsideStorage": "macOS 瀏覽器目錄必須位於此裝置的資料目錄內：{root}",
+    'browser.profileInUse': "此瀏覽器設定正由其他 Desktop 實例使用，請先結束該實例。",
+    'update.otherDevicesOpen': "請先結束其他裝置視窗，再安裝 Desktop 更新。",
     'tray.show': '顯示 MedHealthBuddy',
     'tray.hide': '隱藏 MedHealthBuddy',
     'tray.checkForUpdates': '檢查更新',
@@ -231,15 +287,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "無法安裝更新，MedHealthBuddy 將重新啟動，請稍後重試。",
     'update.noUpdateInfoMessage': '目前平台的更新資訊暫不可用。',
     'update.packagedOnlyMessage': '自動更新僅可在打包後的桌面應用中使用。',
-    'update.notConfiguredMessage': '此版本未設定更新來源，自動更新已關閉。',
     'desktop.startingLocalServices': '正在啟動本地服務...',
     'desktop.connectingRemoteServices': '正在連線遠端伺服器...',
     'desktop.failedConnectRemote': '無法連線遠端伺服器',
+    'desktop.returnLocal': "切換回本機（重新啟動）",
+    'desktop.switchDeviceFailed': "切換裝置失敗，請重試。",
     'desktop.selectRuntimeSource': '請選擇運行時下載來源以啟動本地服務。',
-    'desktop.runtimeSourceMissing': '此版本未設定執行時下載來源。請在本機安裝執行時，或設定 MEDHEALTHBUDDY_RUNTIME_BASE_URL 後重試。',
     'desktop.downloadFailed': '下載失敗',
-    'desktop.downloadMirrorTitle': '從鏡像下載',
-    'desktop.downloadMirrorDetail': '使用為目前版本設定的執行時鏡像來源。',
+    'desktop.downloadCloudflareTitle': '從 Cloudflare 下載',
+    'desktop.downloadCloudflareDetail': '使用 MedHealthBuddy 下載代理。',
     'desktop.downloadGithubTitle': '從 GitHub 下載',
     'desktop.downloadGithubDetail': '直接使用 GitHub Release 資源。',
     'desktop.failedPrepareRuntime': '準備 Hermes 運行時失敗',
@@ -254,6 +310,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Hermes 運行時已就緒。',
     'common.ok': '確定',
     'common.cancel': '取消',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': '選擇 DOM 元素',
     'browser.selectRegion': '框選區域',
     'loginReset.confirmTitle': '重置登入',
@@ -264,8 +323,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': '登入已重置為 {username} / {password}。',
     'loginReset.failedTitle': '重置登入失敗',
     'loginReset.failedMessage': '無法重置桌面端登入。',
+    'desktop.runtimeSourceMissing': '此版本未設定執行時下載來源。請在本機安裝執行時，或設定 MEDHEALTHBUDDY_RUNTIME_BASE_URL 後重試。',
+    'desktop.downloadMirrorTitle': '從鏡像下載',
+    'desktop.downloadMirrorDetail': '使用為目前版本設定的執行時鏡像來源。',
+    'update.notConfiguredMessage': '此版本未設定更新來源，自動更新已關閉。',
   },
   ja: {
+    'browser.trashDownloadTitle': "ダウンロードファイルを削除",
+    'browser.trashDownloadMessage': "「{name}」をゴミ箱へ移動しますか？ダウンロード履歴からも削除されます。",
+    'browser.trashDownloadConfirm': "ゴミ箱へ移動",
+
+    "update.interrupted": "前回の更新が実行中の可能性があります。インストーラーの終了を確認してから復旧してください。",
+    "update.recoverInterrupted": "中断された更新を復旧",
+    "browser.profileOutsideStorage": "macOS のブラウザーディレクトリはこのデバイス保存先内で選択してください: {root}",
+    'browser.profileInUse': "このブラウザープロファイルは別の Desktop インスタンスで使用中です。先に終了してください。",
+    'update.otherDevicesOpen': "Desktop を更新する前に、他のデバイスウィンドウを終了してください。",
     'tray.show': 'MedHealthBuddy を表示',
     'tray.hide': 'MedHealthBuddy を隠す',
     'tray.checkForUpdates': 'アップデートを確認',
@@ -296,15 +368,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "更新をインストールできませんでした。MedHealthBuddy を再起動します。再度お試しください。",
     'update.noUpdateInfoMessage': 'このプラットフォームのアップデート情報はまだ利用できません。',
     'update.packagedOnlyMessage': '自動アップデートはパッケージ版デスクトップアプリでのみ利用できます。',
-    'update.notConfiguredMessage': 'このビルドには更新元が設定されていないため、自動更新は無効です。',
     'desktop.startingLocalServices': 'ローカルサービスを起動しています...',
     'desktop.connectingRemoteServices': 'リモートサーバーに接続しています...',
     'desktop.failedConnectRemote': 'リモートサーバーに接続できません',
+    'desktop.returnLocal': "このコンピューターに切り替え（再起動）",
+    'desktop.switchDeviceFailed': "デバイスを切り替えられませんでした。もう一度お試しください。",
     'desktop.selectRuntimeSource': 'ローカルサービスを開始するためのランタイムダウンロード元を選択してください。',
-    'desktop.runtimeSourceMissing': 'このビルドにはランタイムのダウンロード元が設定されていません。ランタイムをローカルにインストールするか、MEDHEALTHBUDDY_RUNTIME_BASE_URL を設定してから再試行してください。',
     'desktop.downloadFailed': 'ダウンロードに失敗しました',
-    'desktop.downloadMirrorTitle': 'ミラーからダウンロード',
-    'desktop.downloadMirrorDetail': 'このビルドに設定されたランタイムミラーを使用します。',
+    'desktop.downloadCloudflareTitle': 'Cloudflare からダウンロード',
+    'desktop.downloadCloudflareDetail': 'MedHealthBuddy のダウンロードプロキシを使用します。',
     'desktop.downloadGithubTitle': 'GitHub からダウンロード',
     'desktop.downloadGithubDetail': 'GitHub のリリースアセットを直接使用します。',
     'desktop.failedPrepareRuntime': 'Hermes ランタイムの準備に失敗しました',
@@ -319,6 +391,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Hermes ランタイムの準備ができました。',
     'common.ok': 'OK',
     'common.cancel': 'Cancel',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': 'DOM 要素を選択',
     'browser.selectRegion': '領域を選択',
     'loginReset.confirmTitle': 'Reset login',
@@ -329,8 +404,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': 'Login has been reset to {username} / {password}.',
     'loginReset.failedTitle': 'Login reset failed',
     'loginReset.failedMessage': 'Could not reset the desktop login.',
+    'desktop.runtimeSourceMissing': 'このビルドにはランタイムのダウンロード元が設定されていません。ランタイムをローカルにインストールするか、MEDHEALTHBUDDY_RUNTIME_BASE_URL を設定してから再試行してください。',
+    'desktop.downloadMirrorTitle': 'ミラーからダウンロード',
+    'desktop.downloadMirrorDetail': 'このビルドに設定されたランタイムミラーを使用します。',
+    'update.notConfiguredMessage': 'このビルドには更新元が設定されていないため、自動更新は無効です。',
   },
   ko: {
+    'browser.trashDownloadTitle': "다운로드 파일 제거",
+    'browser.trashDownloadMessage': "“{name}”을(를) 휴지통으로 이동할까요? 다운로드 기록도 제거됩니다.",
+    'browser.trashDownloadConfirm': "휴지통으로 이동",
+
+    "update.interrupted": "이전 업데이트가 진행 중일 수 있습니다. 설치 프로그램 종료를 확인한 후 복구하세요.",
+    "update.recoverInterrupted": "중단된 업데이트 복구",
+    "browser.profileOutsideStorage": "macOS 브라우저 디렉터리는 이 기기 저장 폴더 안에 있어야 합니다: {root}",
+    'browser.profileInUse': "다른 Desktop 인스턴스가 이 브라우저 프로필을 사용 중입니다. 먼저 종료하세요.",
+    'update.otherDevicesOpen': "Desktop 업데이트를 설치하기 전에 다른 기기 창을 종료하세요.",
     'tray.show': 'MedHealthBuddy 표시',
     'tray.hide': 'MedHealthBuddy 숨기기',
     'tray.checkForUpdates': '업데이트 확인',
@@ -361,15 +449,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "업데이트를 설치하지 못했습니다. 다시 시도할 수 있도록 MedHealthBuddy를 다시 시작합니다.",
     'update.noUpdateInfoMessage': '이 플랫폼의 업데이트 정보를 아직 사용할 수 없습니다.',
     'update.packagedOnlyMessage': '자동 업데이트는 패키징된 데스크톱 앱에서만 사용할 수 있습니다.',
-    'update.notConfiguredMessage': '이 빌드에는 업데이트 소스가 설정되어 있지 않아 자동 업데이트가 꺼져 있습니다.',
     'desktop.startingLocalServices': '로컬 서비스를 시작하는 중...',
     'desktop.connectingRemoteServices': '원격 서버에 연결하는 중...',
     'desktop.failedConnectRemote': '원격 서버에 연결할 수 없습니다',
+    'desktop.returnLocal': "이 컴퓨터로 전환 (다시 시작)",
+    'desktop.switchDeviceFailed': "기기를 전환하지 못했습니다. 다시 시도하세요.",
     'desktop.selectRuntimeSource': '로컬 서비스를 시작할 런타임 다운로드 소스를 선택하세요.',
-    'desktop.runtimeSourceMissing': '이 빌드에는 런타임 다운로드 소스가 설정되어 있지 않습니다. 런타임을 로컬에 설치하거나 MEDHEALTHBUDDY_RUNTIME_BASE_URL을 설정한 후 다시 시도하세요.',
     'desktop.downloadFailed': '다운로드 실패',
-    'desktop.downloadMirrorTitle': '미러에서 다운로드',
-    'desktop.downloadMirrorDetail': '이 빌드에 설정된 런타임 미러를 사용합니다.',
+    'desktop.downloadCloudflareTitle': 'Cloudflare에서 다운로드',
+    'desktop.downloadCloudflareDetail': 'MedHealthBuddy 다운로드 프록시를 사용합니다.',
     'desktop.downloadGithubTitle': 'GitHub에서 다운로드',
     'desktop.downloadGithubDetail': 'GitHub 릴리스 자산을 직접 사용합니다.',
     'desktop.failedPrepareRuntime': 'Hermes 런타임 준비 실패',
@@ -384,6 +472,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Hermes 런타임이 준비되었습니다.',
     'common.ok': '확인',
     'common.cancel': 'Cancel',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': 'DOM 요소 선택',
     'browser.selectRegion': '영역 선택',
     'loginReset.confirmTitle': 'Reset login',
@@ -394,8 +485,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': 'Login has been reset to {username} / {password}.',
     'loginReset.failedTitle': 'Login reset failed',
     'loginReset.failedMessage': 'Could not reset the desktop login.',
+    'desktop.runtimeSourceMissing': '이 빌드에는 런타임 다운로드 소스가 설정되어 있지 않습니다. 런타임을 로컬에 설치하거나 MEDHEALTHBUDDY_RUNTIME_BASE_URL을 설정한 후 다시 시도하세요.',
+    'desktop.downloadMirrorTitle': '미러에서 다운로드',
+    'desktop.downloadMirrorDetail': '이 빌드에 설정된 런타임 미러를 사용합니다.',
+    'update.notConfiguredMessage': '이 빌드에는 업데이트 소스가 설정되어 있지 않아 자동 업데이트가 꺼져 있습니다.',
   },
   fr: {
+    'browser.trashDownloadTitle': "Supprimer le fichier téléchargé",
+    'browser.trashDownloadMessage': "Mettre « {name} » à la corbeille ? Son entrée sera aussi retirée de l’historique.",
+    'browser.trashDownloadConfirm': "Mettre à la corbeille",
+
+    "update.interrupted": "Une mise à jour peut encore être en cours. Vérifiez que l’installateur est arrêté avant de récupérer.",
+    "update.recoverInterrupted": "Récupérer la mise à jour interrompue",
+    "browser.profileOutsideStorage": "Sur macOS, choisissez un dossier de navigateur dans le stockage de cet appareil : {root}",
+    'browser.profileInUse': "Ce profil de navigateur est utilisé par une autre instance Desktop. Fermez-la d’abord.",
+    'update.otherDevicesOpen': "Fermez les autres fenêtres d’appareils avant d’installer la mise à jour Desktop.",
     'tray.show': 'Afficher MedHealthBuddy',
     'tray.hide': 'Masquer MedHealthBuddy',
     'tray.checkForUpdates': 'Rechercher les mises a jour',
@@ -426,15 +530,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "Impossible d’installer la mise à jour. MedHealthBuddy va redémarrer pour vous permettre de réessayer.",
     'update.noUpdateInfoMessage': 'Les informations de mise a jour ne sont pas encore disponibles pour cette plateforme.',
     'update.packagedOnlyMessage': 'Les mises a jour automatiques ne sont disponibles que dans l application de bureau packagee.',
-    'update.notConfiguredMessage': 'Les mises a jour automatiques sont desactivees pour cette version : aucune source de mise a jour n est configuree.',
     'desktop.startingLocalServices': 'Demarrage des services locaux...',
     'desktop.connectingRemoteServices': 'Connexion au serveur distant...',
     'desktop.failedConnectRemote': 'Impossible de se connecter au serveur distant',
+    'desktop.returnLocal': "Passer à cet ordinateur (redémarrer)",
+    'desktop.switchDeviceFailed': "Impossible de changer d’appareil. Réessayez.",
     'desktop.selectRuntimeSource': 'Selectionnez une source de telechargement du runtime pour demarrer les services locaux.',
-    'desktop.runtimeSourceMissing': 'Aucune source de telechargement du runtime n est configuree pour cette version. Installez le runtime localement ou definissez MEDHEALTHBUDDY_RUNTIME_BASE_URL, puis reessayez.',
     'desktop.downloadFailed': 'Echec du telechargement',
-    'desktop.downloadMirrorTitle': 'Telecharger depuis le miroir',
-    'desktop.downloadMirrorDetail': 'Utilise le miroir de runtime configure pour cette version.',
+    'desktop.downloadCloudflareTitle': 'Telecharger depuis Cloudflare',
+    'desktop.downloadCloudflareDetail': 'Utilise le proxy de telechargement MedHealthBuddy.',
     'desktop.downloadGithubTitle': 'Telecharger depuis GitHub',
     'desktop.downloadGithubDetail': 'Utilise directement l asset de release GitHub.',
     'desktop.failedPrepareRuntime': 'Echec de la preparation du runtime Hermes',
@@ -449,6 +553,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Runtime Hermes pret.',
     'common.ok': 'OK',
     'common.cancel': 'Cancel',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': 'Sélectionner un élément DOM',
     'browser.selectRegion': 'Sélectionner une zone',
     'loginReset.confirmTitle': 'Reset login',
@@ -459,8 +566,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': 'Login has been reset to {username} / {password}.',
     'loginReset.failedTitle': 'Login reset failed',
     'loginReset.failedMessage': 'Could not reset the desktop login.',
+    'desktop.runtimeSourceMissing': 'Aucune source de telechargement du runtime n est configuree pour cette version. Installez le runtime localement ou definissez MEDHEALTHBUDDY_RUNTIME_BASE_URL, puis reessayez.',
+    'desktop.downloadMirrorTitle': 'Telecharger depuis le miroir',
+    'desktop.downloadMirrorDetail': 'Utilise le miroir de runtime configure pour cette version.',
+    'update.notConfiguredMessage': 'Les mises a jour automatiques sont desactivees pour cette version : aucune source de mise a jour n est configuree.',
   },
   es: {
+    'browser.trashDownloadTitle': "Eliminar archivo descargado",
+    'browser.trashDownloadMessage': "¿Mover «{name}» a la papelera? También se quitará su registro del historial.",
+    'browser.trashDownloadConfirm': "Mover a la papelera",
+
+    "update.interrupted": "Una actualización puede seguir en curso. Confirme que el instalador terminó antes de recuperarla.",
+    "update.recoverInterrupted": "Recuperar actualización interrumpida",
+    "browser.profileOutsideStorage": "En macOS, el directorio del navegador debe estar dentro del almacenamiento de este dispositivo: {root}",
+    'browser.profileInUse': "Otra instancia de Desktop está usando este perfil del navegador. Ciérrela primero.",
+    'update.otherDevicesOpen': "Cierre las otras ventanas de dispositivos antes de instalar la actualización de Desktop.",
     'tray.show': 'Mostrar MedHealthBuddy',
     'tray.hide': 'Ocultar MedHealthBuddy',
     'tray.checkForUpdates': 'Buscar actualizaciones',
@@ -491,15 +611,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "No se pudo instalar la actualización. MedHealthBuddy se reiniciará para que pueda intentarlo de nuevo.",
     'update.noUpdateInfoMessage': 'La informacion de actualizacion aun no esta disponible para esta plataforma.',
     'update.packagedOnlyMessage': 'Las actualizaciones automaticas solo estan disponibles en la app de escritorio empaquetada.',
-    'update.notConfiguredMessage': 'Las actualizaciones automaticas estan desactivadas en esta version: no hay ninguna fuente de actualizacion configurada.',
     'desktop.startingLocalServices': 'Iniciando servicios locales...',
     'desktop.connectingRemoteServices': 'Conectando al servidor remoto...',
     'desktop.failedConnectRemote': 'No se pudo conectar al servidor remoto',
+    'desktop.returnLocal': "Cambiar a este equipo (reiniciar)",
+    'desktop.switchDeviceFailed': "No se pudo cambiar de dispositivo. Inténtalo de nuevo.",
     'desktop.selectRuntimeSource': 'Selecciona una fuente de descarga del runtime para iniciar los servicios locales.',
-    'desktop.runtimeSourceMissing': 'Esta version no tiene configurada una fuente de descarga del runtime. Instala el runtime localmente o define MEDHEALTHBUDDY_RUNTIME_BASE_URL y vuelve a intentarlo.',
     'desktop.downloadFailed': 'Error de descarga',
-    'desktop.downloadMirrorTitle': 'Descargar desde el espejo',
-    'desktop.downloadMirrorDetail': 'Usa el espejo de runtime configurado para esta version.',
+    'desktop.downloadCloudflareTitle': 'Descargar desde Cloudflare',
+    'desktop.downloadCloudflareDetail': 'Usa el proxy de descarga de MedHealthBuddy.',
     'desktop.downloadGithubTitle': 'Descargar desde GitHub',
     'desktop.downloadGithubDetail': 'Usa directamente el recurso de release de GitHub.',
     'desktop.failedPrepareRuntime': 'No se pudo preparar el runtime de Hermes',
@@ -514,6 +634,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Runtime de Hermes listo.',
     'common.ok': 'Aceptar',
     'common.cancel': 'Cancel',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': 'Seleccionar elemento DOM',
     'browser.selectRegion': 'Seleccionar región',
     'loginReset.confirmTitle': 'Reset login',
@@ -524,8 +647,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': 'Login has been reset to {username} / {password}.',
     'loginReset.failedTitle': 'Login reset failed',
     'loginReset.failedMessage': 'Could not reset the desktop login.',
+    'desktop.runtimeSourceMissing': 'Esta version no tiene configurada una fuente de descarga del runtime. Instala el runtime localmente o define MEDHEALTHBUDDY_RUNTIME_BASE_URL y vuelve a intentarlo.',
+    'desktop.downloadMirrorTitle': 'Descargar desde el espejo',
+    'desktop.downloadMirrorDetail': 'Usa el espejo de runtime configurado para esta version.',
+    'update.notConfiguredMessage': 'Las actualizaciones automaticas estan desactivadas en esta version: no hay ninguna fuente de actualizacion configurada.',
   },
   de: {
+    'browser.trashDownloadTitle': "Heruntergeladene Datei entfernen",
+    'browser.trashDownloadMessage': "„{name}“ in den Papierkorb verschieben? Der Verlaufseintrag wird ebenfalls entfernt.",
+    'browser.trashDownloadConfirm': "In den Papierkorb",
+
+    "update.interrupted": "Ein Update läuft möglicherweise noch. Stellen Sie vor der Wiederherstellung sicher, dass der Installer beendet ist.",
+    "update.recoverInterrupted": "Unterbrochenes Update wiederherstellen",
+    "browser.profileOutsideStorage": "Wählen Sie unter macOS ein Browser-Verzeichnis im Speicher dieses Geräts: {root}",
+    'browser.profileInUse': "Dieses Browserprofil wird von einer anderen Desktop-Instanz verwendet. Beenden Sie diese zuerst.",
+    'update.otherDevicesOpen': "Beenden Sie andere Gerätefenster, bevor Sie das Desktop-Update installieren.",
     'tray.show': 'MedHealthBuddy anzeigen',
     'tray.hide': 'MedHealthBuddy ausblenden',
     'tray.checkForUpdates': 'Nach Updates suchen',
@@ -556,15 +692,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "Das Update konnte nicht installiert werden. MedHealthBuddy wird neu gestartet, damit Sie es erneut versuchen können.",
     'update.noUpdateInfoMessage': 'Update-Informationen sind fur diese Plattform noch nicht verfugbar.',
     'update.packagedOnlyMessage': 'Automatische Updates sind nur in der paketierten Desktop-App verfugbar.',
-    'update.notConfiguredMessage': 'Automatische Updates sind fur diesen Build deaktiviert: Es ist keine Update-Quelle konfiguriert.',
     'desktop.startingLocalServices': 'Lokale Dienste werden gestartet...',
     'desktop.connectingRemoteServices': 'Verbindung zum Remote-Server wird hergestellt...',
     'desktop.failedConnectRemote': 'Verbindung zum Remote-Server fehlgeschlagen',
+    'desktop.returnLocal': "Zu diesem Computer wechseln (Neustart)",
+    'desktop.switchDeviceFailed': "Gerätewechsel fehlgeschlagen. Bitte erneut versuchen.",
     'desktop.selectRuntimeSource': 'Wahlen Sie eine Runtime-Downloadquelle aus, um lokale Dienste zu starten.',
-    'desktop.runtimeSourceMissing': 'Fur diesen Build ist keine Runtime-Downloadquelle konfiguriert. Installieren Sie die Runtime lokal oder setzen Sie MEDHEALTHBUDDY_RUNTIME_BASE_URL und versuchen Sie es erneut.',
     'desktop.downloadFailed': 'Download fehlgeschlagen',
-    'desktop.downloadMirrorTitle': 'Vom Mirror herunterladen',
-    'desktop.downloadMirrorDetail': 'Verwendet den fur diesen Build konfigurierten Runtime-Mirror.',
+    'desktop.downloadCloudflareTitle': 'Von Cloudflare herunterladen',
+    'desktop.downloadCloudflareDetail': 'Verwendet den MedHealthBuddy Download-Proxy.',
     'desktop.downloadGithubTitle': 'Von GitHub herunterladen',
     'desktop.downloadGithubDetail': 'Verwendet das Release-Asset direkt von GitHub.',
     'desktop.failedPrepareRuntime': 'Hermes Runtime konnte nicht vorbereitet werden',
@@ -579,6 +715,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Hermes Runtime ist bereit.',
     'common.ok': 'OK',
     'common.cancel': 'Cancel',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': 'DOM-Element auswählen',
     'browser.selectRegion': 'Bereich auswählen',
     'loginReset.confirmTitle': 'Reset login',
@@ -589,8 +728,21 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': 'Login has been reset to {username} / {password}.',
     'loginReset.failedTitle': 'Login reset failed',
     'loginReset.failedMessage': 'Could not reset the desktop login.',
+    'desktop.runtimeSourceMissing': 'Fur diesen Build ist keine Runtime-Downloadquelle konfiguriert. Installieren Sie die Runtime lokal oder setzen Sie MEDHEALTHBUDDY_RUNTIME_BASE_URL und versuchen Sie es erneut.',
+    'desktop.downloadMirrorTitle': 'Vom Mirror herunterladen',
+    'desktop.downloadMirrorDetail': 'Verwendet den fur diesen Build konfigurierten Runtime-Mirror.',
+    'update.notConfiguredMessage': 'Automatische Updates sind fur diesen Build deaktiviert: Es ist keine Update-Quelle konfiguriert.',
   },
   pt: {
+    'browser.trashDownloadTitle': "Remover arquivo baixado",
+    'browser.trashDownloadMessage': "Mover “{name}” para a lixeira? O registro também será removido do histórico.",
+    'browser.trashDownloadConfirm': "Mover para a lixeira",
+
+    "update.interrupted": "Uma atualização pode estar em andamento. Confirme que o instalador terminou antes de recuperar.",
+    "update.recoverInterrupted": "Recuperar atualização interrompida",
+    "browser.profileOutsideStorage": "No macOS, escolha um diretório de navegador no armazenamento deste dispositivo: {root}",
+    'browser.profileInUse': "Este perfil de navegador está em uso por outra instância do Desktop. Encerre-a primeiro.",
+    'update.otherDevicesOpen': "Encerre as outras janelas de dispositivos antes de instalar a atualização do Desktop.",
     'tray.show': 'Mostrar MedHealthBuddy',
     'tray.hide': 'Ocultar MedHealthBuddy',
     'tray.checkForUpdates': 'Verificar atualizacoes',
@@ -621,15 +773,15 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'update.installFailedMessage': "Não foi possível instalar a atualização. O MedHealthBuddy será reiniciado para que você possa tentar novamente.",
     'update.noUpdateInfoMessage': 'As informacoes de atualizacao ainda nao estao disponiveis para esta plataforma.',
     'update.packagedOnlyMessage': 'Atualizacoes automaticas estao disponiveis apenas no app desktop empacotado.',
-    'update.notConfiguredMessage': 'As atualizacoes automaticas estao desativadas nesta versao: nenhuma fonte de atualizacao esta configurada.',
     'desktop.startingLocalServices': 'Iniciando servicos locais...',
     'desktop.connectingRemoteServices': 'Conectando ao servidor remoto...',
     'desktop.failedConnectRemote': 'Não foi possível conectar ao servidor remoto',
+    'desktop.returnLocal': "Mudar para este computador (reiniciar)",
+    'desktop.switchDeviceFailed': "Não foi possível mudar de dispositivo. Tente novamente.",
     'desktop.selectRuntimeSource': 'Selecione uma fonte de download do runtime para iniciar os servicos locais.',
-    'desktop.runtimeSourceMissing': 'Esta versao nao tem uma fonte de download do runtime configurada. Instale o runtime localmente ou defina MEDHEALTHBUDDY_RUNTIME_BASE_URL e tente novamente.',
     'desktop.downloadFailed': 'Falha no download',
-    'desktop.downloadMirrorTitle': 'Baixar pelo espelho',
-    'desktop.downloadMirrorDetail': 'Usa o espelho de runtime configurado para esta versao.',
+    'desktop.downloadCloudflareTitle': 'Baixar pelo Cloudflare',
+    'desktop.downloadCloudflareDetail': 'Usa o proxy de download do MedHealthBuddy.',
     'desktop.downloadGithubTitle': 'Baixar pelo GitHub',
     'desktop.downloadGithubDetail': 'Usa diretamente o asset de release do GitHub.',
     'desktop.failedPrepareRuntime': 'Falha ao preparar o runtime Hermes',
@@ -644,6 +796,9 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'runtime.ready': 'Runtime Hermes pronto.',
     'common.ok': 'OK',
     'common.cancel': 'Cancel',
+    'browser.remoteControl': 'Allow remote browser control',
+    'browser.remoteControlAllow': 'Allow for this connection',
+    'browser.remoteControlWarning': 'Agents on this remote Studio account and profile can read pages, take screenshots and operate this Desktop browser, including logged-in sites. Disconnect or stop sharing to revoke access.',
     'browser.selectElement': 'Selecionar elemento DOM',
     'browser.selectRegion': 'Selecionar região',
     'loginReset.confirmTitle': 'Reset login',
@@ -654,10 +809,14 @@ const translations: Record<DesktopLocale, Record<TranslationKey, string>> = {
     'loginReset.successMessage': 'Login has been reset to {username} / {password}.',
     'loginReset.failedTitle': 'Login reset failed',
     'loginReset.failedMessage': 'Could not reset the desktop login.',
+    'desktop.runtimeSourceMissing': 'Esta versao nao tem uma fonte de download do runtime configurada. Instale o runtime localmente ou defina MEDHEALTHBUDDY_RUNTIME_BASE_URL e tente novamente.',
+    'desktop.downloadMirrorTitle': 'Baixar pelo espelho',
+    'desktop.downloadMirrorDetail': 'Usa o espelho de runtime configurado para esta versao.',
+    'update.notConfiguredMessage': 'As atualizacoes automaticas estao desativadas nesta versao: nenhuma fonte de atualizacao esta configurada.',
   },
 }
 
-function resolveLocale(): DesktopLocale {
+export function desktopLocale(): DesktopLocale {
   const tag = app.getLocale()
   const lower = tag.toLowerCase()
   if (lower.startsWith('zh')) {
@@ -671,7 +830,7 @@ function resolveLocale(): DesktopLocale {
 }
 
 export function t(key: TranslationKey, params: Record<string, string> = {}): string {
-  const message = translations[resolveLocale()][key] || translations.en[key]
+  const message = translations[desktopLocale()][key] || translations.en[key]
   return Object.entries(params).reduce(
     (value, [name, replacement]) => value.replaceAll(`{${name}}`, replacement),
     message,

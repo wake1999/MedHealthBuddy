@@ -378,13 +378,25 @@ export async function translatePaperPdfHandler(ctx: any) {
       row.translatedAt = Date.now()
       return row
     }).catch(() => null)
-    ctx.set('Content-Type', 'application/pdf')
     /*
-     * Do not set `Content-Disposition: inline` here. Chrome treats a fetched
-     * inline PDF as a PDF-viewer navigation, answers the fetch with 204 and
-     * aborts the request; the reader fetches these bytes via fetch/XHR, so the
-     * header is both unnecessary and harmful.
+     * The Web UI fetches this endpoint. Returning `application/pdf` makes
+     * Chrome and download managers such as IDM treat it as a file download,
+     * and `Content-Disposition: inline` additionally makes Chrome answer the
+     * fetch with 204. Both modes below keep the response as JSON:
+     *  - `json` only reports completion (card menu / badge trigger);
+     *  - `base64` carries the PDF bytes for the reader without a PDF MIME type.
+     * The plain PDF fallback remains for older clients.
      */
+    const responseFormat = String(ctx.query?.format ?? '').trim().toLowerCase()
+    if (responseFormat === 'json' || responseFormat === 'base64') {
+      ctx.set('Content-Type', 'application/json; charset=utf-8')
+      ctx.set('Cache-Control', 'no-store')
+      ctx.body = JSON.stringify(responseFormat === 'json'
+        ? { ok: true, variant }
+        : { ok: true, variant, base64: bytes.toString('base64') })
+      return
+    }
+    ctx.set('Content-Type', 'application/pdf')
     ctx.set('Cache-Control', 'no-store')
     ctx.body = bytes
   } catch (error: any) {

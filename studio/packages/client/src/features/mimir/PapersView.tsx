@@ -2206,14 +2206,18 @@ function normalizePdfSearchText(raw: string): string {
     setDualError('')
     try {
       const response = await fetch(
-        `/api/studio/research/papers/${encodeURIComponent(paperKey(paper))}/translate-pdf?variant=${variant}`,
+        `/api/studio/research/papers/${encodeURIComponent(paperKey(paper))}/translate-pdf?variant=${variant}&format=base64`,
         { method: 'POST', headers: researchApiHeaders() },
       )
+      const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}))
         throw new Error(body?.error || `HTTP ${response.status}`)
       }
-      setTranslatedPdf({ variant, bytes: new Uint8Array(await response.arrayBuffer()) })
+      if (typeof body?.base64 !== 'string') throw new Error('translation_payload_missing')
+      const binary = atob(body.base64)
+      const bytes = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+      setTranslatedPdf({ variant, bytes })
     } catch (error) {
       setDualError((error as Error).message)
     } finally {
@@ -4801,18 +4805,17 @@ export function PapersView({
     setTranslationStartedAt(prev => ({ ...prev, [key]: Date.now() }))
     setTranslatingIds(prev => new Set(prev).add(key))
     let succeeded = false
-    void fetch(`/api/studio/research/papers/${encodeURIComponent(key)}/translate-pdf?variant=mono`, {
+    void fetch(`/api/studio/research/papers/${encodeURIComponent(key)}/translate-pdf?variant=mono&format=json`, {
       method: 'POST',
       headers: researchApiHeaders(),
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}))
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok || body?.ok !== true) {
           throw new Error(body?.error || `HTTP ${response.status}`)
         }
-        // 只要状态码 200 就说明译本已生成；字节不用读进内存。
-        await response.body?.cancel().catch(() => {})
+        // 卡片只需要完成状态；译文 PDF 留在服务端供阅读器按需读取。
         succeeded = true
         await refreshPapers()
       })

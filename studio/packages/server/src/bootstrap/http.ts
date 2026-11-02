@@ -373,17 +373,24 @@ function recordLockedHermesSelection(selection: HermesRuntimeSelection): void {
 }
 
 export async function bootstrap() {
+  const startupStartedAt = Date.now()
+  const markStartup = (label: string) => {
+    console.log(`[bootstrap-timing] +${Date.now() - startupStartedAt}ms ${label}`)
+  }
   bootstrapReady = false
   console.log(`hermes-web-ui v${APP_VERSION} starting...`)
+  markStartup('bootstrap entered')
   try {
     await runRegisteredStartupTasks()
   } catch {
     logger.warn('[bootstrap] startup task state could not be read or saved; deferred remaining tasks')
   }
+  markStartup('registered startup tasks done')
   await ensureStartupDirectory(config.uploadDir, 'upload')
   if (shouldCreateWebUiDataDir()) {
     await ensureStartupDirectory(config.dataDir, 'development data')
   }
+  markStartup('startup directories ready')
 
   const lockedDesktopSelection = readLockedDesktopHermesSelection()
   let hermesSelection: HermesRuntimeSelection = lockedDesktopSelection
@@ -397,19 +404,30 @@ export async function bootstrap() {
   }
   console.log(`[bootstrap] Hermes source=${hermesSelection.source} version=${hermesSelection.version || '-'} path=${hermesSelection.path || '-'} python=${hermesSelection.pythonPath || '-'} root=${hermesSelection.agentRoot || '-'}`)
   if (lockedDesktopSelection) recordLockedHermesSelection(hermesSelection)
+  markStartup('Hermes selection resolved')
   updateAgentStatus('ekko-agent', { version: APP_VERSION })
-  const inventoryResults = await Promise.allSettled([
-    ...(!lockedDesktopSelection ? [getRuntimeVersionStatus({ includeRemote: false })] : []),
-    getCodingAgentsStatus(),
-  ])
-  for (const result of inventoryResults) {
-    if (result.status === 'rejected') {
-      logger.warn(result.reason, '[bootstrap] failed to initialize an Agent status source')
+  /*
+   * Hermes 运行时的可用性必须先于监听确定；Coding Agents 的版本探测
+   * 只是给设置页展示的清单，实测会串行调用 14 个 CLI、阻塞约 3 秒。
+   * 它不应该挡住 HTTP 首屏，移到监听之后后台刷新。
+   */
+  if (!lockedDesktopSelection) {
+    try {
+      await getRuntimeVersionStatus({ includeRemote: false })
+    } catch (error) {
+      logger.warn(error, '[bootstrap] failed to initialize the Hermes runtime status')
     }
+  }
+  const refreshCodingAgentsInBackground = (): void => {
+    void getCodingAgentsStatus()
+      .catch(error => {
+        logger.warn(error, '[bootstrap] failed to refresh Coding Agents status')
+      })
   }
   const hermesAgentAvailable = isHermesAgentAvailable()
   console.log(`[bootstrap] Hermes Agent inventory status=${hermesAgentAvailable ? 'available' : 'not-installed'}`)
   await initLoginLimiter()
+  markStartup('login limiter ready')
   if (skillInjectionDisabled()) {
     console.log('[bootstrap] bundled skill injection disabled by HERMES_WEB_UI_DISABLE_SKILL_INJECTION')
   } else {
@@ -434,6 +452,7 @@ export async function bootstrap() {
     }
   }
 
+  markStartup('bundled skills done')
   try {
     await injectBundledMcpServer()
   } catch (err) {
@@ -450,6 +469,7 @@ export async function bootstrap() {
     logger.warn(err, '[bootstrap] failed to migrate persisted Pi MCP runtime configs')
   }
 
+  markStartup('bundled MCP + Pi config migration done')
   try {
     const restoredCodexProxyTargets = await restorePersistedCodexProxyTargets()
     if (restoredCodexProxyTargets > 0) {
@@ -468,10 +488,12 @@ export async function bootstrap() {
     logger.warn(err, '[bootstrap] failed to restore persisted Pi proxy targets')
   }
 
+  markStartup('persisted proxy targets restored')
   try {
     /* The research store lives here, so the wiki_note tool is wired server-side. */
     installWikiNoteHandler()
     const ekkoSetup = setupGlobalEkkoAgent()
+    markStartup('global ekko agent setup called')
     try {
       const injection = injectManagedEkkoMcpServers(ekkoSetup)
       const changed = injection.targets.filter(target => target.status === 'injected' || target.status === 'updated')
@@ -486,6 +508,7 @@ export async function bootstrap() {
       console.warn('[bootstrap] failed to inject Studio MCP servers into MedHealthBuddy config:', err instanceof Error ? err.message : err)
     }
     console.log('[bootstrap] ekko-agent setup complete')
+    markStartup('ekko-agent setup done')
   } catch (err) {
     logger.error(err, '[bootstrap] ekko-agent setup failed; continuing with MedHealthBuddy unavailable')
     console.error('[bootstrap] ekko-agent setup failed; continuing without MedHealthBuddy:', err instanceof Error ? err.message : err)
@@ -507,6 +530,7 @@ export async function bootstrap() {
   interruptOrphanedTaskPlans()
   startChatWebhookDispatcher()
   console.log('[bootstrap] all stores initialized')
+  markStartup('stores initialized')
 
   // The research store is written by both the panel and the agent. Its file lock
   // gives up after ~8s, which is "retry in a moment", not a server fault — map it
@@ -560,17 +584,20 @@ export async function bootstrap() {
     }
   })
   console.log('[bootstrap] SPA fallback registered')
+  markStartup('routes registered')
 
   // Start server using the configured bind host. Default is IPv4 for WSL stability.
   const listenResult = await listenWithFallback(app, config.port, config.host)
   server = listenResult.primary
   servers.splice(0, servers.length, ...listenResult.servers)
   console.log('[bootstrap] app.listen called')
+  markStartup('HTTP listening')
   // The Desktop shell only needs registered HTTP routes and static assets before
   // it can render. Keep slower runtime, socket, and recovery work below in the
   // background startup path, matching the pre-readiness launch behavior.
   bootstrapReady = true
   console.log('[bootstrap] web UI shell ready')
+  refreshCodingAgentsInBackground()
 
   const closeDshPluginUi = dshPluginUi.attach(servers)
   additionalShutdownSteps.push({ name: 'DSH plugin UI transport', close: closeDshPluginUi })

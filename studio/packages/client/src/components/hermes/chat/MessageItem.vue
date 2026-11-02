@@ -8,7 +8,7 @@ import {
 } from "@/stores/hermes/chat";
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
-import { useMessage } from "naive-ui";
+import { useDialog, useMessage } from "naive-ui";
 import { downloadFile, getDownloadUrl } from "@/api/studio/download";
 import { copyToClipboard } from "@/utils/clipboard";
 import { parseThinking, countThinkingChars } from "@/utils/thinking-parser";
@@ -37,6 +37,7 @@ import type { ProfileAvatar as ProfileAvatarData } from "@/api/hermes/profiles";
 import ProfileAvatar from "@/components/hermes/profiles/ProfileAvatar.vue";
 import ImagePreviewOverlay from "./ImagePreviewOverlay.vue";
 import MarkdownRenderer from "./MarkdownRenderer.vue";
+import JsonBlock from "./JsonBlock.vue";
 
 const TOOL_PAYLOAD_DISPLAY_LIMIT = 1000;
 const JSON_STRING_DISPLAY_LIMIT = 200;
@@ -60,6 +61,26 @@ const props = withDefaults(defineProps<{
 });
 const { t } = useI18n();
 const toast = useMessage();
+const dialog = useDialog();
+const rewinding = ref(false);
+
+/** 删除这条用户消息及其之后的全部消息，回到提问前。 */
+function rewindToHere(): void {
+  if (rewinding.value || chatStore.isStreaming) return
+  dialog.warning({
+    title: t('chat.rewindTitle'),
+    content: t('chat.rewindConfirm'),
+    positiveText: t('chat.rewindConfirmAction'),
+    negativeText: t('common.cancel'),
+    onPositiveClick: async () => {
+      rewinding.value = true
+      const ok = await chatStore.rewindToMessage(props.message.id)
+      rewinding.value = false
+      if (ok) toast.success(t('chat.rewindDone'))
+      else toast.error(t('chat.rewindFailed'))
+    },
+  })
+}
 
 const isSystem = computed(() => props.message.role === "system");
 const isAgentError = computed(() => props.message.role === "assistant" && props.message.systemType === "error");
@@ -284,6 +305,23 @@ function referenceBubbleContent() {
 const parsedThinking = computed(() =>
   parseThinking(props.message.content || "", { streaming: !!props.message.isStreaming }),
 );
+
+/**
+ * 智能体（FastGPT 工作流）经常把结果整段塞成一坨 JSON：能 parse 成对象/数组时
+ * 交给 JsonBlock 折叠渲染，别再当成一段没有换行的文字糊在气泡里。
+ */
+const assistantJsonPayload = computed<unknown>(() => {
+  if (props.message.role !== 'assistant' || props.message.isStreaming) return null;
+  const raw = (props.message.content || '').trim();
+  if (raw.length < 2) return null;
+  if (raw[0] !== '{' && raw[0] !== '[') return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+});
 
 const quotableContent = computed(() => {
   if (props.message.role !== 'user' && props.message.role !== 'assistant') return null
@@ -1150,8 +1188,13 @@ onBeforeUnmount(() => {
                 <MarkdownRenderer :content="thinkingFullText" />
               </div>
             </div>
+            <JsonBlock
+              v-if="assistantJsonPayload"
+              :value="assistantJsonPayload"
+              :streaming="message.isStreaming"
+            />
             <MarkdownRenderer
-              v-if="parsedThinking.body && message.role === 'assistant'"
+              v-else-if="parsedThinking.body && message.role === 'assistant'"
               :content="parsedThinking.body"
               :heading-id-prefix="effectiveHeadingIdPrefix"
             />
@@ -1284,6 +1327,18 @@ onBeforeUnmount(() => {
               <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="6" y="4" width="4" height="16"/>
                 <rect x="14" y="4" width="4" height="16"/>
+              </svg>
+            </button>
+            <button
+              v-if="message.role === 'user' && !message.queued"
+              class="rewind-bubble-btn"
+              :disabled="rewinding || chatStore.isStreaming"
+              @click="rewindToHere"
+              :title="t('chat.rewindToHere')"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 14 4 9l5-5" />
+                <path d="M4 9h9a7 7 0 1 1 0 14h-3" />
               </svg>
             </button>
             <button
@@ -1843,6 +1898,7 @@ onBeforeUnmount(() => {
 .copy-bubble-btn,
 .reference-bubble-btn,
 .speech-bubble-btn,
+.rewind-bubble-btn,
 .fork-bubble-btn {
   display: flex;
   align-items: center;

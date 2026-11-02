@@ -189,6 +189,12 @@ async function fixture(t, mac = false, testSource, linuxArch) {
   const controllerPath = require.resolve('../dist/main/updater.js')
   delete require.cache[controllerPath]
   process.env.HERMES_DESKTOP_ENABLE_AUTO_UPDATE = 'false'
+  // The shipped build configures no update feed of its own, so the fixture
+  // supplies one; setFeedURL below maps it onto the local server.
+  const originalFeed = process.env.MEDHEALTHBUDDY_UPDATE_FEED
+  const originalFallbackFeed = process.env.MEDHEALTHBUDDY_UPDATE_FALLBACK_FEED
+  process.env.MEDHEALTHBUDDY_UPDATE_FEED = 'https://cf.example.com/latest'
+  process.env.MEDHEALTHBUDDY_UPDATE_FALLBACK_FEED = 'https://github.com/medhealthbuddy/desktop/releases/latest/download'
   const controller = require(controllerPath)
   controller.initAutoUpdater({
     onStateChange: state => control.snapshots.push(state),

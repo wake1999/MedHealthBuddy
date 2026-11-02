@@ -32,7 +32,7 @@ export async function prepareScreenshotImageEditor(): Promise<ScreenshotOverlayW
   if (!imageEditor || imageEditor.window.isDestroyed()) {
     const window = new BrowserWindow({
       width: 1000, height: 740, minWidth: 600, minHeight: 480, show: false,
-      title: 'Ekko Studio',
+      title: 'MedHealthBuddy',
       useContentSize: true, autoHideMenuBar: true, backgroundColor: '#181b22',
       webPreferences: webPreferences(),
     })

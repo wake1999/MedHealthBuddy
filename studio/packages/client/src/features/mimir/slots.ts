@@ -142,6 +142,8 @@ export interface ResearchPanelInjected {
   reloadSource: () => void
   /** Load the literature list once, on the papers view's first open. */
   ensurePapers: () => void
+  /** Re-fetch the literature list now (after an import the list must grow). */
+  refreshPapers: () => Promise<void>
   /**
    * Hand one assembled figure-organization prompt to the current session's
    * agent (the figures view's "organize with AI" button); the outcome lands

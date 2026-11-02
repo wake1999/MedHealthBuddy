@@ -87,12 +87,12 @@ export async function verifyTestArtifacts(output, target, metadata) {
   const info = targets[target]
   if (!info) throw new Error('Unknown test artifact target')
   const expectedSource = resolveDesktopUpdateSource(metadata)
-  if (expectedSource.channel !== 'test') throw new Error('Test artifact metadata must select the test feed')
+  if (!expectedSource || expectedSource.channel !== 'test') throw new Error('Test artifact metadata must select the test feed')
   const resources = join(output, info.resources)
   const { extractFile } = await import('@electron/asar')
   const packaged = JSON.parse(extractFile(join(resources, 'app.asar'), 'package.json').toString('utf8'))
   const source = resolveDesktopUpdateSource(packaged)
-  if (packaged.version !== metadata.version || source.channel !== 'test' || source.url !== expectedSource.url) {
+  if (!source || packaged.version !== metadata.version || source.channel !== 'test' || source.url !== expectedSource.url) {
     throw new Error('Packaged version or update source differs from the requested test build')
   }
   const nativeFeed = loadYaml(await readFile(join(resources, 'app-update.yml'), 'utf8'))

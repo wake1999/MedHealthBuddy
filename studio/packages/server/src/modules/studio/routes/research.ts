@@ -1,6 +1,7 @@
 import Router from '@koa/router'
 
 import * as ctrl from '../controllers/research'
+import * as paperCtrl from '../controllers/research-paper'
 
 export const researchRoutes = new Router()
 
@@ -97,3 +98,38 @@ researchRoutes.get('/api/studio/research/venues/catalog', ctrl.venueCatalog)
 researchRoutes.post('/api/studio/research/items/:collection', ctrl.createItem)
 researchRoutes.patch('/api/studio/research/items/:collection/:id', ctrl.updateItem)
 researchRoutes.delete('/api/studio/research/items/:collection/:id', ctrl.deleteItem)
+
+// Paper intake: any PDF becomes a paper (upload → full text), plus metadata lookup
+researchRoutes.post('/api/studio/research/papers/resolve', paperCtrl.resolvePaperMetadataHandler)
+// Any PDF becomes a paper: record → store → extract, in one call
+researchRoutes.post('/api/studio/research/papers/import-pdf', paperCtrl.importPaperPdfHandler)
+researchRoutes.post('/api/studio/research/papers/:id/pdf', paperCtrl.uploadPaperPdf)
+// One-shot body-text translation (the reader's "translate this page" + passage translate)
+researchRoutes.post('/api/studio/research/papers/:id/translate', paperCtrl.translatePaperHandler)
+// Whole-document translation that keeps the original layout (pdf2zh → *-dual.pdf)
+researchRoutes.post('/api/studio/research/papers/:id/translate-pdf', paperCtrl.translatePaperPdfHandler)
+researchRoutes.post('/api/studio/research/papers/:id/fulltext', paperCtrl.extractPaperFulltextHandler)
+researchRoutes.get('/api/studio/research/papers/:id/fulltext', paperCtrl.readPaperFulltextHandler)
+researchRoutes.post('/api/studio/research/papers/:id/summary', paperCtrl.summarizePaperHandler)
+researchRoutes.post('/api/studio/research/papers/:id/ask', paperCtrl.askPaperHandler)
+// Paper-level skills: full_read / passage_qa / figure_qa / concept
+researchRoutes.post('/api/studio/research/papers/:id/skill', paperCtrl.runPaperSkillHandler)
+// Cross-paper review over the current library
+researchRoutes.post('/api/studio/research/review', paperCtrl.runLiteratureReviewHandler)
+// Vision: look at a rendered page (figures, tables) with a multimodal model
+researchRoutes.post('/api/studio/research/papers/:id/vision', paperCtrl.askPaperFigureHandler)
+// Caption index parsed from the full text (no model involved)
+researchRoutes.get('/api/studio/research/papers/:id/figures', paperCtrl.listPaperFiguresHandler)
+// Tag + relevance proposal (read-only; the panel applies it after confirmation)
+researchRoutes.post('/api/studio/research/papers/:id/suggest', paperCtrl.suggestPaperTagsHandler)
+
+// Structured notes (blocks, reading template) and local library search
+researchRoutes.get('/api/studio/research/papers/:id/notes', paperCtrl.readPaperNotesHandler)
+researchRoutes.put('/api/studio/research/papers/:id/notes', paperCtrl.savePaperNotesHandler)
+researchRoutes.post('/api/studio/research/papers/:id/notes/template', paperCtrl.applyReadingTemplateHandler)
+researchRoutes.get('/api/studio/research/library/search', paperCtrl.searchLibraryHandler)
+// Batch update with an undo payload; `items` mode also serves as the revert call.
+researchRoutes.post('/api/studio/research/items/:collection/batch', paperCtrl.batchUpdateItemsHandler)
+
+// PubMed search (medical literature; the arXiv feed alone cannot serve this panel)
+researchRoutes.get('/api/studio/research/pubmed/search', paperCtrl.searchPubmedHandler)

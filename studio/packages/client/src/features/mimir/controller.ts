@@ -1914,8 +1914,8 @@ export class ResearchController implements HostObservable<ResearchView> {
    * Re-fetch the literature list without flipping the view to loading (the
    * papers view's poll after handing a scoring request to the agent).
    */
-  refreshPapers(): void {
-    void this.loadPapers(true)
+  refreshPapers(): Promise<void> {
+    return this.loadPapers(true)
   }
 
   /**
@@ -3295,7 +3295,18 @@ export class ResearchController implements HostObservable<ResearchView> {
    */
   async updatePaper(
     arxivId: string,
-    patch: { tags?: string[]; projectIds?: string[]; notes?: string; score?: number },
+    patch: {
+      tags?: string[]
+      projectIds?: string[]
+      notes?: string
+      score?: number
+      favorite?: boolean
+      pinned?: boolean
+      status?: 'new' | 'reading' | 'read'
+      translatedAt?: number
+      /** 归到某个文件夹；空串表示移回「未分类」。 */
+      folderId?: string
+    },
   ): Promise<ResearchFailureView | null> {
     try {
       const carried = await this.remote.updatePaper({ arxivId, ...patch })

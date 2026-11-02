@@ -26,7 +26,7 @@ import {
   startWebUiServer,
   stopWebUiServer,
 } from './webui-server'
-import { bundledNode, desktopIcon, desktopLinuxTrayIcon, desktopMacTrayIcon, desktopRuntimeVersion, desktopWindowsTrayIcon, runtimeStorageRoot, webuiDir, webUiHome } from './paths'
+import { bundledNode, desktopIcon, desktopLinuxTrayIcon, desktopMacTrayIcon, desktopRuntimeVersion, desktopWindowIcon, desktopWindowsTrayIcon, runtimeStorageRoot, webuiDir, webUiHome } from './paths'
 import { cancelDesktopUpdateDownload, checkForDesktopUpdates, downloadDesktopUpdate, getDesktopUpdateState, initAutoUpdater, installDesktopUpdate } from './updater'
 import { DESKTOP_UPDATE_STATE_CHANNEL, type DesktopUpdateState } from './updater-types'
 import { t } from './desktop-i18n'
@@ -42,6 +42,7 @@ import { groupChatAgentLinkPopupResponse } from './group-chat-agent-popup'
 import { isTrustedDesktopAppUrl, normalizeExternalHttpUrl } from './window-open-policy'
 import { desktopPreloadArguments, remoteReadyTimeoutMs, resolveRemoteServerUrl, waitForRemoteServerReady } from './remote-server'
 import {
+  availableRuntimeDownloadSources,
   ensureDesktopRuntime,
   isDesktopRuntimeReady,
   migratePendingRuntimeRoot,
@@ -155,7 +156,7 @@ function showWindowWithFade(focus = true) {
     return
   }
 
-  const durationMs = 180
+  const durationMs = 110
   const startedAt = Date.now()
   mainWindow.setOpacity(0)
   mainWindow.show()
@@ -474,13 +475,13 @@ function updateTrayMenu() {
       },
     },
     {
-      label: t('tray.openAtLogin'),
-      type: 'checkbox',
+      // 不用 `type: 'checkbox'`：Windows 原生菜单里只要有一项是 checkbox，就会给
+      // 整个菜单左侧预留勾选栏，其余各项文字前都多出一块空白。改用文字后缀表达状态。
+      label: getOpenAtLogin() ? `${t('tray.openAtLogin')}  ✓` : t('tray.openAtLogin'),
       enabled: process.platform !== 'linux' || app.isPackaged,
-      checked: getOpenAtLogin(),
-      click: (item) => {
+      click: () => {
         try {
-          setOpenAtLogin(item.checked)
+          setOpenAtLogin(!getOpenAtLogin())
         } catch (error) {
           console.error('[tray] failed to change the login item:', error)
           dialog.showErrorBox(t('tray.openAtLoginFailedTitle'), `${t('tray.openAtLoginFailedMessage')}\n\n${String(error instanceof Error ? error.message : error)}`)
@@ -514,7 +515,7 @@ function createTray() {
         quality: 'best',
       })
   tray = new Tray(icon)
-  tray.setToolTip('Ekko Studio')
+  tray.setToolTip('MedHealthBuddy')
   tray.on('click', () => {
     showMainWindow()
     updateTrayMenu()
@@ -528,7 +529,7 @@ async function createWindow(): Promise<void> {
     height: 820,
     minWidth: 769,
     minHeight: 600,
-    title: 'Ekko Studio',
+    title: 'MedHealthBuddy',
     backgroundColor: '#1a1a1a',
     autoHideMenuBar: true,
     show: false,
@@ -549,7 +550,7 @@ async function createWindow(): Promise<void> {
         : process.platform === 'linux'
           ? { frame: false }
           : {}),
-    ...(process.platform === 'linux' ? { icon: desktopIcon() } : {}),
+    icon: desktopWindowIcon(),
     webPreferences: {
       preload: join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
@@ -649,7 +650,7 @@ async function openChatWindow(sessionIdInput: unknown, profileInput?: unknown): 
     height: 760,
     minWidth: 620,
     minHeight: 480,
-    title: 'Ekko Studio',
+    title: 'MedHealthBuddy',
     backgroundColor: '#1a1a1a',
     autoHideMenuBar: true,
     show: false,
@@ -664,7 +665,7 @@ async function openChatWindow(sessionIdInput: unknown, profileInput?: unknown): 
             titleBarOverlay: { height: 46 },
           }
         : {}),
-    ...(process.platform === 'linux' ? { icon: desktopIcon() } : {}),
+    icon: desktopWindowIcon(),
     webPreferences: {
       preload: join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
@@ -773,26 +774,25 @@ function installMicrophonePermissionHandler() {
 
 function splashHtml(label = t('desktop.startingLocalServices')): string {
   const startingLabel = escapeHtml(label)
-  const pageBackground = process.platform === 'win32' ? 'transparent' : '#1a1a1a'
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Ekko Studio</title>
+  const logoUrl = runtimeSourceLogoDataUri()
+  const pageBackground = process.platform === 'win32' ? 'transparent' : '#101114'
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>MedHealthBuddy</title>
 <style>
   html,body{margin:0;height:100%;background:${pageBackground};color:#e5e5e5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;-webkit-app-region:drag;}
-  .surface{height:100%;background:#1a1a1a}
-  .wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px}
-  .dot{width:10px;height:10px;border-radius:50%;background:#888;animation:pulse 1.2s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
-  .row{display:flex;gap:8px}
-  .row .dot:nth-child(2){animation-delay:.2s}.row .dot:nth-child(3){animation-delay:.4s}
-  .label{font-size:14px;color:#b8b8b8}
-  .detail{min-height:18px;font-size:12px;color:#7f7f7f}
-  .progress{width:320px;height:6px;border-radius:999px;background:#2b2b2b;overflow:hidden}
-  .bar{width:0;height:100%;background:#d8d8d8;transition:width .18s ease}
-  .bar.indeterminate{width:40%;animation:progress 1.2s ease-in-out infinite;transition:none}
-  @keyframes progress{0%{transform:translateX(-110%)}100%{transform:translateX(360%)}}
-  h1{font-weight:500;margin:0;font-size:18px}
+  .surface{height:100%;display:grid;place-items:center;background:radial-gradient(circle at 50% 42%,#1b1d22 0%,#101114 58%)}
+  .wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-width:280px;text-align:center}
+  .brand{display:flex;align-items:center;gap:11px;margin-bottom:2px}
+  .mark{width:34px;height:34px;border-radius:9px;object-fit:contain;box-shadow:0 4px 14px rgb(0 0 0 / 35%)}
+  h1{font-weight:560;margin:0;font-size:19px;letter-spacing:.01em;color:#f2f3f5}
+  .label{font-size:12.5px;color:#a9adb6;line-height:1.5}
+  .detail{min-height:16px;font-size:11px;color:#6f7681}
+  .progress{width:min(260px,64vw);height:3px;border-radius:999px;background:#242830;overflow:hidden}
+  .bar{width:0;height:100%;background:linear-gradient(90deg,#8b93a1,#d8dce4);transition:width .18s ease}
+  .bar.indeterminate{width:34%;animation:progress .95s ease-in-out infinite;transition:none}
+  @keyframes progress{0%{transform:translateX(-120%)}100%{transform:translateX(330%)}}
+  @media (prefers-reduced-motion:reduce){.bar.indeterminate{animation:none;width:42%}}
 </style></head><body><main class="surface"><div class="wrap">
-<h1>Ekko Studio</h1>
-<div class="row"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+<div class="brand">${logoUrl ? `<img class="mark" src="${logoUrl}" alt="">` : ''}<h1>MedHealthBuddy</h1></div>
 <div id="label" class="label">${startingLabel}</div>
 <div class="progress"><div id="bar" class="bar indeterminate"></div></div>
 <div id="detail" class="detail"></div>
@@ -825,11 +825,12 @@ function escapeHtml(value: string): string {
 }
 
 function resolveRuntimeSourceLogo(): string {
+  // 启动页固定使用桌面品牌图标，不能再优先取 Web UI 里的旧校徽资源。
   const candidates = [
+    desktopIcon(),
     join(webuiDir(), 'dist', 'client', 'logo.png'),
     join(webuiDir(), 'packages', 'client', 'public', 'logo.png'),
     join(webuiDir(), 'logo.png'),
-    desktopIcon(),
   ]
   return candidates.find(candidate => existsSync(candidate)) || desktopIcon()
 }
@@ -855,7 +856,21 @@ function runtimeSourceHtml(errorMessage?: string): string {
         <pre>${safeError}</pre>
        </section>`
     : ''
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Ekko Studio</title>
+  // Only sources this build configured for itself are offered; a build without
+  // any configured source explains that instead of pointing at upstream hosts.
+  const downloadSources = availableRuntimeDownloadSources()
+  const label = downloadSources.length > 0
+    ? t('desktop.selectRuntimeSource')
+    : t('desktop.runtimeSourceMissing')
+  const actionsBlock = downloadSources.length > 0
+    ? `<div class="actions">
+${downloadSources.map(source => `  <button id="${source}">
+    <span class="button-title">${escapeHtml(t(source === 'github' ? 'desktop.downloadGithubTitle' : 'desktop.downloadMirrorTitle'))}</span>
+    <span class="button-detail">${escapeHtml(t(source === 'github' ? 'desktop.downloadGithubDetail' : 'desktop.downloadMirrorDetail'))}</span>
+  </button>`).join('\n')}
+</div>`
+    : ''
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>MedHealthBuddy</title>
 <style>
   :root{color-scheme:dark}
   *{box-sizing:border-box}
@@ -883,26 +898,14 @@ function runtimeSourceHtml(errorMessage?: string): string {
     button{min-height:78px}
   }
 </style></head><body><main class="surface"><div class="wrap">
-<div class="brand">${logoUrl ? `<img class="mark" src="${logoUrl}" alt="Ekko Studio">` : ''}<h1>Ekko Studio</h1></div>
-<p class="label">${escapeHtml(t('desktop.selectRuntimeSource'))}</p>
+<div class="brand">${logoUrl ? `<img class="mark" src="${logoUrl}" alt="MedHealthBuddy">` : ''}<h1>MedHealthBuddy</h1></div>
+<p class="label">${escapeHtml(label)}</p>
 ${errorBlock}
-<div class="actions">
-  <button id="cf">
-    <span class="button-title">${escapeHtml(t('desktop.downloadCloudflareTitle'))}</span>
-    <span class="button-detail">${escapeHtml(t('desktop.downloadCloudflareDetail'))}</span>
-  </button>
-  <button id="github">
-    <span class="button-title">${escapeHtml(t('desktop.downloadGithubTitle'))}</span>
-    <span class="button-detail">${escapeHtml(t('desktop.downloadGithubDetail'))}</span>
-  </button>
-</div>
+${actionsBlock}
 <script>
-  document.getElementById('cf')?.addEventListener('click', () => {
-    window.hermesDesktop?.retryBootstrap?.('cf')
-  })
-  document.getElementById('github')?.addEventListener('click', () => {
-    window.hermesDesktop?.retryBootstrap?.('github')
-  })
+${downloadSources.map(source => `  document.getElementById('${source}')?.addEventListener('click', () => {
+    window.hermesDesktop?.retryBootstrap?.('${source}')
+  })`).join('\n')}
 </script>
 </div></main></body></html>`
   return 'data:text/html;charset=utf-8,' + encodeURIComponent(html)
@@ -971,7 +974,7 @@ async function installPackagedCommandShims(): Promise<void> {
   for (const result of results) {
     if (result.status === 'rejected') {
       console.warn(
-        `[cli-shim] failed to install Ekko Studio command: `
+        `[cli-shim] failed to install MedHealthBuddy command: `
         + `${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
       )
       continue
@@ -1036,7 +1039,13 @@ async function bootstrap(source?: RuntimeDownloadSource) {
     }
     if (isDesktopRuntimeReady()) {
       writeActiveRuntimeVersion()
-      await installPackagedCommandShims()
+      /*
+       * CLI shim 只影响外部终端命令，不影响首屏。
+       * 放到后台安装，避免打包版每次启动都为写 shim 等待。
+       */
+      void installPackagedCommandShims().catch(error => {
+        console.warn('[cli-shim] background installation failed:', error)
+      })
     }
   } catch (err) {
     console.error('Failed to prepare Hermes runtime:', err)
@@ -1416,7 +1425,7 @@ ipcMain.handle('hermes-desktop:notify-completion', (_event, payload?: { title?: 
 
   const title = typeof payload?.title === 'string' && payload.title.trim()
     ? payload.title.trim()
-    : 'Ekko Studio'
+    : 'MedHealthBuddy'
   const body = typeof payload?.body === 'string' ? payload.body.trim().slice(0, 240) : ''
   const icon = resolveNotificationIcon(payload?.icon)
   const clickUrl = safeNotificationClickUrl(payload?.clickUrl)
@@ -1511,10 +1520,15 @@ function runDesktopApp() {
     void warmScreenshotEditor().catch(error => console.warn('[screenshot] could not preload editor:', error))
     app.once('will-quit', disposeScreenshotOverlays)
     app.once('will-quit', () => screenshotShortcut.dispose())
-    await initializeDesktopBrowser().catch(error => {
+    /*
+     * 本地服务是首屏启动的关键路径；内嵌浏览器不是。
+     * 之前这里 await 浏览器初始化，把首页 ready 时间白白拖后。
+     * 现在两者并行：服务先跑，浏览器在后台补齐。
+     */
+    void bootstrap()
+    void initializeDesktopBrowser().catch(error => {
       console.error('[desktop-browser] failed to initialize:', error)
     })
-    void bootstrap()
     initAutoUpdater({
       beforeQuitAndInstall: prepareAppShutdown,
       onInstallFailure: async () => {
@@ -1534,7 +1548,7 @@ function runDesktopApp() {
     })
   }).catch(error => {
     console.error('[desktop] failed during Electron startup:', error)
-    dialog.showErrorBox('Ekko Studio', String(error instanceof Error ? error.message : error))
+    dialog.showErrorBox('MedHealthBuddy', String(error instanceof Error ? error.message : error))
     quitApp()
   })
 

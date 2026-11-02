@@ -20825,6 +20825,61 @@
         }
       }
     },
+    "/api/studio/sessions/{id}/rewind": {
+      "post": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "Create rewind",
+        "description": "POST /api/studio/sessions/:id/rewind",
+        "operationId": "rewind",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messageId": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "messageId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/sessions/{id}/share-context-length": {
       "get": {
         "tags": [

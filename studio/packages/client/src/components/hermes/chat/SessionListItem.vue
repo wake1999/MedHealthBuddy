@@ -22,6 +22,8 @@ const props = withDefaults(defineProps<{
   selectable?: boolean
   selected?: boolean
   showProfile?: boolean
+  /** 挂在某个工作空间下面时缩进一级，体现「目录 › 会话」的层级。 */
+  indent?: boolean
   categoryLabel?: string
   to?: string
   interceptModifiedNavigation?: boolean
@@ -41,6 +43,22 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const appStore = useAppStore()
 const profilesStore = useProfilesStore()
+/** 列表用相对时间（13 小时前），比绝对日期更容易看出新近程度。 */
+const timeLabel = computed(() => {
+  const raw = props.session.updatedAt || props.session.createdAt || 0
+  if (!raw) return ''
+  const diff = Date.now() - raw
+  if (diff < 0) return formatTimestampMs(raw)
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  if (diff < minute) return t('chat.timeJustNow')
+  if (diff < hour) return t('chat.timeMinutesAgo', { count: Math.floor(diff / minute) })
+  if (diff < day) return t('chat.timeHoursAgo', { count: Math.floor(diff / hour) })
+  if (diff < 7 * day) return t('chat.timeDaysAgo', { count: Math.floor(diff / day) })
+  return formatTimestampMs(raw)
+})
+
 const profileName = computed(() => props.session.profile || 'default')
 const profileDisplayText = computed(() => {
   const found = profilesStore.profiles.find(profile => profile.name === profileName.value)
@@ -114,7 +132,7 @@ onUnmounted(() => {
   <component
     :is="selectable || !to ? 'button' : 'a'"
     class="session-item"
-    :class="{ active, 'batch-mode': selectable, 'missing-models': profileModelsMissing }"
+    :class="{ active, 'session-item--indented': indent, 'batch-mode': selectable, 'missing-models': profileModelsMissing }"
     :aria-current="active ? 'page' : undefined"
     :href="!selectable ? to : undefined"
     :type="selectable || !to ? 'button' : undefined"
@@ -146,7 +164,7 @@ onUnmounted(() => {
             {{ t('chat.profileMissingModelsTip', { profile: profileDisplayText }) }}
           </NTooltip>
         </span>
-        <span class="session-item-time">{{ formatTimestampMs(session.createdAt) }}</span>
+        <span class="session-item-time">{{ timeLabel }}</span>
         <button
           class="session-item-more"
           type="button"
@@ -161,7 +179,7 @@ onUnmounted(() => {
           </svg>
         </button>
       </span>
-      <span class="session-item-agent-row">
+      <span v-if="props.showProfile" class="session-item-agent-row">
         <span class="session-item-agent-logo-wrap" :class="{ streaming }">
           <img
             class="session-item-agent-logo"
@@ -218,16 +236,17 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 8px 10px;
+  min-height: 34px;
+  padding: 4px 10px;
   border: none;
   background: none;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   cursor: pointer;
   text-align: start;
   text-decoration: none;
   color: var(--text-secondary);
-  transition: all var(--transition-fast);
-  margin-bottom: 2px;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+  margin-bottom: 1px;
 }
 
 .session-item:hover {
@@ -245,15 +264,20 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
+/* 选中态对齐参考图：整行浅灰底，文字只比未选中深一档，不用纯黑加粗。 */
 .session-item.active {
-  background: rgba(var(--accent-primary-rgb), 0.12);
+  background: rgba(var(--text-primary-rgb), 0.06);
   color: var(--text-primary);
   font-weight: 500;
-  border-radius: 6px;
 }
 
 .session-item.active .session-item-title {
   color: var(--text-primary);
+}
+
+/* 挂在工作空间下面的会话：左内边距让出目录图标的位置。 */
+.session-item--indented {
+  padding-inline-start: 30px;
 }
 
 .session-item.missing-models {
@@ -340,6 +364,7 @@ onUnmounted(() => {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
+  color: var(--text-primary);
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -365,7 +390,7 @@ onUnmounted(() => {
 
 .session-item-time {
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 

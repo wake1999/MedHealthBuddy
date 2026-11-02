@@ -34,6 +34,8 @@ export interface ResearchProject {
 export interface ResearchPaper {
   id: string
   projectId: string
+  /** 所属文件夹；未分类时缺省。 */
+  folderId?: string
   title: string
   authors: string
   year: string
@@ -49,6 +51,18 @@ export interface ResearchPaper {
   addedAt: number
   /** 已抓取的 PDF 的本地绝对路径，没有抓过就没有这个字段。 */
   pdfPath?: string
+  /** 抽取出来的全文文件路径；有它才说明这篇能问、能自动摘要。 */
+  fulltextPath?: string
+  /** 全文的字符数，面板用来给一个体积提示。 */
+  fulltextChars?: number
+  /** 已生成的结构化摘要，避免每次打开都重算一遍。 */
+  aiSummary?: string
+  /** 卡片上的收藏（书签）标记。 */
+  favorite?: boolean
+  /** 置顶：列表里排在其它文献前面。 */
+  pinned?: boolean
+  /** 整篇翻译完成的时间戳；有值说明已经有译本可以直接打开。 */
+  translatedAt?: number
 }
 
 export interface ResearchMetric {
@@ -167,8 +181,17 @@ export interface ResearchDeck {
   pages: number
 }
 
+/** 文献库里的文件夹（论文通过 folderId 归属，未分类时缺省）。 */
+export interface ResearchFolder {
+  id: string
+  projectId: string
+  name: string
+  createdAt: number
+}
+
 export interface ResearchCollections {
   papers: ResearchPaper[]
+  folders: ResearchFolder[]
   experiments: ResearchExperiment[]
   figures: ResearchFigure[]
   ideas: ResearchIdea[]
@@ -211,7 +234,14 @@ function qs(params: Record<string, string>): string {
 
 export async function fetchResearchState(profile?: string | null): Promise<ResearchStateResponse> {
   const value = profileParam(profile)
-  return request<ResearchStateResponse>(`/api/studio/research/state${qs(value ? { profile: value } : {})}`)
+  /*
+   * 必须绕开 HTTP 缓存：上传 PDF 之后会立刻回读一次列表，如果这次 GET 命中
+   * 浏览器缓存，拿到的还是上传前的快照 —— 表现就是「卡片要切走再回来才出现」。
+   */
+  return request<ResearchStateResponse>(
+    `/api/studio/research/state${qs(value ? { profile: value } : {})}`,
+    { cache: 'no-store' },
+  )
 }
 
 /* ------------------------------------------------------------- decks */

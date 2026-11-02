@@ -517,6 +517,19 @@ export function desktopIcon(): string {
   return resolve(desktopAppPath(), 'build', filename)
 }
 
+/**
+ * Window/taskbar icon. On Windows the .ico is used so the running window shows
+ * the product icon even when the app is started from `electron .` (development),
+ * where the executable is Electron's own binary.
+ */
+export function desktopWindowIcon(): string {
+  const filename = process.platform === 'win32'
+    ? 'icon.ico'
+    : process.platform === 'linux' ? 'iconLinux.png' : 'icon.png'
+  if (isPackaged()) return resolve(process.resourcesPath, 'build', filename)
+  return resolve(desktopAppPath(), 'build', filename)
+}
+
 export function desktopWindowsTrayIcon(): string {
   if (isPackaged()) return resolve(process.resourcesPath, 'build', 'trayWindows.png')
   return resolve(desktopAppPath(), 'build', 'trayWindows.png')

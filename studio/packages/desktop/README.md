@@ -1,15 +1,32 @@
-# Ekko Studio
+# MedHealthBuddy
 
-Electron desktop distribution for Ekko Studio.
+Electron desktop distribution for MedHealthBuddy.
 
 ## Install
 
-Download the latest macOS, Windows, or Linux installer for your CPU
-architecture from the project
-[GitHub Releases](https://github.com/EKKOLearnAI/ekko-studio/releases/latest).
+Build the installer for your platform with `npm run dist:win`, `dist:mac` or
+`dist:linux`; the artifact is written to `release/`.
 
 The desktop app bundles the Web UI runtime and launches it locally from the
 native shell app.
+
+## Update and runtime download sources
+
+This build ships **no** update feed and **no** runtime download host: it never
+contacts the upstream Ekko Studio releases, which would replace it with a
+differently branded app. Configure your own hosts when you need them:
+
+| Variable | Purpose |
+| --- | --- |
+| `MEDHEALTHBUDDY_UPDATE_FEED` | Generic update feed directory, e.g. `https://updates.example.com/latest` |
+| `MEDHEALTHBUDDY_UPDATE_FALLBACK_FEED` | Optional second feed, tried when the first fails |
+| `MEDHEALTHBUDDY_RUNTIME_BASE_URL` | Runtime archive base URL; `{tag}` and `{asset}` are substituted |
+| `MEDHEALTHBUDDY_RUNTIME_REPO` | GitHub `owner/repo` hosting runtime archives |
+
+Without them, automatic updates are off and runtime archives are not
+downloaded — the app uses an already-installed runtime (from the packaged
+resources or an earlier install). Values pointing at the upstream project are
+refused with a warning.
 
 ## Remote server mode
 

@@ -1,5 +1,5 @@
 // @ts-nocheck 鈥?vendored ui-mimir island: React 18 JSX plus dsh-* SDK modules that exist only as ambient stubs here, so project-wide type checking cannot cover it. Transformed by esbuild with jsxImportSource=react and verified at runtime.
-import { getActiveProfileName, getApiKey, getBaseUrlValue } from '../../api/client'
+import { getBaseUrlValue } from '../../api/client'
 import { deckBlobUrl } from './deck-blobs'
 import { figureBlobUrl } from './figure-blobs'
 /**
@@ -393,13 +393,9 @@ export function bibEntryFromDraft(draft: BibEntryDraft): BibEntry | null {
  * already-open iframe to re-request.
  */
 export function paperPdfUrl(arxivId: string, version: number): string {
-  // ekko 把字节放在 /api/studio/research/paper-pdf；iframe 带不了 Authorization
-  // 头，所以 token 与当前 profile 走 query —— 和事件流同一条老路。
+  // 两个调用方都是 fetch(arrayBuffer)，Authorization / profile 已由请求头携带。
+  // 不把 token 放进 URL：避免日志、下载管理器及截图泄露凭据。
   const query = [`arxivId=${encodeURIComponent(arxivId)}`, `v=${version}`]
-  const token = getApiKey()
-  if (token !== '') query.push(`token=${encodeURIComponent(token)}`)
-  const profile = getActiveProfileName()
-  if (profile !== null && profile !== '') query.push(`profile=${encodeURIComponent(profile)}`)
   return `${getBaseUrlValue()}/api/studio/research/paper-pdf?${query.join('&')}`
 }
 

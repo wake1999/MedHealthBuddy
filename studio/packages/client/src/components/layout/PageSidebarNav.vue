@@ -372,7 +372,7 @@ function openWorkflow() {
 .page-sidebar-tab {
   width: 100%;
   min-width: 0;
-  height: 34px;
+  height: 36px;
   border: none;
   border-radius: $radius-sm;
   background: transparent;
@@ -382,7 +382,7 @@ function openWorkflow() {
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  padding: 7px 10px;
+  padding: 8px 10px;
   cursor: pointer;
   transition:
     background-color $transition-fast,
@@ -397,8 +397,8 @@ function openWorkflow() {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 14px;
+    line-height: 20px;
   }
 
   &:hover,
@@ -410,27 +410,30 @@ function openWorkflow() {
 
 /* New-chat entry: the one tinted row in the sidebar, so it reads as the
    primary action instead of another nav item. */
+/* 主操作与普通导航同高同字号，只靠字重和图标区分，避免一行大一行小。 */
 .page-sidebar-primary {
   width: 100%;
-  height: 38px;
-  margin: 2px 0 8px;
+  height: 36px;
+  /* 与下面「发现应用」保持一个导航间距，不再额外留 8px。 */
+  margin: 2px 0 0;
   padding: 0 10px;
   gap: 8px;
   border: none;
   border-radius: 8px;
-  background: rgba(var(--text-primary-rgb), 0.05);
+  background: transparent;
   color: $text-primary;
-  font-weight: 600;
+  font-weight: 500;
+  transition: background-color $transition-fast;
 
   .page-sidebar-primary__icon {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     color: $text-primary;
   }
 
   .page-sidebar-primary__label {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 20px;
   }
 

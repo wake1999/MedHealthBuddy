@@ -512,6 +512,19 @@ export async function batchDeleteSessions(targets: Array<string | BatchDeleteSes
   }
 }
 
+/** 删除目标消息及其之后的消息，把会话回退到该消息之前。 */
+export async function rewindSession(id: string, messageId: string): Promise<boolean> {
+  try {
+    await request(`/api/studio/sessions/${encodeURIComponent(id)}/rewind`, {
+      method: 'POST',
+      body: JSON.stringify({ messageId }),
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function renameSession(id: string, title: string): Promise<boolean> {
   try {
     await request(`/api/studio/sessions/${id}/rename`, {

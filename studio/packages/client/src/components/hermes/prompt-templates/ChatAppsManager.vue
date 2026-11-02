@@ -80,6 +80,8 @@ const editingId = ref<string | null>(null)
 const draft = ref<AppDraft>({ id: '', sort: 0, enabled: true, zh: emptyText(), en: emptyText(), scenes: [] })
 /** 图标与底色不在表单里编辑：新建用默认，编辑保留原值。 */
 const iconPaths = ref<string[]>([...DEFAULT_ICON])
+/** 图片图标同样只保留原值，避免编辑文案时把校徽等图片图标冲掉。 */
+const iconImage = ref('')
 const tint = ref(DEFAULT_TINT)
 
 const editorTitle = computed(() => (
@@ -102,6 +104,7 @@ onMounted(() => { void load() })
 function openCreate() {
   editingId.value = null
   iconPaths.value = [...DEFAULT_ICON]
+  iconImage.value = ''
   tint.value = DEFAULT_TINT
   const nextSort = apps.value.reduce((max, app) => Math.max(max, Number(app.sort ?? 0)), -1) + 1
   draft.value = { id: '', sort: nextSort, enabled: true, zh: emptyText(), en: emptyText(), scenes: [emptyScene(0)] }
@@ -111,6 +114,7 @@ function openCreate() {
 function openEdit(app: ChatAppDto) {
   editingId.value = app.id
   iconPaths.value = app.iconPaths?.length ? [...app.iconPaths] : [...DEFAULT_ICON]
+  iconImage.value = app.iconImage ?? ''
   tint.value = app.tint || DEFAULT_TINT
   const zh = app.text?.zh ?? emptyText()
   const en = app.text?.en ?? emptyText()
@@ -182,7 +186,7 @@ function buildPayload() {
       }
     })
 
-  return { iconPaths: iconPaths.value, tint: tint.value, text, scenes }
+  return { iconPaths: iconPaths.value, iconImage: iconImage.value.trim(), tint: tint.value, text, scenes }
 }
 
 async function save() {
@@ -219,7 +223,7 @@ async function toggleEnabled(app: ChatAppDto, enabled: boolean) {
   enabledSaving.value = app.id
   try {
     await saveChatApp(app.id, {
-      payload: { iconPaths: app.iconPaths, tint: app.tint, text: app.text, scenes: app.scenes },
+      payload: { iconPaths: app.iconPaths, iconImage: app.iconImage, tint: app.tint, text: app.text, scenes: app.scenes },
       enabled,
     })
     app.enabled = enabled
@@ -267,7 +271,8 @@ function appName(app: ChatAppDto): string {
       <ul v-else class="chat-apps-list">
         <li v-for="app in apps" :key="app.id" class="chat-apps-item">
           <span class="chat-apps-icon" :style="{ background: app.tint || DEFAULT_TINT }" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+            <img v-if="app.iconImage" class="chat-apps-icon-img" :src="app.iconImage" alt="" />
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
               stroke-linecap="round" stroke-linejoin="round">
               <path v-for="(path, index) in (app.iconPaths?.length ? app.iconPaths : DEFAULT_ICON)" :key="index" :d="path" />
             </svg>
@@ -464,8 +469,9 @@ function appName(app: ChatAppDto): string {
 }
 .chat-apps-icon {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 32px; height: 32px; border-radius: 9px; color: #fff;
+  width: 32px; height: 32px; border-radius: 9px; color: #fff; overflow: hidden;
 }
+.chat-apps-icon-img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .chat-apps-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .chat-apps-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chat-apps-name { color: $text-primary; font-size: 13.5px; font-weight: 550; }

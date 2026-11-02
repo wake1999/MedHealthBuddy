@@ -32,6 +32,8 @@ export interface ChatAppSeedScene {
 
 export interface ChatAppSeedPayload {
   iconPaths: string[]
+  /** 图片图标（站内路径）；有值时前端优先渲染它，`iconPaths` 作为兜底。 */
+  iconImage?: string
   tint: string
   text: Record<string, ChatAppSeedText>
   scenes: ChatAppSeedScene[]
@@ -49,6 +51,8 @@ export const DEFAULT_CHAT_APPS: readonly ChatAppSeed[] = [
     id: 'btit',
     sort: 0,
     payload: {
+      // 校徽图标（client/public/apps/btit-hfut.png）；svg 路径留作图片加载失败时的兜底。
+      iconImage: '/apps/btit-hfut.png',
       iconPaths: [
         'M9.5 3h5',
         'M10.5 3v13.2a2.6 2.6 0 0 0 5.2 0V3',

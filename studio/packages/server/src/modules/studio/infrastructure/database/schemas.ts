@@ -1641,6 +1641,33 @@ function seedDefaultPromptTemplates(db: NonNullable<ReturnType<typeof getDb>>): 
   }
 }
 
+/**
+ * 老库里 btit 还只有 svg 胶囊图标：补上校徽图。只在该行还没有 `iconImage`
+ * 时写一次，运营自己配过图标不会被动。
+ */
+function upgradeSeededChatAppIcons(db: NonNullable<ReturnType<typeof getDb>>): void {
+  const table = quoteIdentifier(CHAT_APPS_TABLE)
+  const row = db.prepare(`SELECT payload FROM ${table} WHERE id = 'btit'`).get() as { payload?: unknown } | undefined
+  if (typeof row?.payload !== 'string') return
+
+  let payload: Record<string, unknown>
+  try {
+    const decoded: unknown = JSON.parse(row.payload)
+    if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return
+    payload = decoded as Record<string, unknown>
+  } catch {
+    return
+  }
+  if (typeof payload.iconImage === 'string' && payload.iconImage.trim() !== '') return
+
+  const seeded = DEFAULT_CHAT_APPS.find(app => app.id === 'btit')
+  const iconImage = seeded?.payload.iconImage
+  if (!iconImage) return
+  payload.iconImage = iconImage
+  db.prepare(`UPDATE ${table} SET payload = ?, updated_at = ? WHERE id = 'btit'`)
+    .run(JSON.stringify(payload), Math.floor(Date.now() / 1000))
+}
+
 /** 表还是空的时候灌出厂目录；运营改过之后这里不再生效。 */
 function seedDefaultChatApps(db: NonNullable<ReturnType<typeof getDb>>): void {
   const total = db.prepare(`SELECT COUNT(*) AS total FROM ${quoteIdentifier(CHAT_APPS_TABLE)}`)
@@ -1791,6 +1818,7 @@ export function initAllHermesTables(): void {
     seedDefaultPromptTemplates(db)
     syncTable(CHAT_APPS_TABLE, CHAT_APPS_SCHEMA)
     seedDefaultChatApps(db)
+    upgradeSeededChatAppIcons(db)
     syncTable(MESSAGES_TABLE, MESSAGES_SCHEMA)
     db.exec(MESSAGES_INDEX)
     syncTable(SKILL_USAGE_EVENTS_TABLE, SKILL_USAGE_EVENTS_SCHEMA, {

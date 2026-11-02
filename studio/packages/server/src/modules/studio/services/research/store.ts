@@ -30,6 +30,8 @@ export const RESEARCH_COLLECTIONS = [
   'decks',
   'journal',
   'evidence',
+  'knowledge',
+  'folders',
 ] as const
 
 export type ResearchCollection = typeof RESEARCH_COLLECTIONS[number]
@@ -50,9 +52,19 @@ export interface ResearchProject {
   venue?: ResearchVenueRef | null
 }
 
+/** 文献库里的一个文件夹（用户自建的分类，论文通过 folderId 归属）。 */
+export interface ResearchFolder {
+  id: string
+  projectId: string
+  name: string
+  createdAt: number
+}
+
 export interface ResearchPaper {
   id: string
   projectId: string
+  /** 所属文件夹；未分类时缺省。 */
+  folderId?: string
   title: string
   authors: string
   year: string
@@ -60,6 +72,8 @@ export interface ResearchPaper {
   doi: string
   url: string
   arxivId: string
+  /** PubMed id, when the record came from or resolves to PubMed. */
+  pmid?: string
   score: number
   status: 'new' | 'reading' | 'read'
   notes: string
@@ -68,6 +82,96 @@ export interface ResearchPaper {
   addedAt: number
   /** Absolute path of the downloaded PDF, absent until it is fetched. */
   pdfPath?: string
+  /** Absolute path of the extracted full text (markdown, page-delimited). */
+  fulltextPath?: string
+  /** Character count of the extracted text, so the panel can show a size hint. */
+  fulltextChars?: number
+  /** Structured AI summary produced from the full text. */
+  aiSummary?: string
+  /** 卡片上的收藏（书签）标记。 */
+  favorite?: boolean
+  /** 置顶：列表里排在其它文献前面。 */
+  pinned?: boolean
+  /** 整篇翻译完成的时间戳；有值说明已经有译本。 */
+  translatedAt?: number
+  /** Structured notes; `notes` stays as the legacy free-text field. */
+  noteBlocks?: PaperNoteBlock[]
+}
+
+/** One line of a highlight, in 0-1 page coordinates so zoom never breaks it. */
+export interface PaperHighlightRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** One freehand stroke, points in 0-1 page coordinates. */
+export interface PaperInkStroke {
+  color: string
+  width: number
+  points: Array<{ x: number; y: number }>
+}
+
+/** Where a note block points inside the paper. */
+export interface PaperNoteAnchor {
+  /** 1-based page number, when the block came from a highlight. */
+  page?: number
+  /** The sentence a highlight was taken from. */
+  quote?: string
+  /** One rect per visual line the selection covered. */
+  rects?: PaperHighlightRect[]
+  /** Freehand strokes, for blocks of kind `ink`. */
+  strokes?: PaperInkStroke[]
+}
+
+/**
+ * One note block. `notes` remains the legacy free-text blob so older records
+ * keep rendering; new writes go here, which is what makes a note able to point
+ * at a page and be lifted into the knowledge layer later.
+ */
+export interface PaperNoteBlock {
+  id: string
+  kind: 'note' | 'highlight' | 'question' | 'claim' | 'gap' | 'ink'
+  content: string
+  /** 高亮颜色，`#rrggbbaa`；缺省时前端用默认黄。 */
+  color?: string
+  /** 读者对这条高亮/笔记写的一句话批注。 */
+  comment?: string
+  /** 只隐藏色块，保留批注与「笔记」标记。 */
+  highlightHidden?: boolean
+  anchor?: PaperNoteAnchor
+  createdAt: number
+}
+
+/**
+ * What a knowledge row is. The first five are analysis *outputs* (one per skill,
+ * following the structure obsidian-vault-mcp uses); the last two are the claims
+ * and gaps a reader distils by hand.
+ */
+export type ResearchKnowledgeKind =
+  | 'full_read'
+  | 'literature_review'
+  | 'passage_qa'
+  | 'figure_qa'
+  | 'concept'
+  | 'claim'
+  | 'gap'
+
+/** A claim, gap or analysis output distilled out of a paper, carrying its source. */
+export interface ResearchKnowledge {
+  id: string
+  projectId: string
+  kind: ResearchKnowledgeKind
+  statement: string
+  /** The paper this came from. */
+  paperId?: string
+  /** The note block inside that paper. */
+  blockId?: string
+  /** 0-10, how confident the user is. */
+  confidence?: number
+  tags?: string[]
+  createdAt: number
 }
 
 export interface ResearchMetric {
@@ -255,6 +359,7 @@ export interface ResearchEvidenceEdge {
 
 export interface ResearchCollections {
   papers: ResearchPaper[]
+  folders: ResearchFolder[]
   experiments: ResearchExperiment[]
   figures: ResearchFigure[]
   ideas: ResearchIdea[]
@@ -266,6 +371,7 @@ export interface ResearchCollections {
   decks: ResearchDeck[]
   journal: ResearchJournalEntry[]
   evidence: ResearchEvidenceEdge[]
+  knowledge: ResearchKnowledge[]
 }
 
 export interface ResearchStore extends ResearchCollections {
@@ -339,6 +445,7 @@ export function emptyStore(): ResearchStore {
     version: STORE_VERSION,
     projects: [],
     papers: [],
+    folders: [],
     experiments: [],
     figures: [],
     ideas: [],
@@ -350,6 +457,7 @@ export function emptyStore(): ResearchStore {
     decks: [],
     journal: [],
     evidence: [],
+    knowledge: [],
     updatedAt: 0,
   }
 }

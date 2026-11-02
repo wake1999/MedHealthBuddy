@@ -14,6 +14,7 @@
 
 import { createElement, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'
+import { watch } from 'vue'
 import { ResearchPanel } from './ResearchPanel.tsx'
 import { uploadResearchFigure } from '@/api/studio/research'
 import { ResearchController } from './controller.ts'
@@ -197,11 +198,95 @@ export function createMimirWorkbench(container: HTMLElement): MimirWorkbench {
     venueFormat: { sent: 'toast.venueFormatSent', failed: 'toast.venueFormatSendFailed' },
   }
 
-  const sendPromptToCurrentSession = async (prompt: string, copy: SendCopy): Promise<void> => {
+  /**
+   * 从工作台直接跳到「聊天」页并选中工作台当前会话。
+   * 阅读器里的 AI 追问是投递到那个会话的，但用户停在工作台看不到回答，
+   * 所以必须给一条回跳的入口，否则「问了没结果」。
+   */
+  const openCurrentSession = (): void => {
+    const sessionId = sessionSnapshot.current
+    if (sessionId === null) {
+      controller.notify('error', 'toast.fixSendFailed', t('toast.fixNoSession'))
+      return
+    }
+    const chat = useChatStore()
+    void (async () => {
+      if (!chat.sessions.some(item => item.id === sessionId)) {
+        await chat.loadSessions(undefined, sessionId)
+      }
+      if (chat.activeSessionId !== sessionId) await chat.switchSession(sessionId)
+      const mod = await import('@/router')
+      await (mod.default as { push: (to: unknown) => Promise<unknown> }).push({ name: 'hermes.models' })
+    })()
+  }
+
+  /** 打开阅读器会话面板前，确保工作台当前会话及其历史消息已经加载。 */
+  const prepareCurrentSession = async (): Promise<void> => {
+    const sessionId = sessionSnapshot.current
+    if (sessionId === null) return
+    const chat = useChatStore()
+    if (!chat.sessions.some(item => item.id === sessionId)) {
+      await chat.loadSessions(undefined, sessionId)
+    }
+    if (chat.activeSessionId !== sessionId || chat.activeSession === null) {
+      await chat.switchSession(sessionId)
+    }
+  }
+
+  /** 把阅读器框选的图片作为附件投递到当前单聊会话。 */
+  const sendImageToCurrentSession = async (
+    image: string,
+    prompt: string,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const sessionId = sessionSnapshot.current
+    if (sessionId === null) {
+      controller.notify('error', 'toast.fixSendFailed', t('toast.fixNoSession'))
+      return { ok: false, error: t('toast.fixNoSession') }
+    }
+    try {
+      await prepareCurrentSession()
+      const chat = useChatStore()
+      if (chat.activeSessionId !== sessionId || chat.activeSession === null) {
+        return { ok: false, error: t('toast.fixNoSession') }
+      }
+      /*
+       * 不要 fetch(dataURL)：应用 CSP 的 connect-src 不包含 data:，
+       * 会直接报 "Failed to fetch"，图片永远发不出去。这里本地解码 Base64。
+       */
+      const comma = image.indexOf(',')
+      const meta = comma >= 0 ? image.slice(0, comma) : ''
+      const payload = comma >= 0 ? image.slice(comma + 1) : image
+      const mime = /data:([^;]+)/.exec(meta)?.[1] || 'image/jpeg'
+      let bytes: Uint8Array
+      if (meta.includes(';base64')) {
+        const binary = atob(payload)
+        bytes = new Uint8Array(binary.length)
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+      } else {
+        bytes = new TextEncoder().encode(decodeURIComponent(payload))
+      }
+      const file = new File([bytes], `pdf-crop-${Date.now()}.jpg`, { type: mime })
+      await chat.sendMessage(prompt, [{
+        id: `crop_${Date.now().toString(36)}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: image,
+        file,
+      }])
+      return { ok: true }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      controller.notify('error', 'toast.fixSendFailed', detail)
+      return { ok: false, error: detail }
+    }
+  }
+
+  const sendPromptToCurrentSession = async (prompt: string, copy: SendCopy): Promise<{ ok: boolean; error?: string }> => {
     const sessionId = sessionSnapshot.current
     if (sessionId === null) {
       controller.notify('error', copy.failed, t('toast.fixNoSession'))
-      return
+      return { ok: false, error: t('toast.fixNoSession') }
     }
     try {
       const chat = useChatStore()
@@ -211,13 +296,13 @@ export function createMimirWorkbench(container: HTMLElement): MimirWorkbench {
       }
       if (!chat.sessions.some(item => item.id === sessionId)) {
         controller.notify('error', copy.failed, t('toast.fixNoSession'))
-        return
+        return { ok: false, error: t('toast.fixNoSession') }
       }
       if (chat.activeSessionId !== sessionId) await chat.switchSession(sessionId)
       /* 会话不在列表时 switchSession 只改 id、不落 activeSession；此时再 send 会另起一个新会话 */
       if (chat.activeSessionId !== sessionId || chat.activeSession === null) {
         controller.notify('error', copy.failed, t('toast.fixNoSession'))
-        return
+        return { ok: false, error: t('toast.fixNoSession') }
       }
       await chat.sendMessage(prompt)
       /* sendMessage 不抛出：失败会写一条 system 消息进对话，这里回读一次 */
@@ -228,11 +313,14 @@ export function createMimirWorkbench(container: HTMLElement): MimirWorkbench {
       if (failed) {
         const detail = (last.content as string).slice('Error:'.length).trim()
         controller.notify('error', copy.failed, detail || null)
-        return
+        return { ok: false, error: detail }
       }
       controller.notify('success', copy.sent)
+      return { ok: true }
     } catch (error) {
-      controller.notify('error', copy.failed, error instanceof Error ? error.message : null)
+      const detail = error instanceof Error ? error.message : String(error)
+      controller.notify('error', copy.failed, detail)
+      return { ok: false, error: detail }
     }
   }
 
@@ -290,8 +378,39 @@ export function createMimirWorkbench(container: HTMLElement): MimirWorkbench {
 
     requestCompileFix: (prompt: string) => sendPromptToCurrentSession(prompt, SEND_COPY.fix),
     requestRelatedWork: (prompt: string) => sendPromptToCurrentSession(prompt, SEND_COPY.relwork),
+    requestProjectSession: (prompt: string) => sendPromptToCurrentSession(prompt, SEND_COPY.relwork),
+    requestProjectImage: (image: string, prompt: string) => sendImageToCurrentSession(image, prompt),
     requestFigureOrganize: (prompt: string) => sendPromptToCurrentSession(prompt, SEND_COPY.figureOrganize),
     requestVenueFormat: (prompt: string) => sendPromptToCurrentSession(prompt, SEND_COPY.venueFormat),
+    /** 跳到聊天页并选中工作台当前会话（阅读器追问后的回跳入口）。 */
+    openSession: openCurrentSession,
+    prepareSession: prepareCurrentSession,
+    /*
+     * 阅读器侧栏的会话镜像。之前这两个字段压根没注入，ReadingPanel 拿到的一直是
+     * undefined，阅读器就只能显示「暂无会话」，也拿不到会话标题 —— 这是「无法
+     * 链接到工作台已选会话」的直接原因。
+     * 值是挂载时的快照；切换会话后重新打开阅读器即可刷新。
+     */
+    get sessionTitle() {
+      const id = sessionSnapshot.current
+      return sessionSnapshot.list.find(item => item.id === id)?.title ?? ''
+    },
+    get projectSession() {
+      const id = sessionSnapshot.current
+      const title = sessionSnapshot.list.find(item => item.id === id)?.title ?? ''
+      const chat = useChatStore()
+      const session = chat.sessions.find(item => item.id === id)
+        ?? (chat.activeSession?.id === id ? chat.activeSession : null)
+      const messages = (session?.messages ?? [])
+        .filter(message => message.role === 'user' || message.role === 'assistant')
+        .map(message => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          timestamp: message.timestamp,
+        }))
+      return { sessionId: id, title, messages }
+    },
 
     ensureVenueTemplates: () => { controller.ensureVenueTemplates() },
     applyVenueTemplate: (projectId: string, options: unknown) => controller.applyVenueTemplate(projectId, options as never),
@@ -305,6 +424,7 @@ export function createMimirWorkbench(container: HTMLElement): MimirWorkbench {
     editSource: (content: string) => { controller.edit(content) },
     reloadSource: () => { controller.reloadSource() },
     ensurePapers: () => { controller.ensurePapers() },
+    refreshPapers: () => controller.refreshPapers(),
     ensureSubscriptions: () => { controller.ensureSubscriptions() },
     saveArxivSubscription: (query: string) => controller.saveArxivSubscription(query),
     deleteArxivSubscription: (id: string) => controller.deleteArxivSubscription(id),
@@ -423,12 +543,42 @@ export function createMimirWorkbench(container: HTMLElement): MimirWorkbench {
   }
 
   const root = createRoot(container)
-  root.render(createElement(ResearchPanel as never, props as never))
+  const renderPanel = (): void => {
+    root.render(createElement(ResearchPanel as never, props as never))
+  }
+  renderPanel()
+
+  /*
+   * 每次 controller 发布新快照都整体重渲染一次。
+   *
+   * 只靠各视图里的 useSyncExternalStore 在这一层没生效：上传 PDF、翻译完成、
+   * 生成摘要之后 store 明明已经更新（state.json 里字段都在），界面却要「切走
+   * 到别的模块再回来」才刷新 —— 因为离开路由会整块重建。这里补一次确定性的
+   * 重渲染，数据一变立刻生效；React 之间照常 diff，面板内的展开/选中状态不会丢。
+   */
+  const unsubscribeRender = controller.subscribe(renderPanel)
+
+  // 会话不是 research controller 的一部分：提问、流式回答、切换会话时，
+  // 也要把最新镜像推进 React 岛，右侧才能和单聊显示同一段对话。
+  const stopSessionWatch = watch(
+    () => {
+      const id = sessionSnapshot.current
+      const chat = useChatStore()
+      const session = chat.sessions.find(item => item.id === id)
+        ?? (chat.activeSession?.id === id ? chat.activeSession : null)
+      const messages = session?.messages ?? []
+      const last = messages[messages.length - 1]
+      return `${id ?? ''}|${messages.length}|${last?.content.length ?? 0}|${last?.isStreaming ? 1 : 0}`
+    },
+    () => { renderPanel() },
+  )
 
   return {
     unmount: () => {
       themeObserver.disconnect()
       unsubscribePrefetch()
+      unsubscribeRender()
+      stopSessionWatch()
       controller.dispose()
       root.unmount()
     },

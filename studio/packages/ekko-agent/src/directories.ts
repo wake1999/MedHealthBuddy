@@ -209,7 +209,7 @@ export class EkkoDirectoryManager {
   }
 
   profileWorkspaceDirectory(profile = 'default'): string {
-    const directory = join(this.workspaceDirectory, profileDirectoryName(profile))
+    const directory = join(this.workspaceDirectory, workspaceProfileDirectoryName(profile))
     mkdirSync(directory, { recursive: true })
     return directory
   }
@@ -217,7 +217,7 @@ export class EkkoDirectoryManager {
   sessionWorkspaceDirectory(profile: string, sessionId: string): string {
     const directory = join(
       this.workspaceDirectory,
-      profileDirectoryName(profile),
+      workspaceProfileDirectoryName(profile),
       sessionDirectoryName(sessionId),
     )
     mkdirSync(directory, { recursive: true })
@@ -237,7 +237,10 @@ export class EkkoDirectoryManager {
       for (const entry of entries) {
         if (!entry.isDirectory() || entry.name.startsWith('.')) continue
         try {
-          profiles.add(profileDirectoryName(entry.name))
+          // workspace 下 default 用的是中文目录名，反向映射回 profile id，
+          // 否则会把「默认空间」当成一个不存在的 profile 列出来。
+          const name = entry.name === DEFAULT_WORKSPACE_PROFILE_DIR ? 'default' : entry.name
+          profiles.add(profileDirectoryName(name))
         } catch {
           // Ignore filesystem entries that cannot represent an Ekko profile.
         }
@@ -366,6 +369,21 @@ export class EkkoDirectoryManager {
 function profileDirectoryName(value: string): string {
   const profile = String(value || '').trim() || 'default'
   return safeDirectoryName(profile, 'profile')
+}
+
+/**
+ * default profile 在 workspace 下使用中文目录名。
+ *
+ * 用户没选工作空间时会落到 default profile，原先生成 `.../workspace/default/<session>`
+ * 这种路径，在文件管理器里看不出是「默认空间」。这里只改 workspace 这一层：
+ * skills / logs 仍用 `default`，避免把既有目录结构整体改名。
+ * 旧会话数据库里存的是绝对路径，仍指向原来的 `default` 目录，不受影响。
+ */
+const DEFAULT_WORKSPACE_PROFILE_DIR = '默认空间'
+
+function workspaceProfileDirectoryName(value: string): string {
+  const profile = String(value || '').trim() || 'default'
+  return profile === 'default' ? DEFAULT_WORKSPACE_PROFILE_DIR : safeDirectoryName(profile, 'profile')
 }
 
 function sessionDirectoryName(value: string): string {

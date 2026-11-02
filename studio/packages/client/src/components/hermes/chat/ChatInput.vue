@@ -23,6 +23,7 @@ import { useToolTraceVisibility } from '@/composables/useToolTraceVisibility'
 import { extractClipboardFiles } from '@/utils/clipboard-files'
 import VoiceDialogueControls from './VoiceDialogueControls.vue'
 import BundleCreateModal from './BundleCreateModal.vue'
+import { enhancePromptText } from '@/api/studio/prompt-enhance'
 import SkillImportModal from '@/components/hermes/skills/SkillImportModal.vue'
 import { BRIDGE_SESSION_COMMAND_DEFINITIONS } from '@/utils/hermes/bridge-session-commands'
 import { clampChatInputHeight, isMobileChatInputViewport } from '@/utils/chat-input-height'
@@ -75,6 +76,8 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   /** 「发现应用」场景自带的快捷提示词：点一下整段填进草稿。 */
   quickPrompts?: readonly { label: string; text: string }[]
+  /** 智能体对话模式：快捷提示词点一下直接发出，而不是先填进草稿。 */
+  quickPromptSubmit?: boolean
   submit?: (text: string, attachments?: Attachment[]) => Promise<boolean>
 }>(), {
   modelLabel: '',
@@ -89,6 +92,7 @@ const props = withDefaults(defineProps<{
   templateDomain: null,
   placeholder: '',
   quickPrompts: () => [] as { label: string; text: string }[],
+  quickPromptSubmit: false,
 })
 
 const composerSession = computed(() => props.draft ? null : chatStore.activeSession)
@@ -365,6 +369,12 @@ function applyInsertPromptTemplate(template: PromptTemplate) {
 
 /** 「发现应用」的快捷提示词：整段追加到已有草稿后面，光标落回末尾。 */
 function applyAppQuickPrompt(text: string) {
+  // 智能体对话模式：这一句本身就是发给智能体的请求，点一下直接发。
+  if (props.quickPromptSubmit && props.submit) {
+    submitting.value = true
+    void props.submit(text).finally(() => { submitting.value = false })
+    return
+  }
   const draft = inputText.value
   const { text: next, caret } = insertTemplateBlock(draft, text, draft.length)
   inputText.value = next
@@ -1515,6 +1525,42 @@ function focusComposer() {
 
 defineExpose({ addFiles, focusComposer })
 
+// --- 提示词增强 ---
+
+const enhancingPrompt = ref(false)
+
+/** 用当前会话自己的模型改写草稿，结果回填输入框，不发送。 */
+async function enhancePrompt() {
+  const draft = inputText.value.trim()
+  if (!draft || enhancingPrompt.value || props.sendDisabled) return
+  const target = reasoningSession.value
+  if (!target?.provider || !target?.model || target.provider === 'moa') {
+    message.warning(t('chat.enhancePromptUnavailable'))
+    return
+  }
+  enhancingPrompt.value = true
+  try {
+    const text = await enhancePromptText({
+      text: draft,
+      profile: target.profile || undefined,
+      provider: target.provider,
+      model: target.model,
+    })
+    if (!text) {
+      message.error(t('chat.enhancePromptEmpty'))
+      return
+    }
+    inputText.value = text
+    await nextTick()
+    autoSizeTextarea()
+    textareaRef.value?.focus()
+  } catch (error: any) {
+    message.error(t('chat.enhancePromptFailed', { error: error?.message || 'unknown' }))
+  } finally {
+    enhancingPrompt.value = false
+  }
+}
+
 // --- Send ---
 
 /** Chips travel as `/skill <name>` lines in front of whatever was typed. */
@@ -1898,6 +1944,7 @@ function openAttachmentPreview(attachment: Attachment) {
       <div class="input-toolbar">
         <!-- Bottom bar: attach + input settings + actions -->
         <div class="input-top-bar">
+          <slot name="toolbar-agents" />
           <NPopover
             :show="showAddMenuPanel"
             trigger="manual"
@@ -2139,6 +2186,26 @@ function openAttachmentPreview(attachment: Attachment) {
 
         </div>
         <div class="input-actions">
+          <NTooltip trigger="hover" placement="top">
+            <template #trigger>
+              <button
+                type="button"
+                class="enhance-prompt-button"
+                :class="{ 'is-busy': enhancingPrompt }"
+                :disabled="!inputText.trim() || enhancingPrompt || sendDisabled"
+                :aria-label="t('chat.enhancePrompt')"
+                @click="enhancePrompt"
+              >
+                <NSpin v-if="enhancingPrompt" :size="13" stroke="#8b8b8b" />
+                <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z" />
+                  <path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" />
+                </svg>
+              </button>
+            </template>
+            {{ enhancingPrompt ? t('chat.enhancingPrompt') : t('chat.enhancePrompt') }}
+          </NTooltip>
           <VoiceDialogueControls
             :status="voiceInput.dialogue.status.value"
             :transcript="voiceInput.transcript.value"
@@ -3327,6 +3394,28 @@ function openAttachmentPreview(attachment: Attachment) {
     color: $text-primary;
     background: rgba(var(--text-primary-rgb), 0.06);
   }
+}
+
+/* 提示词增强：草稿为空时不可点，生成中转圈，不抢发送按钮的视觉权重。 */
+.enhance-prompt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: $text-muted;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover:not(:disabled) { background: rgba(var(--text-primary-rgb), 0.07); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+  &:disabled { opacity: 0.42; cursor: default; }
+  &.is-busy { color: $accent-primary; }
 }
 
 .send-button {

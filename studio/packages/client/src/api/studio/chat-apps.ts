@@ -38,6 +38,8 @@ export interface ChatAppDto {
   sort?: number
   enabled?: boolean
   iconPaths?: string[]
+  /** 图片图标（站内路径或 URL），有值时优先于 `iconPaths`。 */
+  iconImage?: string
   tint?: string
   text: Record<string, ChatAppTextDto>
   scenes?: ChatAppSceneDto[]

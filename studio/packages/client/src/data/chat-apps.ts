@@ -34,6 +34,8 @@ export interface ChatApp {
   /** 没选场景时的占位符。 */
   readonly placeholder: string
   readonly iconPaths: readonly string[]
+  /** 图片图标；有值时优先渲染，`iconPaths` 作为兜底。 */
+  readonly iconImage?: string
   readonly tint: string
   readonly scenes: readonly ChatAppScene[]
 }
@@ -74,6 +76,7 @@ export function resolveChatApp(dto: ChatAppDto, locale: string): ChatApp {
     heroSubtitle: text?.heroSubtitle ?? '',
     placeholder: text?.placeholder ?? '',
     iconPaths: dto.iconPaths ?? [],
+    iconImage: dto.iconImage,
     tint: dto.tint ?? 'linear-gradient(135deg, #4aa3f0, #2f6fe0)',
     scenes,
   }
@@ -91,6 +94,7 @@ export const FALLBACK_CHAT_APPS: readonly ChatAppDto[] = [
   {
     id: 'btit',
     sort: 0,
+    iconImage: '/apps/btit-hfut.png',
     iconPaths: [
       'M9.5 3h5',
       'M10.5 3v13.2a2.6 2.6 0 0 0 5.2 0V3',

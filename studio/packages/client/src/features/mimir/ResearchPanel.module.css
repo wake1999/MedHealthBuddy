@@ -476,10 +476,9 @@
 
 /* Overview stat chips: one tinted chip per count. */
 .statChips {
-  display: flex;
-  flex-wrap: wrap;
   display: grid;
-  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  /* 总览固定 5 个统计项：一屏一排，避免第 5 个单独换行。 */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -853,7 +852,7 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -1062,6 +1061,12 @@
 }
 
 /* Meeting decks: the generate form, pick lists, and the deck list. */
+.meetings {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
 .meetingForm {
   display: flex;
   flex-direction: column;
@@ -1086,9 +1091,11 @@
 
 .meetingDate {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  white-space: nowrap;
   color: var(--dsw-alias-label-secondary, #5b6472);
 }
 
@@ -2109,26 +2116,524 @@ li.dropIndicator {
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  /* 网格列数按文献区实际可用宽度切换，不受侧栏折叠/窗口模式影响。 */
+  container-type: inline-size;
+  max-width: none;
 }
+
 
 .papersGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 14px;
+  /*
+   * 列数随窗口分档、宽度等比放大：
+   *   窗口（~936px 可用）→ 6 列，单卡 ≈156px
+   *   全屏（~1800px 可用）→ 8 列，单卡 ≈225px（≈1.45 倍）
+   * 之前用 auto-fill 固定最小宽度，全屏会排到 11–12 列，
+   * 结果是「两边卡片一样大」，反而看不出全屏的空间优势。
+   */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 20px 12px;
+  /* 卡片各自按内容高度排列，不被同一行的最高卡片拉伸。 */
+  align-items: start;
 }
 
+/*
+ * 每行文献数按「文献区宽度」而不是文献总数决定：
+ * 全屏 6 列，常见窗口 5 列，再窄依次降为 4/3/2 列。
+ */
+@container (min-width: 960px) {
+  .papersGrid:not([data-view="list"]) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 748px) and (max-width: 959px) {
+  .papersGrid:not([data-view="list"]) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 590px) and (max-width: 747px) {
+  .papersGrid:not([data-view="list"]) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 440px) and (max-width: 589px) {
+  .papersGrid:not([data-view="list"]) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 439px) {
+  .papersGrid:not([data-view="list"]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * 全屏不再加列：两边都是 6 列，宽度差多少，卡片就放大多少。
+ * 窗口 936px / 6 ≈ 156px，全屏 1800px / 6 ≈ 300px（≈1.9 倍），
+ * 等比关系清晰。之前宽屏加到 7 列，等于把多出来的宽度又切给了新列，
+ * 结果全屏和窗口的卡片几乎一样大。
+ */
+
+/* ── 阅读器浮层：左工具条 / 右上页码 / 右下缩放 ───────────────────────
+   顶部不放工具条：三个浮层贴着阅读区边缘，配色、圆角、阴影全部沿用本项目的
+   token，和文献卡片、右侧笔记栏是同一套语言。 */
+
+
+/* ── 区域 1：文档标签栏 40px ──────────────────────────────────────── */
+
+.paperReaderTabBar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 40px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--reader-border, #e8e6e1);
+  background: var(--reader-bg, #fafaf9);
+}
+
+.paperReaderTabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* 文档标签：最大 200px，激活态白底 + 底部 2px 深色条。 */
+.paperReaderTab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border-radius: 6px 6px 0 0;
+  color: var(--reader-muted, #6b6b66);
+  font-size: 12px;
+}
+
+.paperReaderTab[data-active] {
+  background: var(--reader-surface, #fff);
+  color: var(--reader-text, #1a1a19);
+}
+
+.paperReaderTab[data-active]::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 2px;
+  background: var(--reader-text, #1a1a19);
+}
+
+.paperReaderTabTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paperReaderTabClose {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperReaderTabClose:hover {
+  background: rgb(0 0 0 / 8%);
+}
+
+
+/* ── 区域 2：左侧工具栏 48px ──────────────────────────────────────── */
+
+.paperReaderTools {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 48px;
+  padding: 10px 0;
+  border-inline-end: 1px solid var(--reader-border, #e8e6e1);
+  background: var(--reader-surface, #fff);
+}
+
+/* 36×36 圆角 6，激活态 #EFEEE9 底 + 深色图标。 */
+.paperReaderToolBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--reader-muted, #6b6b66);
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.paperReaderToolBtn:hover:not(:disabled),
+.paperReaderToolBtn[data-active] {
+  background: var(--reader-active, #efeee9);
+  color: var(--reader-text, #1a1a19);
+}
+
+/* 深色阅读器：页面画布仍是白纸，周围 chrome 切到深色。 */
+:global(.dark) .paperReader {
+  --reader-bg: #141518;
+  --reader-surface: #1c1f24;
+  --reader-elevated: #242830;
+  --reader-border: #30343c;
+  --reader-text: #e8e8e6;
+  --reader-muted: #9aa1ab;
+  --reader-active: #2a2f37;
+}
+
+.paperReaderToolBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.paperReaderToolIcon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* 悬停 400ms 后右侧弹出深色 tooltip（8px 圆角、12px 白字）。 */
+.paperReaderToolBtn::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  z-index: 30;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--reader-text, #1a1a19);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.12s ease 0.4s;
+}
+
+.paperReaderToolBtn:hover::after {
+  opacity: 1;
+}
+
+.paperReaderToolsDivider {
+  flex: none;
+  width: 24px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--reader-border, #e8e6e1);
+}
+
+/* ── 区域 4：右上页码 + 右下缩放 ─────────────────────────────────── */
+
+.paperReaderPageHud {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 14;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--reader-border, #e8e6e1);
+  border-radius: 8px;
+  background: var(--reader-surface, #fff);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+}
+
+.paperReaderPageHudInput {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--reader-text, #1a1a19);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  text-align: right;
+  outline: none;
+}
+
+.paperReaderPageHudTotal {
+  color: var(--reader-muted, #6b6b66);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.paperReaderZoomHud {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 14;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  padding: 0 5px;
+  border: 1px solid var(--reader-border, #e8e6e1);
+  border-radius: 999px;
+  background: var(--reader-surface, #fff);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+}
+
+.paperReaderZoomHudButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--reader-text, #1a1a19);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.14s ease;
+}
+
+.paperReaderZoomHudButton:hover:not(:disabled) {
+  background: var(--reader-active, #efeee9);
+}
+
+.paperReaderZoomHudButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.paperReaderZoomHudValue {
+  min-width: 36px;
+  color: var(--reader-muted, #6b6b66);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* ── 区域 5：侧栏分段控件（40px，等宽两段）────────────────────────── */
+
+.paperReaderSideTabs {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  height: 40px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--reader-border, #e8e6e1);
+}
+
+.paperReaderSideTab {
+  flex: 1;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--reader-muted, #6b6b66);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.paperReaderSideTab:hover:not([data-active]) {
+  color: var(--reader-text, #1a1a19);
+}
+
+.paperReaderSideTab[data-active] {
+  background: var(--reader-surface, #fff);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  color: var(--reader-text, #1a1a19);
+  font-weight: 600;
+}
+
+/* ── 旧的浮动工具条（已由上面的固定列替代）──────────────────────── */
+
+.paperReaderFloatTools {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 9%));
+  border-radius: 12px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 6px 20px rgb(33 30 25 / 10%);
+  transform: translateY(-50%);
+}
+
+/* 纯图标按钮：34×34，无文字，靠 title 提示。 */
+.paperReaderFloatTool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.paperReaderFloatTool:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderFloatTool[data-active] {
+  background: rgb(59 130 246 / 12%);
+  color: #2558a8;
+}
+
+.paperReaderFloatTool:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.paperReaderFloatToolGlyph {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.paperReaderFloatToolText {
+  font-size: 9.5px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+/* 右上页码 / 右下缩放：同一种胶囊。 */
+.paperReaderFloatPage,
+.paperReaderFloatZoom {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 9%));
+  border-radius: 999px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 4px 14px rgb(33 30 25 / 10%);
+}
+
+/* 页码在右下（翻页时视线在页脚），缩放在右上。 */
+.paperReaderFloatPage {
+  right: 12px;
+  bottom: 12px;
+}
+
+.paperReaderFloatZoom {
+  top: 10px;
+  right: 12px;
+}
+
+.paperReaderFloatPageArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.paperReaderFloatPageArrow:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 8%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderFloatPageArrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 订阅区标题本身就是开关，徽章仍在右侧可见。 */
+.subscriptionsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.subscriptionsChevron {
+  display: inline-block;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 0.16s ease;
+}
+
+.subscriptionsChevron[data-open] {
+  transform: rotate(180deg);
+}
+
+/* 折叠态就是列表项：紧凑，一屏能看到十几篇；点开才变成工作区。 */
 .paperCard {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 18px;
+  gap: 6px;
+  padding: 13px 15px;
   border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
-  border-radius: 17px;
+  border-radius: 14px;
   background: var(--dsw-specific-menu, #fff);
   box-shadow: var(--mimir-card-shadow);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+/* 展开后重新变成一块大卡片。 */
+.paperCard[data-open] {
+  gap: 10px;
+  padding: 16px 18px 18px;
+  border-color: var(--dsw-alias-border-l3, rgb(0 0 0 / 14%));
+  box-shadow: var(--mimir-edge), 0 16px 36px rgb(33 30 25 / 12%);
 }
 
 .paperCard:hover {
@@ -2154,11 +2659,29 @@ li.dropIndicator {
   color: var(--dsw-alias-state-business-primary, #4176e6);
 }
 
+/* 作者 + 日期压成一行：长作者列表在列表视图里没有信息价值。 */
 .paperCardMeta {
   margin: 0;
+  overflow: hidden;
   color: var(--dsw-alias-label-tertiary, #5b6474);
   font-size: 12px;
   line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 标签也只占一行，多了就裁掉（展开后完整显示）。 */
+.paperTags {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.paperCard[data-open] .paperCardMeta {
+  white-space: normal;
+}
+
+.paperCard[data-open] .paperTags {
+  flex-wrap: wrap;
 }
 
 .paperSummary {
@@ -2172,7 +2695,7 @@ li.dropIndicator {
   line-height: 1.6;
   text-align: left;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   cursor: pointer;
 }
 
@@ -2180,11 +2703,48 @@ li.dropIndicator {
   -webkit-line-clamp: unset;
 }
 
+/* 卡片右下角的展开/收起胶囊，避免整张卡片可点带来的误触。 */
+.paperCardToggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 2px 9px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.paperCardToggle:hover {
+  border-color: var(--dsw-alias-border-l3, rgb(0 0 0 / 16%));
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 5%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperCardChevron {
+  display: inline-block;
+  transition: transform 0.16s ease;
+}
+
+.paperCardChevron[data-open] {
+  transform: rotate(180deg);
+}
+
+/* 笔记面板容器：阅读器右侧栏，高度由父级给定，内部自己滚动。 */
 .paperNotes {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 0;
   margin: 0;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: var(--dsw-alias-markdown-code-block, #f9fafb);
   color: var(--dsw-alias-label-secondary, #3c4557);
   font-size: 12px;
   line-height: 1.6;
@@ -2432,6 +2992,2114 @@ li.dropIndicator {
 .paperPdfActions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 「上传 PDF」用 label 包住隐藏的 file input，外观与 .btn 一致。 */
+.paperUploadLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 7px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.paperUploadLabel:hover {
+  border-color: var(--dsw-alias-border-l3, rgb(0 0 0 / 12%));
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperUploadLabel[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* 论文级 AI：摘要与带出处的问答，默认只露两个按钮。 */
+.paperAi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.paperAiActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.paperAiSummary {
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 5%));
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.paperAsk {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paperAskRow {
+  display: flex;
+  gap: 8px;
+}
+
+.paperAskInput {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 7px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.paperAskInput:focus {
+  outline: none;
+  border-color: var(--dsw-alias-border-l3, rgb(0 0 0 / 20%));
+}
+
+.paperAskPages {
+  display: block;
+  margin-top: 6px;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11.5px;
+}
+
+/* 受控 PDF 阅读器：工具栏 + 单页画布，替代原来的 iframe。 */
+/*
+ * 阅读器私有令牌。PDF 页面本身保持白纸，但标签栏、工具条、页码、
+ * 侧栏和浮层全部跟随明暗主题。
+ */
+.paperReader {
+  --reader-bg: #f7f7f5;
+  --reader-surface: #fff;
+  --reader-elevated: #fff;
+  --reader-border: #e8e6e1;
+  --reader-text: #1a1a19;
+  --reader-muted: #6b6b66;
+  --reader-active: #efeee9;
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* 图表清单：从工具栏右侧展开，滚动不撑高阅读器。 */
+.paperReaderFigurePanel {
+  position: absolute;
+  top: 48px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 10px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 16%);
+}
+
+.paperReaderFigureItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.paperReaderFigureItem:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+}
+
+.paperReaderFigureLabel {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgb(59 130 246 / 12%);
+  color: #2558a8;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.paperReaderFigureLabel[data-kind='table'] {
+  background: rgb(47 125 79 / 12%);
+  color: #26694a;
+}
+
+.paperReaderFigureTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paperReaderFigurePage {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 10.5px;
+}
+
+.paperReaderBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+  background: var(--dsw-specific-menu, #fff);
+}
+
+/* 工具栏分三组，靠分隔线和 auto 外边距拉开层次。 */
+.paperReaderGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.paperReaderGroup[data-align='end'] {
+  margin-inline-start: auto;
+}
+
+.paperReaderDivider {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+}
+
+/* 图标按钮：翻页与缩放，方方正正不抢视线。 */
+.paperReaderIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.paperReaderIconButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 7%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderIconButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 文字工具按钮：查找/问这页/图表/框选/手绘。 */
+.paperReaderTool {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.paperReaderTool:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 7%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderTool[data-active] {
+  background: rgb(59 130 246 / 12%);
+  color: #2558a8;
+}
+
+.paperReaderTool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── 目录：贴着左侧工具栏浮出的导航面板 ─────────────────────────── */
+.paperReaderOutline {
+  position: absolute;
+  top: 12px;
+  left: 60px;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  width: 264px;
+  max-height: 62vh;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 10px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 2px 6px rgb(26 26 26 / 6%), 0 12px 32px rgb(26 26 26 / 12%);
+  overflow: hidden;
+}
+
+.paperReaderOutlineHead {
+  flex: none;
+  padding: 9px 12px 7px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.paperReaderOutlineList {
+  flex: 1;
+  min-height: 0;
+  padding: 4px;
+  overflow-y: auto;
+}
+
+.paperReaderOutlineItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.paperReaderOutlineItem:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 7%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderOutlineItem[data-current] {
+  background: rgb(59 130 246 / 12%);
+  color: #2558a8;
+}
+
+.paperReaderOutlineText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paperReaderOutlinePage {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 划词翻译：贴阅读区右下的只读浮层 ───────────────────────────── */
+.paperReaderTranslate {
+  position: absolute;
+  right: 16px;
+  bottom: 56px;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-height: 42vh;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 10px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 2px 6px rgb(26 26 26 / 6%), 0 12px 32px rgb(26 26 26 / 12%);
+  overflow: hidden;
+}
+
+.paperReaderTranslateHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  padding: 8px 10px 6px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.paperReaderTranslateClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperReaderTranslateClose:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 7%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderTranslateBody {
+  flex: 1;
+  min-height: 0;
+  padding: 10px 12px 12px;
+  overflow-y: auto;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* ── 页内查找弹窗（portal 到 body）────────────────────────────── */
+.paperSearchBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(15 23 42 / 45%);
+}
+
+.paperSearchDialog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  max-height: 76vh;
+  padding: 16px 18px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 12%));
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 28%);
+}
+
+.paperSearchHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.paperSearchClose {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperSearchClose:hover {
+  background: rgb(15 23 42 / 6%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperSearchInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paperSearchInputRow .paperReaderSearchInput {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.paperSearchFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgb(15 23 42 / 7%));
+}
+
+.paperSearchNavButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 128px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 12%));
+  border-radius: 8px;
+  background: #fff;
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.paperSearchNavButton:hover:not(:disabled) {
+  border-color: rgb(37 99 235 / 32%);
+  background: rgb(37 99 235 / 5%);
+  color: #1d4ed8;
+}
+
+.paperSearchNavButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.paperSearchShortcut {
+  min-width: 16px;
+  padding: 1px 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 10%));
+  border-radius: 4px;
+  background: rgb(15 23 42 / 4%);
+  color: var(--dsw-alias-label-tertiary, #64748b);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.paperSearchResults {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.paperSearchResultItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.paperSearchResultItem:hover {
+  background: rgb(15 23 42 / 5%);
+}
+
+.paperSearchResultMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.paperSearchResultPage {
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.paperSearchResultSnippet {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary, #64748b);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paperSearchResultCount {
+  flex: none;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 5%);
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 11px;
+  text-align: center;
+}
+
+.paperReaderSearchInput {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
+  border-radius: 6px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  font-size: 12px;
+}
+
+.paperReaderSearchInput:focus {
+  outline: none;
+  border-color: rgb(59 130 246 / 55%);
+}
+
+.paperReaderSearchCount {
+  flex: none;
+  min-width: 42px;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* 「问这页」：输入行 + 回答块，回答可以直接读，不弹窗。 */
+.paperReaderAskBar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+  background: var(--dsw-alias-bg-l1, #f9fafb);
+}
+
+/* 内层复用了搜索条样式，这里去掉重复的边框和背景。 */
+.paperReaderAskBar .paperReaderSearchBar[data-flat] {
+  padding: 6px 0 0;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.paperReaderAskAnswer {
+  max-height: 220px;
+  overflow: auto;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 框选模式：十字光标，禁止选中文字，避免和划词高亮抢事件。 */
+.paperReaderPageBox[data-crop] {
+  cursor: crosshair;
+  user-select: none;
+}
+
+/* 框选出来的区域：蓝色虚线框，松开鼠标后仍保留，等待确认。 */
+.paperReaderCropBox {
+  position: absolute;
+  z-index: 4;
+  border: 1.5px dashed rgb(59 130 246 / 92%);
+  border-radius: 2px;
+  background: rgb(59 130 246 / 12%);
+  pointer-events: none;
+}
+
+/* 工具栏上的模式开关：激活时描边变蓝。 */
+.paperReaderBar .btn[data-active] {
+  border-color: rgb(59 130 246 / 55%);
+  background: rgb(59 130 246 / 10%);
+  color: rgb(37 88 168);
+}
+
+/* 命中高亮：与已存高亮同一套矩形覆盖层，位置随缩放和翻页自动跟随。 */
+.paperReaderSearchHit {
+  position: absolute;
+  border-radius: 2px;
+  background: rgb(250 204 21 / 58%);
+  box-shadow: 0 0 0 1px rgb(234 179 8 / 55%);
+  pointer-events: none;
+}
+
+.paperReaderPage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12px;
+}
+
+.paperReaderPageInput {
+  width: 44px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 6px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+}
+
+.paperReaderPageTotal {
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 12px;
+}
+
+.paperReaderZoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+
+.paperReaderZoomButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 6px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperReaderZoomButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+}
+
+.paperReaderZoomButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.paperReaderZoomValue {
+  min-width: 38px;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* 右侧栏顶部的选区引用块：选中即出现，可直接发问。 */
+.paperReaderQuote {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 11px;
+  border: 1px solid rgb(59 130 246 / 22%);
+  border-radius: 10px;
+  background: rgb(59 130 246 / 5%);
+}
+
+.paperReaderQuoteHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.paperReaderQuotePage {
+  flex: 1;
+  color: rgb(37 88 168);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.paperReaderQuoteClose {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperReaderQuoteClose:hover {
+  background: rgb(0 0 0 / 8%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderQuoteText {
+  max-height: 120px;
+  margin: 0;
+  overflow: auto;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.paperReaderQuote > button {
+  align-self: flex-start;
+}
+
+/* 问答页签里的引用更紧凑，给消息列表留高度。 */
+.paperReaderQuote[data-compact] {
+  margin-bottom: 0;
+}
+
+.paperReaderQuote[data-compact] .paperReaderQuoteText {
+  max-height: 72px;
+  font-size: 11.5px;
+}
+
+/* 阅读器右侧栏：笔记块与问答两个页签，切换不改变栏宽。 */
+.paperReaderSide {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: min(480px, 42vw);
+  min-width: 0;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-inline-start: 1px solid var(--reader-border, #e8e6e1);
+  background: var(--reader-bg, #fafaf9);
+}
+
+/* 右侧两个面板上下堆叠：各有标题栏，可单独折叠。 */
+.paperReaderPane {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  /* 嵌入单聊后不再需要「卡片套卡片」的边框和圆角。 */
+  border: 0;
+  border-radius: 0;
+  background: var(--reader-surface, #fff);
+  overflow: hidden;
+}
+
+.paperReaderPane[data-closed] {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/* 笔记偏参考，聊天是主工作区，给它更高的比例。 */
+.paperReaderPane:first-of-type {
+  flex: 0.8 1 0;
+}
+
+.paperReaderPane:last-of-type {
+  flex: 1.2 1 0;
+}
+
+/* 只有 AI 会话一个面板时，必须撑满右侧整个高度。 */
+.paperReaderPane:only-of-type {
+  flex: 1 1 auto;
+}
+
+/* 作者样式里的 display:flex 会盖掉 [hidden]，必须显式还原。 */
+.paperReaderPane[hidden] {
+  display: none;
+}
+
+.paperReaderPaneHead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--reader-border, #e8e6e1);
+  background: var(--reader-bg, #f7f8fa);
+}
+
+.paperReaderPaneTitle {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.paperReaderPaneIcon {
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.paperReaderPaneChevron {
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 0.14s ease;
+}
+
+.paperReaderPaneChevron[data-open] {
+  transform: rotate(180deg);
+}
+
+.paperReaderPaneClose {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperReaderPaneClose:hover {
+  background: rgb(0 0 0 / 8%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderPaneBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.paperReaderPaneBody[hidden] {
+  display: none;
+}
+
+/* 完整 ChatPanel 自己管理滚动、间距和输入区，外层只提供高度。 */
+.paperReaderPaneBody[data-chat-host] {
+  padding: 0;
+  overflow: hidden;
+}
+
+/*
+ * 阅读器内嵌单聊时去掉「独立窗口」外观：
+ * .chat-main 原本有 10px 外边距、1px 描边、14px 圆角和阴影，
+ * 放进 480px 侧栏后会形成一圈难看的留白与卡片边框。
+ */
+.paperReaderChat :global(.chat-panel) {
+  height: 100%;
+  min-height: 0;
+  background: transparent;
+}
+
+.paperReaderChat :global(.chat-main) {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.paperReaderChat :global(.chat-main--sidebar-collapsed) {
+  margin: 0;
+}
+
+.paperReaderChat :global(.chat-main-content),
+.paperReaderChat :global(.chat-content-wrapper),
+.paperReaderChat :global(.message-list) {
+  background: transparent;
+}
+
+.paperReaderChat :global(.chat-input-area) {
+  padding: 8px 12px 12px;
+  background: transparent;
+}
+
+/* 输入卡片跟随阅读器主题，并压缩高度，避免侧栏里出现大片空白。 */
+.paperReaderChat :global(.input-wrapper) {
+  min-height: 104px;
+  border-color: var(--reader-border, #e8e6e1);
+  border-radius: 10px;
+  background: var(--reader-elevated, #fff);
+}
+
+.paperReaderChat :global(.input-wrapper:focus-within) {
+  border-color: rgb(37 99 235 / 65%);
+}
+
+/* 问答面板：消息列表在上，输入固定在下。 */
+.paperReaderChat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.paperReaderChatList {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  max-height: 280px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.paperReaderChatTurn {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.paperReaderChatQuestion {
+  margin: 0;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgb(59 130 246 / 8%);
+  color: #2558a8;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.paperReaderChatAnswer {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.paperReaderChatPages {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 10.5px;
+}
+
+.paperReaderChatInput {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+}
+
+.paperReaderChatTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
+  border-radius: 8px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.paperReaderChatTextarea:focus {
+  outline: none;
+  border-color: rgb(59 130 246 / 55%);
+}
+
+/* 阅读区：中性灰底 + 四周留白，让白页浮起来。左侧留出竖排工具条的位置。 */
+.paperReaderStage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 0;
+  /* 左让出 48px 工具栏 + 间隙，底部留 60px 给悬浮控制条。 */
+  padding: 16px 16px 16px 60px;
+  overflow: auto;
+  background: var(--reader-bg, #f7f7f5);
+}
+
+/* 整页正文翻译：覆盖阅读区，可一键切回原文。 */
+.paperReaderTranslatedPage {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 28px 60px 72px;
+  overflow: auto;
+  background: var(--reader-bg, #f7f7f5);
+}
+
+.paperReaderTranslatedHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--reader-border, #e8e6e1);
+  color: var(--reader-text, #1a1a19);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.paperReaderTranslatedToggle {
+  padding: 4px 10px;
+  border: 1px solid var(--reader-border, #e8e6e1);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--reader-muted, #6b6b66);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.paperReaderTranslatedToggle:hover {
+  color: var(--reader-text, #1a1a19);
+  border-color: var(--reader-text, #1a1a19);
+}
+
+.paperReaderTranslatedBody {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  color: var(--reader-text, #1a1a19);
+  font-size: 14.5px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+
+/* 页面盒子：canvas、文本层、高亮色块叠在同一坐标系里。 */
+.paperReaderPageBox {
+  position: relative;
+  flex: none;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+}
+
+.paperReaderCanvas {
+  display: block;
+  border-radius: 2px;
+}
+
+/*
+ * pdfjs 文本层：span 绝对定位，透明但可选中。
+ *
+ * 这里补齐 pdf.js 官方 text_layer.css 的两条关键规则，DOM 文本才会和 Canvas 里
+ * 画出的字形在几何上对齐：
+ *   1. `font-size: calc(var(--text-scale-factor) * var(--font-height))`
+ *      —— 字号取 PDF 的真实字号（TextLayer 写在每个 span 的 --font-height），
+ *      再乘页面缩放（--total-scale-factor）。
+ *   2. `transform: ... scaleX(var(--scale-x)) ...`
+ *      —— 水平缩放把浏览器按字体度量排出的文本宽度收敛到 PDF 的真实字形宽度。
+ *
+ * 之前这里误判「加了 scaleX 反而更宽」，其实是只加了 scaleX、没配套 font-size，
+ * 测量基准错了。两条一起加，span 才精确，原生选区与 mark 高亮才靠得住。
+ */
+.paperReaderTextLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-align: initial;
+  forced-color-adjust: none;
+
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.paperReaderTextLayer span {
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0 0;
+  color: transparent;
+  cursor: text;
+  user-select: text;
+  z-index: 1;
+
+  /* set by pdfjs TextLayer（每个 span 的内联样式） */
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+/*
+ * 浏览器给跨行选区刷的是「行盒」，而 pdfjs 的 span 用 white-space: pre，
+ * 行尾空白会被一起刷上颜色 —— 就是右侧那截多出来的蓝。这里把原生选区压到
+ * 很淡，松手后由 .paperReaderPending（逐字符测量）盖上去，视觉上就对齐了。
+ */
+/*
+ * 原生选区彻底不画。浏览器按行盒刷色，即使删掉尾随空格，仍会留 2-10px 的
+ * 边缘和抗锯齿；这里改为完全透明，松手后由 .paperReaderPending 的精确矩形
+ * 显示选中范围，边界和字形完全一致。
+ */
+.paperReaderTextLayer ::selection {
+  background: transparent;
+}
+
+/*
+ * 引文高亮用 <mark> 包裹在文本层里：浏览器按字形刷背景，
+ * 边界天然等于文字边界，行尾空白与两端对齐都不会被算进来。
+ */
+.paperReaderTextLayer mark[data-hl] {
+  margin: 0;
+  padding: 0;
+  border-radius: 2px;
+  background: rgb(250 204 21 / 42%);
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.paperReaderTextLayer mark[data-hl]:hover {
+  background: rgb(239 68 68 / 32%);
+}
+
+/*
+ * 手绘层：始终存在但不吃事件，只有绘制模式打开才接管指针。
+ * 这样普通阅读时它不会挡住划词。
+ */
+.paperReaderInk {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.paperReaderInk[data-active] {
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* 松手到点「高亮」之间，用精确矩形预览选中的范围。 */
+.paperReaderPending {
+  position: absolute;
+  border-radius: 2px;
+  background: rgb(59 130 246 / 28%);
+  pointer-events: none;
+}
+
+/*
+ * 已存高亮：纯半透明覆盖，不用 mix-blend-mode。
+ * multiply 会让色块与白底相乘，边缘变淡却仍可见，视觉上像“多出一截”。
+ */
+.paperReaderHighlight {
+  position: absolute;
+  border-radius: 2px;
+  background: rgb(250 204 21 / 30%);
+  cursor: pointer;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.paperReaderHighlight:hover {
+  background: rgb(239 68 68 / 34%);
+  box-shadow: inset 0 0 0 1px rgb(239 68 68 / 55%);
+}
+
+/* 划词后浮出的小工具条。 */
+/* 选区工具条：白色浮层，一排色点即点即存，右侧接文字动作。 */
+.paperReaderSelectionBar {
+  position: absolute;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 10px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 4px 10px rgb(0 0 0 / 10%), 0 12px 30px rgb(0 0 0 / 16%);
+  transform: translate(-6px, calc(-100% - 8px));
+  /* 贴近页边时不许被压成竖排 */
+  white-space: nowrap;
+}
+
+/* 圆形色点，悬停微放大。 */
+.paperHighlightSwatch {
+  flex: none;
+  width: 21px;
+  height: 21px;
+  padding: 0;
+  border: 1.5px solid var(--dsw-alias-border-l3, rgb(0 0 0 / 18%));
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.paperHighlightSwatch:hover:not(:disabled) {
+  border-color: var(--dsw-alias-label-secondary, #3c4557);
+  transform: scale(1.1);
+}
+
+.paperHighlightSwatch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 色点与工具之间的竖线。 */
+.paperHighlightDivider {
+  flex: none;
+  width: 1px;
+  height: 21px;
+  margin: 0 1px;
+  background: var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
+}
+
+.paperReaderSelectionAction {
+  flex: none;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.paperReaderSelectionAction:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 7%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderSelectionAction:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 工具条内所有动作统一白底/透明背景，不做单独的蓝色强调块。 */
+.paperReaderSelectionAction[data-primary] {
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-weight: inherit;
+}
+
+.paperReaderSelectionAction[data-primary]:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 7%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+/* 右侧「笔记 + AI 助手」双面板下线：不渲染、不占宽度。 */
+.paperReaderSide[data-hidden] {
+  display: none;
+}
+
+/* 有笔记的选区：页边悬浮的小笔记图标，默认只有图标，悬停才出现底。 */
+.paperReaderNoteMark {
+  position: absolute;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #b45309;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 95%)) drop-shadow(0 2px 4px rgb(15 23 42 / 18%));
+  transform: translate(5px, -2px);
+  transition: background-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease, filter 0.12s ease;
+}
+
+.paperReaderNoteMark svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* 批注浮层不再受某一页的层叠与裁剪影响。 */
+.paperNoteBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  background: rgb(15 23 42 / 8%);
+}
+
+.paperReaderNoteMark:hover {
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 2px 6px rgb(15 23 42 / 10%), 0 6px 14px rgb(15 23 42 / 9%);
+  filter: none;
+  transform: translate(5px, -3px) scale(1.06);
+}
+
+/* 纯色高亮的操作入口：文字层比色块层级高，色块本身收不到点击。
+   用荧光笔图标打开颜色与取消高亮操作。 */
+.paperReaderToneMenu {
+  position: absolute;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 95%)) drop-shadow(0 2px 4px rgb(15 23 42 / 16%));
+  transform: translate(5px, -2px);
+  transition: background-color 0.12s ease, box-shadow 0.12s ease, color 0.12s ease, transform 0.12s ease, filter 0.12s ease;
+}
+
+.paperReaderToneMenu svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.paperReaderToneMenu:hover {
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 10%), 0 6px 14px rgb(15 23 42 / 9%);
+  color: #334155;
+  filter: none;
+  transform: translate(5px, -3px) scale(1.06);
+}
+
+/* 批注内容浮层 */
+.paperReaderNotePeek {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  bottom: auto;
+  z-index: 4001;
+  width: min(340px, calc(100vw - 48px));
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 12%));
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 20%);
+}
+
+.paperReaderNotePeekHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.paperReaderNotePeekClose {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperReaderNotePeekClose:hover {
+  background: rgb(15 23 42 / 6%);
+}
+
+.paperReaderNotePeekQuote {
+  margin: 0 0 6px;
+  padding-left: 8px;
+  border-left: 2px solid rgb(234 179 8 / 60%);
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.paperReaderNotePeekBody {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.paperReaderNotePeekActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgb(15 23 42 / 7%));
+}
+
+.paperReaderNotePeekAction {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.paperReaderNotePeekAction:hover {
+  background: rgb(15 23 42 / 6%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperReaderNotePeekAction[data-danger] {
+  color: #c43d3d;
+}
+
+/* 新建笔记时的高亮颜色选择。 */
+.paperReaderCommentColors {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 2px;
+}
+
+.paperReaderCommentSwatch {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid rgb(15 23 42 / 16%);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.paperReaderCommentSwatch:hover {
+  transform: scale(1.12);
+}
+
+.paperReaderCommentSwatch[data-active] {
+  box-shadow: 0 0 0 2px var(--dsw-specific-menu, #fff), 0 0 0 3px rgb(120 92 32 / 55%);
+}
+
+/* 笔记浮层里的颜色切换。 */
+.paperReaderNotePeekColors {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 8px;
+}
+
+.paperReaderNotePeekSwatch {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgb(15 23 42 / 16%);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.paperReaderNotePeekSwatch:hover {
+  transform: scale(1.12);
+}
+
+.paperReaderNotePeekSwatch[data-active] {
+  box-shadow: 0 0 0 2px var(--dsw-specific-menu, #fff), 0 0 0 3px rgb(120 92 32 / 55%);
+}
+
+/* 笔记输入：嵌在工具条里，宽度够写一句话就停。 */
+.paperReaderCommentInput {
+  width: 210px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
+  border-radius: 5px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  font-size: 12px;
+}
+
+.paperReaderCommentInput::placeholder { color: var(--dsw-alias-label-tertiary, #6b7280); }
+
+.paperReaderCommentInput:focus { outline: none; border-color: rgb(59 130 246 / 55%); }
+
+.paperReaderSelectionCancel {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperReaderSelectionCancel:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 7%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+/* 引用出处：每条一个可展开的页码 + 原文摘录。 */
+.paperCitations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+}
+
+.paperCitationsHead {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.paperCitationRow {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* 引用右侧的「在 PDF 中查看」：悬停引用行时才显形，不抢视觉。 */
+.paperCitationJump {
+  flex: none;
+  align-self: center;
+  padding: 3px 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 6px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.paperCitationRow:hover .paperCitationJump,
+.paperCitationJump:focus-visible {
+  opacity: 1;
+}
+
+.paperCitationJump:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+}
+
+.paperCitation {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--dsw-specific-menu, #fff);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.paperCitation:hover {
+  border-color: var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 5%));
+}
+
+.paperCitationPage {
+  flex: none;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.paperCitationText {
+  flex: 1;
+  min-width: 0;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11.5px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 点开时显示完整摘录。 */
+.paperCitation[data-open] .paperCitationText {
+  display: block;
+  -webkit-line-clamp: unset;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+}
+
+/* PubMed 结果卡：PMID、期刊行、摘要。 */
+.pubmedBadge {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(var(--accent-primary-rgb, 59 130 246), 0.1);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pubmedMeta {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.pubmedAbstract {
+  margin: 6px 0 0;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12px;
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pubmedActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* 结构化笔记块：一条一块，claim / gap 用左侧色条区分。 */
+.paperNotes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+}
+
+.paperNotesHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paperNotesCount {
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.paperNotesHead > button {
+  margin-inline-start: auto;
+}
+
+.paperNoteBlockList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.paperNoteBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 8px 6px 10px;
+  border-inline-start: 2px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 4%));
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.paperNoteBlock[data-kind='claim'] {
+  border-inline-start-color: #2f7d4f;
+}
+
+.paperNoteBlock[data-kind='gap'] {
+  border-inline-start-color: #b4671a;
+}
+
+.paperNoteBlockText {
+  flex: 1;
+  min-width: 0;
+  color: var(--dsw-alias-label-primary, #17233d);
+  word-break: break-word;
+}
+
+.paperNoteBlockMeta {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11px;
+}
+
+/* 页码变成按钮后要清掉默认外观，只留一个安静的小胶囊。 */
+button.paperNoteBlockMeta {
+  padding: 1px 5px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+button.paperNoteBlockMeta:hover {
+  border-color: var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+}
+
+/* 知识沉淀列表：一行一条，左侧 kind 徽章，右侧来源与删除。 */
+.knowledgeHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.knowledgeHead > h3 {
+  margin: 0;
+}
+
+.knowledgeHead > button {
+  margin-inline-start: auto;
+}
+
+/* 「刷新 + 关闭」被包进动作组后不再是直接子按钮，这里单独把它推到最右。 */
+.knowledgeHead > .papersPanelActions {
+  margin-inline-start: auto;
+}
+
+.knowledgeList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.knowledgeItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+  border-radius: 8px;
+  background: var(--dsw-specific-menu, #fff);
+}
+
+.knowledgeKind {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.knowledgeKind[data-kind='claim'] { background: rgb(47 125 79 / 12%); color: #26694a; }
+.knowledgeKind[data-kind='gap'] { background: rgb(180 103 26 / 14%); color: #8a4f14; }
+.knowledgeKind[data-kind='literature_review'] { background: rgb(59 130 246 / 12%); color: #2558a8; }
+
+.knowledgeStatement {
+  flex: 1;
+  min-width: 0;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.knowledgeSource {
+  flex: none;
+  max-width: 160px;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledgeRemove {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.knowledgeItem:hover .knowledgeRemove,
+.knowledgeRemove:focus-visible {
+  opacity: 1;
+}
+
+.knowledgeRemove:hover {
+  background: rgb(0 0 0 / 8%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+/* 「导入 PDF」：与按钮同款的 label，包住隐藏的 file input。 */
+.paperImportLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 7px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.paperImportLabel:hover {
+  border-color: var(--dsw-alias-border-l3, rgb(0 0 0 / 12%));
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperImportLabel[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* 导入结果一行提示。 */
+.importResult {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgb(47 125 79 / 10%);
+  color: #26694a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 自动打标：建议先展示，确认后才写入 paper.tags / score。 */
+.paperSuggest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+}
+
+.paperSuggestBox {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid rgb(59 130 246 / 22%);
+  border-radius: 9px;
+  background: rgb(59 130 246 / 5%);
+}
+
+.paperSuggestTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.paperSuggestTag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 11.5px;
+}
+
+.paperSuggestScore {
+  margin-inline-start: auto;
+  color: rgb(37 88 168);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.paperSuggestReason {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.paperSuggestActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* 分析结果底部的操作条（存为知识）。 */
+.paperAiFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--dsw-alias-border-l2, rgb(0 0 0 / 8%));
+}
+
+/* 笔记块右侧的「+」：把这一条升成知识。 */
+.paperNoteBlockLift {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.paperNoteBlock:hover .paperNoteBlockLift,
+.paperNoteBlockLift:focus-visible {
+  opacity: 1;
+}
+
+.paperNoteBlockLift:hover:not(:disabled) {
+  background: rgb(0 0 0 / 8%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperNoteBlockLift:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 高亮块里的批注：换行显示，用一条细线区分“原文”和“我写的”。 */
+.paperNoteBlockComment {
+  display: block;
+  margin-top: 4px;
+  padding-inline-start: 7px;
+  border-inline-start: 2px solid rgb(47 125 79 / 45%);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.paperNoteBlockRemove {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperNoteBlockRemove:hover:not(:disabled) {
+  background: rgb(0 0 0 / 8%);
+  color: var(--dsw-alias-label-primary, #17233d);
 }
 
 /* Experiments view: the run table card plus the log viewer card. */
@@ -2440,7 +5108,7 @@ li.dropIndicator {
   flex-direction: column;
   gap: 14px;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -2694,7 +5362,7 @@ li.dropIndicator {
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 1360px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -2880,7 +5548,7 @@ li.dropIndicator {
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -3730,6 +6398,7 @@ li.dropIndicator {
 }
 
 .experimentLog table {
+  width: 100%;
   margin: 8px 0;
   border-collapse: collapse;
   font-size: 12.5px;
@@ -3995,7 +6664,7 @@ li.dropIndicator {
   flex-direction: column;
   gap: 14px;
   width: 100%;
-  max-width: 1080px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -4896,11 +7565,24 @@ li.dropIndicator {
 
 /* Fullscreen PDF reading: the viewport-sized overlay lifting one card's
    reader (iframe + notes panel) out of the grid. */
-.paperPdfOverlay {   position: fixed;
+.paperPdfOverlay {   /* 阅读器 chrome 的主题令牌放在最外层：标签栏、右侧会话栏是
+   阅读器根节点的兄弟节点，只有从这里才能一起继承。 */
+  --reader-bg: #f7f7f5;
+  --reader-surface: #fff;
+  --reader-elevated: #fff;
+  --reader-border: #e8e6e1;
+  --reader-text: #1a1a19;
+  --reader-muted: #6b6b66;
+  --reader-active: #efeee9;
+  color-scheme: light;
+  position: fixed;
   inset: 0;
-  /* Above the shell's floating widgets (1200) and Naive UI's modal layer
-     (2000): the reader takes the page over, nothing may sit on its head. */
-  z-index: 3000;
+  /*
+   * 高于页面浮窗（1200），但低于 Naive UI 的 modal 层（2000）：
+   * 阅读器仍铺满页面，确认框、菜单等系统弹窗必须能盖在它上面，否则
+   * 点击会落到 PDF 文本层，按钮看起来存在却点不到。
+   */
+  z-index: 1900;
   /* The desktop shell marks the window's top strip as `drag` (and inherits it
      into whatever sits there), which swallows mousedown/click and turns a
      double click into a window maximize. The reader opts out explicitly. */
@@ -4910,10 +7592,22 @@ li.dropIndicator {
   background: var(--dsw-alias-bg-body, #f5f6f7);
 }
 
+:global(.dark) .paperPdfOverlay {
+  --reader-bg: #141518;
+  --reader-surface: #1c1f24;
+  --reader-elevated: #242830;
+  --reader-border: #30343c;
+  --reader-text: #e8e8e6;
+  --reader-muted: #9aa1ab;
+  --reader-active: #2a2f37;
+  color-scheme: dark;
+}
+
+/* 顶栏压到 32px 左右：这一条只放「退出」和标题，越矮越把高度让给正文。 */
 .paperPdfOverlayHead {   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  padding: 5px 14px;
   -webkit-app-region: no-drag;
   border-bottom: 1px solid var(--mimir-line-soft);
   background: var(--dsw-specific-menu, #fff);
@@ -4930,11 +7624,11 @@ li.dropIndicator {
   white-space: nowrap;
 }
 
+/* 标签栏之下直接铺满：阅读器自己管内边距，这里不再加。 */
 .paperPdfOverlayBody {   flex: 1;
   display: flex;
-  gap: 10px;
   min-height: 0;
-  padding: 10px 16px 14px;
+  padding: 0;
 }
 
 .paperPdfOverlayFrame {   flex: 1;
@@ -5078,6 +7772,14 @@ li.dropIndicator {
 .paperNotesTitle {   margin: 0;
   color: var(--dsw-alias-label-primary, #1f2329);
   font-size: 13px;
+}
+
+/* 空笔记状态：一句提示 + 「插入精读模板」引导按钮。 */
+.paperNotesEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .paperNoteList {   flex: 1;
@@ -5846,7 +8548,7 @@ li.dropIndicator {
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -6171,4 +8873,1295 @@ li.dropIndicator {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+/* ---- 文库首页（Gamma 布局）：页头筛选 / 排序 / 收录开关 ---- */
+.papersLibFilter {
+  width: 230px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 7px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12px;
+}
+
+.papersLibFilter::placeholder {
+  color: var(--dsw-alias-label-tertiary, #8a94a6);
+}
+
+.papersLibFilter:focus {
+  outline: none;
+  border-color: var(--dsw-alias-border-focus, #3b82f6);
+  box-shadow: 0 0 0 2px rgb(59 130 246 / 18%);
+}
+
+.papersSort {
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 7px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.papersSort:focus {
+  outline: none;
+  border-color: var(--dsw-alias-border-focus, #3b82f6);
+}
+
+/* 收录面板：arXiv 订阅、三源检索与 Zotero 都住在这里，默认收起。 */
+.papersCollectPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 14px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+/* ---- Paperloom 书库：整卡即入口，封面与文字之外不放任何操作 ---- */
+.paperCard[data-library],
+.paperCard[data-library][data-open] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transition: none;
+}
+
+.paperCard[data-library]:hover {
+  border: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.paperCard[data-library]:focus-visible {
+  outline: none;
+}
+
+.paperCover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 0.72;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 4px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 8%);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease;
+}
+
+.paperCard[data-library]:hover .paperCover {
+  box-shadow: 0 10px 24px rgb(15 23 42 / 14%);
+  transform: translateY(-2px);
+}
+
+.paperCard[data-library]:focus-visible .paperCover {
+  outline: 2px solid var(--dsw-alias-border-focus, #3b82f6);
+  outline-offset: 3px;
+}
+
+.paperCover > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  user-select: none;
+}
+
+.paperCoverFallback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 13px 12px;
+  background: linear-gradient(180deg, #fff, #f7f7f5);
+  color: #8a8f98;
+}
+
+.paperCoverFallback > span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.paperCoverFallback > p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #4b5563;
+  font-family: var(--mimir-serif);
+  font-size: 11px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.paperCoverStatus {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgb(15 23 42 / 78%);
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
+.paperCard[data-library] .paperCardTitle {
+  display: -webkit-box;
+  min-height: 2.9em;
+  margin: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.paperCard[data-library] .paperCardMeta {
+  margin: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .papersGrid {
+    /* 手机上不按文献数量强行分列，保持可读的卡片宽度。 */
+    grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)) !important;
+    gap: 16px 12px;
+  }
+}
+
+/*
+ * 网格卡片内部等比缩放：以卡片宽度（container query）为基准，
+ * 而不是固定视口宽度。这样窗口、全屏、超宽屏下，
+ * 标题、元信息和徽章相对封面的比例保持一致。
+ */
+@media (min-width: 721px) {
+  .papersGrid:not([data-view="list"]) {
+    gap: clamp(14px, 1vw, 24px) clamp(8px, 0.8vw, 16px);
+  }
+
+  .papersGrid:not([data-view="list"]) .paperCard[data-library] {
+    container-type: inline-size;
+  }
+
+  .papersGrid:not([data-view="list"]) .paperCard[data-library] .paperCardTitle {
+    font-size: clamp(13px, 8.2cqw, 20px);
+  }
+
+  .papersGrid:not([data-view="list"]) .paperCard[data-library] .paperCardMeta {
+    font-size: clamp(11px, 5.4cqw, 13px);
+  }
+
+  .papersGrid:not([data-view="list"]) .paperCard[data-library] .paperCardBadges {
+    margin: 0 clamp(8px, 4.2cqw, 12px) clamp(7px, 3.2cqw, 10px);
+  }
+
+  .papersGrid:not([data-view="list"]) .paperCard[data-library] .paperCardBadge {
+    font-size: clamp(9px, 5.1cqw, 12px);
+  }
+}
+
+/* 窗口宽度下压缩网格卡片高度；全屏仍保持完整封面比例。 */
+@media (min-width: 721px) and (max-width: 1500px) {
+  .papersGrid:not([data-view="list"]) {
+    row-gap: 14px;
+  }
+
+  .papersGrid:not([data-view="list"]) .paperCard[data-library] {
+    gap: 5px;
+  }
+
+  /* 封面比例不在窗口/全屏之间切换，避免同一行卡片出现两种纵向比例。 */
+  .papersGrid:not([data-view="list"]) .paperCard[data-library] .paperCardBadges {
+    margin-bottom: 7px;
+  }
+}
+
+/* ---- 书库工具栏：批量 / 筛选 / 视图 / Gamma 式收录菜单 ---- */
+.papers .viewActions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.papersToolbarMenu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.papersAddButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--dsw-alias-label-primary, #17233d);
+  color: var(--dsw-specific-menu, #fff);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.papersAddButton:hover {
+  filter: brightness(1.12);
+}
+
+.papersCollectMenu,
+.papersFilterMenu {
+  position: absolute;
+  z-index: 80;
+  top: 36px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 300px;
+  padding: 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 14px;
+  background: var(--dsw-specific-menu, #fff);
+  box-shadow: 0 16px 42px rgb(15 23 42 / 16%);
+}
+
+.papersFilterMenu {
+  width: 164px;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.papersCollectPaste {
+  width: 100%;
+  height: 36px;
+  margin-bottom: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-focus, #3b82f6);
+  border-radius: 8px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.papersMenuItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  /* 撑满容器：不写 width 时 button 宽度跟着文字走，hover 背景就长短不一。 */
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.papersMenuItem:hover,
+.papersMenuItem[data-active] {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 6%));
+}
+
+.papersMenuItem:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.papersViewToggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 8px;
+  background: var(--dsw-specific-menu, #fff);
+}
+
+.papersViewToggle > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.papersViewToggle > button[data-active] {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(38 49 72 / 8%));
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.papersSelectionCount {
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.paperSelectMark {
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgb(15 23 42 / 22%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 92%);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 12%);
+}
+
+.paperSelectMark[data-selected] {
+  border-color: var(--dsw-alias-label-primary, #17233d);
+  background: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperCard[data-library][data-selected] .paperCover {
+  outline: 2px solid var(--dsw-alias-border-focus, #3b82f6);
+  outline-offset: 2px;
+}
+
+.papersImportProgress {
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 列表仍只有封面、标题与元信息；选择/阅读都点整行。 */
+.papersGrid[data-view="list"] {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgb(15 23 42 / 6%));
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library],
+.papersGrid[data-view="list"] .paperCard[data-library][data-open] {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(15 23 42 / 6%));
+}
+
+.papersGrid[data-view="list"] .paperCover {
+  grid-row: 1 / 3;
+  width: 48px;
+  border-radius: 3px;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library]:hover .paperCover {
+  transform: none;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardTitle {
+  grid-column: 2;
+  min-height: 0;
+  font-size: 13px;
+  -webkit-line-clamp: 1;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardMeta {
+  grid-column: 2;
+}
+
+.papersGrid[data-view="list"] .paperCoverFallback {
+  gap: 3px;
+  padding: 5px;
+}
+
+.papersGrid[data-view="list"] .paperCoverFallback > p {
+  display: none;
+}
+
+.papersGrid[data-view="list"] .paperCoverFallback > span {
+  font-size: 8px;
+}
+
+.papersGrid[data-view="list"] .paperSelectMark {
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* ---- 紧凑书库卡：圆角封面卡 + 悬停收藏/删除 ---- */
+.paperCard[data-library],
+.paperCard[data-library][data-open] {
+  display: block;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 14px;
+  background: var(--dsw-specific-menu, #fff);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 5%);
+  cursor: default;
+}
+
+.paperCard[data-library]:hover {
+  border-color: var(--dsw-alias-border-l3, rgb(0 0 0 / 15%));
+  box-shadow: 0 10px 26px rgb(15 23 42 / 10%);
+  transform: none;
+}
+
+.paperCardMain {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  outline: none;
+  cursor: pointer;
+}
+
+.paperCardMain:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-focus, #3b82f6);
+  outline-offset: -2px;
+  border-radius: 14px;
+}
+
+.paperCard[data-library] .paperCover {
+  width: 100%;
+  /*
+   * 高度不再写死 220px：之前固定高度下，列宽一变封面比例就跟着变
+   *（窗口化时 120×220 竖长、全屏时 200×220 扁宽）。改成跟着宽度走的
+   * 固定宽高比，两种窗口尺寸下封面形状一致。
+   *
+   * 比例从 0.72 提到 0.9：0.72 时高是宽的 1.39 倍，卡片整体被拉得过长。
+   * 再加 150px 上限：窗口列宽 146 / 全屏 177 都超过这个高度，
+   * 于是两种状态封面一样高（图片 object-fit: cover 顶部对齐，裁掉的是页脚空白）。
+   */
+  height: auto;
+  /*
+   * 0.9 -> 1.05：封面略扁一点，卡片整体矮约 15%，
+   * 窗口模式下不再显得「又窄又长」；仍是竖版封面（高 ≈ 宽的 0.95）。
+   */
+  aspect-ratio: 1.05;
+  border: 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(15 23 42 / 6%));
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.paperCard[data-library]:hover .paperCover {
+  box-shadow: none;
+  transform: none;
+}
+
+.paperCard[data-library] .paperCardTitle {
+  min-height: 2.8em;
+  margin: 10px 11px 5px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.38;
+}
+
+.paperCard[data-library] .paperCardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: auto 11px 9px;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.paperCardActions {
+  position: absolute;
+  z-index: 6;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 5px;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.paperCard[data-library]:hover .paperCardActions,
+.paperCard[data-library]:focus-within .paperCardActions,
+.paperCardActions[data-favorite] {
+  opacity: 1;
+  transform: none;
+}
+
+.paperCardAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgb(15 23 42 / 10%);
+  border-radius: 7px;
+  background: rgb(255 255 255 / 92%);
+  color: #596273;
+  box-shadow: 0 2px 7px rgb(15 23 42 / 10%);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.paperCardAction > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.paperCardAction:hover {
+  color: #17233d;
+  background: #fff;
+}
+
+.paperCardAction[data-active] {
+  color: #b7791f;
+}
+
+.paperCardAction[data-active] > svg {
+  fill: currentColor;
+}
+
+.paperCardAction[data-danger]:hover {
+  color: #c43d3d;
+}
+
+/* ── 卡片「⋯」菜单 ─────────────────────────────────────────────────── */
+.paperCardMenuWrap {
+  position: relative;
+}
+
+.paperCardMenuDots {
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.paperCardMenu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 176px;
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 12%));
+  border-radius: 10px;
+  /* 必须是实心底色：之前用 var(--dsw-specific-menu, #fff)，变量在这些页面上
+     没有定义成不透明值，菜单会透出背后的 PDF，看起来像是「叠在论文上」。 */
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgb(15 23 42 / 18%);
+  /* 不能裁剪：二级子菜单要向左溢出到卡片外。 */
+  overflow: visible;
+}
+
+/* ── 「移动到文件夹」二级子菜单：悬停展开到左侧 ─────────────────── */
+.paperCardSubmenuWrap {
+  position: relative;
+}
+
+.paperCardMenuChevron {
+  margin-inline-start: auto;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.paperCardSubmenu {
+  display: none;
+  position: absolute;
+  top: -4px;
+  /* 展开在主菜单右侧：左侧会被卡片盖住（卡片本身有 z-index 与裁剪）。 */
+  left: calc(100% + 6px);
+  right: auto;
+  z-index: 60;
+  min-width: 148px;
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 12%));
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgb(15 23 42 / 18%);
+}
+
+.paperCardSubmenuWrap:hover > .paperCardSubmenu,
+.paperCardSubmenuWrap:focus-within > .paperCardSubmenu {
+  display: block;
+}
+
+.paperCardSubmenuItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.paperCardSubmenuItem:hover {
+  background: rgb(15 23 42 / 6%);
+}
+
+.paperCardSubmenuDot {
+  box-sizing: border-box;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.35;
+}
+
+.paperCardSubmenuItem[data-active] {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.paperCardSubmenuItem[data-active] .paperCardSubmenuDot {
+  background: currentColor;
+  opacity: 1;
+}
+
+.paperCardMenuState {
+  margin-inline-start: auto;
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font-size: 11px;
+}
+
+/* 分组标题（「移动到文件夹」这类）——用正文色 + 加粗，避免被当成禁用项。 */
+.paperCardMenuLabel {
+  display: block;
+  padding: 8px 10px 4px;
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 深色阅读器浮层：选区工具条、查找弹窗、批注浮层。 */
+:global(.dark) .paperReaderSelectionBar,
+:global(.dark) .paperSearchDialog,
+:global(.dark) .paperReaderNotePeek {
+  border-color: #30343c;
+  background: #1c1f24;
+  color: #e8e8e6;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 48%);
+}
+
+:global(.dark) .paperReaderSelectionAction {
+  color: #d7dbe2;
+}
+
+:global(.dark) .paperReaderSelectionAction:hover {
+  background: rgb(255 255 255 / 8%);
+  color: #fff;
+}
+
+:global(.dark) .paperHighlightDivider {
+  background: #3a3f48;
+}
+
+:global(.dark) .paperReaderSearchInput {
+  border-color: #3a3f48;
+  background: #242830;
+  color: #e8e8e6;
+}
+
+:global(.dark) .paperSearchResultItem:hover {
+  background: rgb(255 255 255 / 7%);
+}
+
+:global(.dark) .paperSearchFooter {
+  border-color: #30343c;
+}
+
+:global(.dark) .paperSearchNavButton {
+  border-color: #3a3f48;
+  background: #242830;
+  color: #d7dbe2;
+}
+
+:global(.dark) .paperSearchNavButton:hover:not(:disabled) {
+  border-color: rgb(147 197 253 / 45%);
+  background: rgb(147 197 253 / 8%);
+  color: #bfdbfe;
+}
+
+:global(.dark) .paperSearchShortcut {
+  border-color: #3a3f48;
+  background: rgb(255 255 255 / 6%);
+  color: #9aa1ab;
+}
+
+:global(.dark) .paperSearchResultPage {
+  color: #e8e8e6;
+}
+
+:global(.dark) .paperSearchResultSnippet {
+  color: #9aa1ab;
+}
+
+:global(.dark) .paperSearchResultCount {
+  background: rgb(255 255 255 / 7%);
+  color: #a7b0bd;
+}
+
+:global(.dark) .paperReaderNotePeekQuote {
+  color: #9aa1ab;
+}
+
+:global(.dark) .paperReaderNotePeekBody {
+  color: #e8e8e6;
+}
+
+:global(.dark) .paperReaderNoteMark {
+  color: #f5c45e;
+  filter: drop-shadow(0 1px 0 rgb(20 21 24 / 95%)) drop-shadow(0 2px 4px rgb(0 0 0 / 45%));
+}
+
+:global(.dark) .paperReaderNoteMark:hover {
+  background: #2a2f37;
+  filter: none;
+}
+
+:global(.dark) .paperReaderToneMenu {
+  color: #cbd5e1;
+  filter: drop-shadow(0 1px 0 rgb(20 21 24 / 95%)) drop-shadow(0 2px 4px rgb(0 0 0 / 42%));
+}
+
+:global(.dark) .paperReaderToneMenu:hover {
+  background: #2f3540;
+  color: #fff;
+  filter: none;
+}
+
+:global(.dark) .paperReaderCommentSwatch[data-active],
+:global(.dark) .paperReaderNotePeekSwatch[data-active] {
+  box-shadow: 0 0 0 2px #1c1f24, 0 0 0 3px rgb(245 207 130 / 55%);
+}
+
+/* 深色主题：菜单和二级子菜单必须使用深色实底，不能白底白字。 */
+:global(.dark) .paperCardMenu,
+:global(.dark) .paperCardSubmenu {
+  border-color: rgb(255 255 255 / 14%);
+  background: #20242c;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 45%);
+}
+
+:global(.dark) .papersMenuItem,
+:global(.dark) .paperCardSubmenuItem {
+  color: #f3f4f6;
+}
+
+:global(.dark) .papersMenuItem:hover,
+:global(.dark) .papersMenuItem[data-active],
+:global(.dark) .paperCardSubmenuItem:hover {
+  background: rgb(255 255 255 / 8%);
+}
+
+:global(.dark) .paperCardSubmenuItem[data-active] {
+  color: #7dd3fc;
+}
+
+:global(.dark) .paperCardMenuLabel,
+:global(.dark) .paperCardMenuState,
+:global(.dark) .paperCardMenuChevron {
+  color: #a7b0bd;
+}
+
+/* ── 文件夹：筛选 chips + 新建弹窗 ───────────────────────────────── */
+.papersFolders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.papersFolderChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  box-sizing: border-box;
+  padding: 3px 8px 3px 11px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 12%));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #46505f);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+.papersFolderChip:hover {
+  border-color: rgb(15 23 42 / 24%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.papersFolderChip[data-active] {
+  border-color: rgb(59 130 246 / 45%);
+  background: rgb(59 130 246 / 10%);
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* 胶囊内的删除按钮：默认隐藏，悬停或键盘聚焦时才出现。 */
+.papersFolderDelete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.papersFolderChip:hover .papersFolderDelete,
+.papersFolderChip:focus-within .papersFolderDelete,
+.papersFolderDelete:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.papersFolderDelete:hover {
+  background: rgb(196 61 61 / 14%);
+  color: #c43d3d;
+  opacity: 1;
+}
+
+/* 综述等展开面板的标题行：左侧标题、右侧关闭。 */
+.papersPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* 标题行右侧的动作组（刷新 + 关闭）。 */
+.papersPanelActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.papersPanelClose {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.papersPanelClose:hover {
+  background: rgb(15 23 42 / 6%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperFolderDialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: min(380px, 100%);
+  padding: 20px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 30%);
+}
+
+.paperFolderDialog > h4 {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.paperFolderInput {
+  box-sizing: border-box;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 14%));
+  border-radius: 8px;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.paperFolderInput:focus {
+  border-color: #2563eb;
+}
+
+.paperFolderActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.paperFolderSubmit {
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.paperFolderSubmit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 菜单位置溢出时不要被卡片自身的 overflow: hidden 裁掉。 */
+.paperCard[data-library]:has(.paperCardMenu) {
+  z-index: 30;
+  overflow: visible;
+}
+
+/* 子菜单展开时整张卡片再抬一层，避免被相邻卡片压住。 */
+.paperCard[data-library]:has(.paperCardSubmenuWrap:hover) {
+  z-index: 50;
+}
+
+/* ── 卡片状态徽章：未翻译 / 未摘要 ─────────────────────────────────── */
+.paperCardBadges {
+  display: flex;
+  /* 不换行：两个徽章（已翻译 / 已摘要）必须并排，否则只有「已完成」的
+     卡片会竖成两行，和其他卡片高度不一致。 */
+  flex-wrap: nowrap;
+  gap: 3px;
+  min-width: 0;
+  margin: 0 11px 9px;
+  overflow: hidden;
+}
+
+/* 徽章同时也是按钮：点一下就触发翻译 / 摘要。 */
+.paperCardBadge {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(15 23 42 / 12%));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font: inherit;
+  /* 跟着窗口宽度缩放：窗口约 10px、全屏约 13px，和卡片一起放大。 */
+  font-size: clamp(9px, 0.62vw, 12px);
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.paperCardBadge:hover:not(:disabled) {
+  border-color: rgb(15 23 42 / 24%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+/* 已完成：整枚徽章转绿，圆圈里换成勾。 */
+.paperCardBadge[data-on] {
+  border-color: rgb(22 163 74 / 40%);
+  background: rgb(22 163 74 / 10%);
+  color: #15803d;
+}
+
+.paperCardBadge[data-on] .paperCardBadgeDot {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.paperCardBadge:disabled {
+  cursor: default;
+}
+
+/* 左侧状态点：空闲是空心圆，进行中变成旋转的圈，完成是勾。 */
+.paperCardBadgeDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+.paperCardBadge[data-busy] .paperCardBadgeDot {
+  border-color: rgb(37 99 235 / 25%);
+  border-top-color: #2563eb;
+  animation: paperCardBadgeSpin 0.8s linear infinite;
+}
+
+.paperCardBadge[data-busy] {
+  border-color: rgb(37 99 235 / 35%);
+  color: #2563eb;
+}
+
+@keyframes paperCardBadgeSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* 已生成摘要的查看弹窗 */
+.paperSummaryBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(15 23 42 / 45%);
+}
+
+.paperSummaryDialog {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(720px, 100%);
+  max-height: 78vh;
+  padding: 18px 20px 20px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 30%);
+}
+
+.paperSummaryHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.paperSummaryHead > h4 {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.paperSummaryClose {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.paperSummaryClose:hover {
+  background: rgb(15 23 42 / 6%);
+  color: var(--dsw-alias-label-primary, #17233d);
+}
+
+.paperSummaryTitle {
+  margin: 0 0 10px;
+  color: var(--dsw-alias-label-tertiary, #5b6474);
+  font-size: 12px;
+}
+
+.paperSummaryBody {
+  overflow: auto;
+  color: var(--dsw-alias-label-primary, #17233d);
+  font-size: 13.5px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.papersViewToggle > button > svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
+}
+
+/* 列表态保留同一底栏与悬停动作。 */
+.papersGrid[data-view="list"] .paperCard[data-library],
+.papersGrid[data-view="list"] .paperCard[data-library][data-open] {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(15 23 42 / 6%));
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  box-shadow: none;
+}
+
+.papersGrid[data-view="list"] .paperCardMain {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 10px 4px;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCover {
+  grid-row: 1 / 3;
+  width: 48px;
+  height: 66px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 3px;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardTitle {
+  grid-column: 2;
+  min-height: 0;
+  margin: 0;
+  font-size: 13px;
+  -webkit-line-clamp: 1;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardMeta {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding-right: 8px;
+}
+
+/*
+ * 列表只有标题 / 元信息两行。徽章必须落在第二列，
+ * 否则 CSS Grid 会自动把它放到封面下方的第三行，
+ * 表现为绿色对勾悬在封面左下角。
+ */
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardBadges {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+  align-self: center;
+  max-width: 58%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.papersGrid[data-view="list"] .paperCardActions {
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library]:hover .paperCardActions,
+.papersGrid[data-view="list"] .paperCard[data-library]:focus-within .paperCardActions,
+.papersGrid[data-view="list"] .paperCardActions[data-favorite] {
+  transform: translateY(-50%);
+}
+
+/*
+ * 列表视图等比密度：窗口变大时封面、字号、行距一起放大，
+ * 而不是只把右侧留白拉长。
+ */
+.papersGrid[data-view="list"] .paperCardMain {
+  grid-template-columns: clamp(48px, 3.2vw, 64px) minmax(0, 1fr);
+  gap: clamp(12px, 0.9vw, 18px);
+  padding: clamp(10px, 0.75vw, 14px) 4px;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 0.72;
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardTitle {
+  font-size: clamp(13px, 0.9vw, 16px);
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardMeta {
+  font-size: clamp(11px, 0.7vw, 12.5px);
+}
+
+.papersGrid[data-view="list"] .paperCard[data-library] .paperCardBadges {
+  gap: clamp(3px, 0.3vw, 6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paperCardActions {
+    transition: none;
+  }
+}
+
+/* 列数由 auto-fill 自动决定，窄窗口自然变少，不再需要手动降级。 */
+
+/* 当前会话名：聊天标题栏中的弱化标签，长标题截断、悬停看全名。 */
+.paperReaderSessionLabel {
+  flex: 0 1 170px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary, #6b7280);
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

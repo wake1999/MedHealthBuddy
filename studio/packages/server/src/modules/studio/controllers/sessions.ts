@@ -32,6 +32,7 @@ import {
   getSession as localGetSession,
   getSessionDetail as localGetSessionDetail,
   deleteSession as localDeleteSession,
+  deleteMessagesFrom as localDeleteMessagesFrom,
   renameSession as localRenameSession,
   setSessionArchived as localSetSessionArchived,
   setSessionPushEnabled as localSetSessionPushEnabled,
@@ -1456,6 +1457,27 @@ export async function usageSingle(ctx: any) {
     return
   }
   ctx.body = result
+}
+
+/** POST /api/studio/sessions/:id/rewind — 删除目标消息及其之后的消息。 */
+export async function rewind(ctx: any) {
+  const sessionId = String(ctx.params.id || '')
+  const existing = localGetSession(sessionId)
+  if (denySessionAccess(ctx, existing)) return
+  const messageId = String((ctx.request.body as { messageId?: unknown })?.messageId ?? '').trim()
+  if (messageId === '') {
+    ctx.status = 400
+    ctx.body = { error: 'messageId is required' }
+    return
+  }
+  const deleted = localDeleteMessagesFrom(sessionId, messageId)
+  if (deleted < 0) {
+    ctx.status = 404
+    ctx.body = { error: 'Message not found in this session' }
+    return
+  }
+  getChatRunServer()?.rewindSessionHistory?.(sessionId, messageId)
+  ctx.body = { ok: true, deleted }
 }
 
 export async function rename(ctx: any) {

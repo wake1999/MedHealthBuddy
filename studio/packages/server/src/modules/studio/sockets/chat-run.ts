@@ -464,6 +464,26 @@ export class ChatRunSocket {
     })
   }
 
+  /**
+   * 回退后同步内存中的会话状态，避免下一次模型调用仍携带已删除的消息。
+   * 只保留目标消息之前的记录。
+   */
+  rewindSessionHistory(sessionId: string, beforeMessageId: string | number): void {
+    const state = this.sessionMap.get(sessionId)
+    if (!state) return
+    const cutoff = Number(beforeMessageId)
+    if (!Number.isFinite(cutoff)) return
+    state.messages = (state.messages || []).filter(message => {
+      const id = Number(message.id)
+      return !Number.isFinite(id) || id < cutoff
+    })
+    state.messageTotal = state.messages.length
+    state.messageLoadedCount = state.messages.length
+    state.messageStateBaselineCount = state.messages.length
+    state.hasMoreBefore = false
+    state.backgroundContinuationContexts = undefined
+  }
+
   getLiveActivityPlans() {
     return this.taskPlanRuns.activeSnapshots().filter(entry => {
       const source = this.sessionMap.get(entry.snapshot.session_id)?.source || getSession(entry.snapshot.session_id)?.source

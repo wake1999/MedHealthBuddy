@@ -43,9 +43,8 @@ import {
   windowsRuntimeNeedsRelocationRepair,
 } from './runtime-relocation'
 import { t } from './desktop-i18n'
+import { resolveRuntimeBaseUrl, resolveRuntimeRepo } from './release-sources'
 
-const DEFAULT_RUNTIME_BASE_URL = 'https://download.ekkolearnai.com'
-const DEFAULT_RUNTIME_GITHUB_REPO = 'EKKOLearnAI/ekko-studio'
 const RUNTIME_MANIFEST_NAME = 'runtime-manifest.json'
 const PACKAGED_RUNTIME_RELEASE_NAME = 'runtime-release.json'
 const ACTIVE_RUNTIME_VERSION_NAME = 'active-version.json'
@@ -337,16 +336,34 @@ export function cachedRuntimeNeedsPackagedReleaseUpdate(): boolean {
   return match === false
 }
 
+/**
+ * Runtime archives are only fetched from hosts this build configured for
+ * itself; there is no upstream default. Sources that are not configured are
+ * simply not offered in the "select a runtime source" page.
+ */
+export function availableRuntimeDownloadSources(): RuntimeDownloadSource[] {
+  const sources: RuntimeDownloadSource[] = []
+  if (resolveRuntimeBaseUrl()) sources.push('cf')
+  if (resolveRuntimeRepo()) sources.push('github')
+  return sources
+}
+
 function runtimeAssetUrl(assetName: string, tag: string, source: RuntimeDownloadSource): string {
   if (source === 'github') {
-    const repo = process.env.HERMES_DESKTOP_RUNTIME_REPO?.trim() || DEFAULT_RUNTIME_GITHUB_REPO
+    const repo = resolveRuntimeRepo()
+    if (!repo) {
+      throw new Error('Runtime downloads are not configured for this build: set MEDHEALTHBUDDY_RUNTIME_REPO or install the runtime locally')
+    }
     if (tag === 'latest') {
       return `https://github.com/${repo}/releases/latest/download/${encodeURIComponent(assetName)}`
     }
     return `https://github.com/${repo}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(assetName)}`
   }
 
-  const template = process.env.HERMES_DESKTOP_RUNTIME_BASE_URL?.trim() || DEFAULT_RUNTIME_BASE_URL
+  const template = resolveRuntimeBaseUrl()
+  if (!template) {
+    throw new Error('Runtime downloads are not configured for this build: set MEDHEALTHBUDDY_RUNTIME_BASE_URL or install the runtime locally')
+  }
   if (template.includes('{asset}') || template.includes('{tag}')) {
     return template
       .replace(/\{asset\}/g, encodeURIComponent(assetName))

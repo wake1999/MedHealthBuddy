@@ -174,8 +174,8 @@ const FOCUSABLE_SELECTOR = 'button:not(:disabled), a[href], input:not(:disabled)
 export function ResearchPanel({
   useStore, actions, useResearch, useChrome, useSessionList,
   ensure, selectProject, importProject, createProject, renameProject, deleteProject, selectSession, compile, resolvePdfUrl, editSource, reloadSource, requestCompileFix,
-  requestRelatedWork, requestFigureOrganize,
-  ensurePapers, searchArxiv, searchWeb, importPaper, removePaper, updatePaper, fetchPaperPdf, loadArtifact, loadFigures, uploadFigures, deleteFigure,
+  requestRelatedWork, requestProjectSession, requestProjectImage, requestFigureOrganize, openSession, prepareSession, sessionTitle, projectSession,
+  ensurePapers, refreshPapers, searchArxiv, searchWeb, importPaper, removePaper, updatePaper, fetchPaperPdf, loadArtifact, loadFigures, uploadFigures, deleteFigure,
   renameFigure, updateFigure,
   ensureSubscriptions, saveArxivSubscription, deleteArxivSubscription, checkArxivSubscriptions,
   ensureZotero, recheckZotero, searchZotero, importZoteroItem, exportZoteroCollectionToBib,
@@ -783,6 +783,14 @@ export function ResearchPanel({
         )}
         {activeTab === 'papers' && (
           <PapersView
+            /*
+             * key 跟着「论文数量 + 已翻译数 + 已摘要数」走：这三项一变就重挂列表。
+             * 之前只靠 store 订阅，实测切走再回来才刷新（岛内的订阅没把新切片
+             * 推到这一层），重挂是确定性的兜底。
+             */
+            key={`papers-${papers.list.length}-${
+              papers.list.filter(row => Boolean((row as { translatedAt?: number }).translatedAt)).length
+            }-${papers.list.filter(row => Boolean(row.aiSummary)).length}`}
             papers={papers}
             arxivSearch={arxivSearch}
             webSearch={webSearch}
@@ -791,6 +799,7 @@ export function ResearchPanel({
             projects={projects}
             selectedProjectId={selectedProjectId}
             ensurePapers={ensurePapers}
+            refreshPapers={refreshPapers}
             saveArxivSubscription={saveArxivSubscription}
             deleteArxivSubscription={deleteArxivSubscription}
             checkArxivSubscriptions={checkArxivSubscriptions}
@@ -810,6 +819,12 @@ export function ResearchPanel({
             importZoteroItem={importZoteroItem}
             exportZoteroCollectionToBib={exportZoteroCollectionToBib}
             requestRelatedWork={requestRelatedWork}
+            requestProjectSession={requestProjectSession}
+            requestProjectImage={requestProjectImage}
+            openSession={openSession}
+            prepareSession={prepareSession}
+            sessionTitle={sessionTitle}
+            projectSession={projectSession}
             t={t}
           />
         )}

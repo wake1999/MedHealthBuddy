@@ -30,6 +30,7 @@ import { sessionRoutes } from '../modules/studio/routes/sessions'
 import { promptTemplateRoutes } from '../modules/studio/routes/prompt-templates'
 import { chatAppRoutes } from '../modules/studio/routes/chat-apps'
 import { fastGptAgentRoutes } from '../modules/studio/routes/fastgpt-agents'
+import { promptEnhanceRoutes } from '../modules/studio/routes/prompt-enhance'
 import { sessionSharePublicRoutes, sessionShareRoutes } from '../modules/studio/routes/session-shares'
 import { profileRoutes } from '../modules/hermes/routes/profiles'
 import { skillRoutes } from '../modules/hermes/routes/skills'
@@ -119,6 +120,7 @@ export function registerRoutes(app: any, authMiddleware: Array<(ctx: Context, ne
   app.use(promptTemplateRoutes.routes())
   app.use(chatAppRoutes.routes())
   app.use(fastGptAgentRoutes.routes())
+  app.use(promptEnhanceRoutes.routes())
   app.use(sessionShareRoutes.routes())
   app.use(profileRoutes.routes())
   app.use(ekkoMemoryRoutes.routes())

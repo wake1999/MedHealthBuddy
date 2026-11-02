@@ -7,9 +7,12 @@ import { isStoredSuperAdmin } from '@/api/client'
 import RouteLinkItem from '@/components/common/RouteLinkItem.vue'
 import PageSidebarFooter from './PageSidebarFooter.vue'
 import { useMobileNavigation } from '@/composables/usePageSidebar'
+import { useTheme } from '@/composables/useTheme'
 
 const route = useRoute()
 const { t } = useI18n()
+const { isDark, toggleBrightness } = useTheme()
+const themeToggleLabel = computed(() => (isDark.value ? t('sidebar.themeToLight') : t('sidebar.themeToDark')))
 const canManageAgents = computed(() => isStoredSuperAdmin())
 const entries = computed(() => [
   { key: 'chat', route: 'hermes.chat', label: 'sidebar.singleChat', path: 'M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
@@ -62,6 +65,28 @@ function handleNavigate(key: string) {
     <div class="studio-navigation-rail__bottom">
       <NTooltip placement="right" trigger="hover">
         <template #trigger>
+          <button
+            type="button"
+            class="studio-navigation-rail__item studio-navigation-rail__theme"
+            :aria-label="themeToggleLabel"
+            :title="themeToggleLabel"
+            @click="toggleBrightness()"
+          >
+            <svg v-if="isDark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" />
+            </svg>
+            <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20.5 14.2A8.6 8.6 0 0 1 9.8 3.5a8.6 8.6 0 1 0 10.7 10.7z" />
+            </svg>
+          </button>
+        </template>
+        {{ themeToggleLabel }}
+      </NTooltip>
+      <NTooltip placement="right" trigger="hover">
+        <template #trigger>
           <RouteLinkItem class="studio-navigation-rail__item" :to="{ name: 'hermes.settings' }" :active="activeKey === 'settings'" :aria-label="t('sidebar.settings')">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </RouteLinkItem>
@@ -101,6 +126,15 @@ function handleNavigate(key: string) {
   overflow-y: auto;
   scrollbar-width: none;
 }
+/* 主题切换：放在设置上方，和导航图标同尺寸同语言。 */
+.studio-navigation-rail__theme {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .studio-navigation-rail__bottom { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; }
 .api-relay-logo { border-radius: 4px; }
 .studio-navigation-rail__item {

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { agentMetadata, isNativeCodingAgent, isGlobalOnlyCodingAgent } from '@/utils/agent-catalog'
 import PageSidebar from "@/components/layout/PageSidebar.vue"
 import { usePageSidebarState } from "@/composables/usePageSidebar"
@@ -41,6 +41,7 @@ import {
   NSelect,
   NTooltip,
   NPopconfirm,
+  NPopover,
   useMessage,
   type DropdownOption,
 } from "naive-ui";
@@ -58,7 +59,14 @@ import {
 import DiscoverAppsPopover from './DiscoverAppsPopover.vue';
 import { FALLBACK_CHAT_APPS, resolveChatApps, type ChatAppScene } from '@/data/chat-apps';
 import { fetchChatApps, type ChatAppDto } from '@/api/studio/chat-apps';
-import { fetchFastGptAgents, type FastGptAgent } from '@/api/studio/fastgpt-agents';
+import {
+  FASTGPT_EMBED_BASE,
+  fetchFastGptAgentVariables,
+  fetchFastGptAgents,
+  streamFastGptAgentChat,
+  type FastGptAgent,
+  type FastGptAgentVariable,
+} from '@/api/studio/fastgpt-agents';
 import { prepareAgentDeployment, type AgentDeploymentController } from "./agentDeployment.mjs";
 import RealtimeVoiceStage from "./RealtimeVoiceStage.vue";
 import ConversationMonitorPane from "./ConversationMonitorPane.vue";
@@ -70,8 +78,7 @@ import TerminalPanel from "./TerminalPanel.vue";
 import SubagentStreamPanel from "./SubagentStreamPanel.vue";
 import { chatSessionAgentAvatar } from "@/utils/chat-agent-avatar";
 import { isHermesSession } from "@/utils/hermes/session-agent";
-import { buildVisibleSessionCategoryGroups, partitionRecentSessions } from "./session-category-groups";
-import { buildSessionCategoryMenuChildren, resolveRecentSessionCategoryLabel } from "./session-category-menu";
+import { buildSessionCategoryMenuChildren } from "./session-category-menu";
 import { buildActiveSessionMenuOptions, buildSessionContextMenuOptions } from "./session-menu-options";
 import PageSidebarNav from "@/components/layout/PageSidebarNav.vue";
 import PageSidebarFooter from "@/components/layout/PageSidebarFooter.vue";
@@ -180,7 +187,12 @@ const newChatPlaceholder = computed(() => {
   const scene = activeChatScene.value;
   return scene ? scene.placeholder : app.placeholder;
 });
-const newChatQuickPrompts = computed(() => activeChatScene.value?.quickPrompts ?? [])
+/** 选中智能体后换成它自己的预设提示词，没选就是场景那组。 */
+const newChatQuickPrompts = computed(() => {
+  const agentPrompts = activeAgentCard.value?.prompts
+  if (agentPrompts && agentPrompts.length > 0) return agentPrompts
+  return activeChatScene.value?.quickPrompts ?? []
+})
 
 /**
  * 场景智能体卡片：FastGPT 里的应用按场景挂在 BTIT 首页，点卡片开详情，
@@ -189,6 +201,45 @@ const newChatQuickPrompts = computed(() => activeChatScene.value?.quickPrompts ?
 const fastGptAgents = ref<FastGptAgent[]>([])
 const fastGptAgentsLoading = ref(false)
 const agentDetail = ref<FastGptAgent | null>(null)
+/** 弹窗内嵌的分享页地址；空串表示还停在详情卡上。 */
+const agentEmbedUrl = ref('')
+/** iframe 重建计数：FastGPT 没有对外刷新接口，换 key 是唯一可靠的重载方式。 */
+const agentEmbedFrameKey = ref(0)
+const agentEmbedFailed = ref(false)
+/** 内嵌页顶部的操作提示条；用户关掉后本次内嵌不再打扰，重新进入时恢复。 */
+const agentEmbedTipHidden = ref(false)
+/** 选中智能体后，输入框直接发给它，回答落在 Studio 会话里。 */
+const activeAgentCard = ref<FastGptAgent | null>(null)
+const agentChatBusy = ref(false)
+/** 每个 Studio 会话对应一个 FastGPT chatId，多轮上下文留在 FastGPT 侧。 */
+const agentChatIds = new Map<string, string>()
+/** 选中智能体的运行时变量（record_id / domain …），发送时一并带给 FastGPT。 */
+const activeAgentVars = ref<FastGptAgentVariable[]>([])
+const activeAgentVarValues = ref<Record<string, string>>({})
+/** 聊天框里那个「智能体」选择器的展开状态。 */
+const agentPickerOpen = ref(false)
+
+/** 智能体卡片横向翻页：只有真的溢出时才显示两侧按钮。 */
+const agentsTrackRef = ref<HTMLElement | null>(null)
+const agentsOverflow = ref(false)
+const agentsAtStart = ref(true)
+const agentsAtEnd = ref(false)
+
+function updateAgentsScrollState() {
+  const el = agentsTrackRef.value
+  if (!el) return
+  const max = el.scrollWidth - el.clientWidth
+  agentsOverflow.value = max > 8
+  agentsAtStart.value = el.scrollLeft <= 4
+  agentsAtEnd.value = el.scrollLeft >= max - 4
+}
+
+function scrollAgentsBy(direction: 1 | -1) {
+  const el = agentsTrackRef.value
+  if (!el) return
+  el.scrollBy({ left: direction * el.clientWidth * 0.92, behavior: 'smooth' })
+}
+
 /** 当前场景下的智能体：只跟 chat app 的 scene 走，不再参与「发现应用」的选择。 */
 const sceneAgents = computed(() => {
   const app = activeChatApp.value
@@ -196,6 +247,8 @@ const sceneAgents = computed(() => {
   if (!app || !scene) return []
   return fastGptAgents.value.filter(agent => agent.sceneId === scene.id)
 })
+
+
 
 async function loadFastGptAgents(force = false) {
   if (fastGptAgentsLoading.value) return
@@ -211,22 +264,188 @@ async function loadFastGptAgents(force = false) {
   }
 }
 
+/**
+ * 点卡片＝把输入框切到「跟这个智能体对话」：同一张卡再点一次退出。
+ * 详情弹层挪到卡片右上角的小按钮上，避免「看说明」和「开始对话」抢同一个手势。
+ */
+async function toggleAgentCard(agent: FastGptAgent) {
+  if (activeAgentCard.value?.appId === agent.appId) {
+    activeAgentCard.value = null
+    return
+  }
+  activeAgentCard.value = agent
+  activeAgentVars.value = []
+  activeAgentVarValues.value = {}
+  // 变量定义从分享页元数据里读，一个应用一次；切走之后回来的结果直接丢掉。
+  const vars = await fetchFastGptAgentVariables(agent.appId)
+  if (activeAgentCard.value?.appId !== agent.appId) return
+  activeAgentVars.value = vars
+  const initial: Record<string, string> = {}
+  for (const item of vars) {
+    if (item.defaultValue) initial[item.key] = item.defaultValue
+  }
+  activeAgentVarValues.value = initial
+}
+
+/** 聊天框里的选择器：选中就切入该智能体，点同一张卡不算取消（取消走「退出」）。 */
+async function selectAgentFromPicker(agent: FastGptAgent) {
+  agentPickerOpen.value = false
+  if (activeAgentCard.value?.appId === agent.appId) return
+  await toggleAgentCard(agent)
+}
+
+function exitAgentChat() {
+  activeAgentCard.value = null
+}
+
+/** 换场景或退出应用后，原来选中的智能体已不在列表里，顺手退出对话模式。 */
+function dropAgentIfOutOfScene(agents: FastGptAgent[]) {
+  const current = activeAgentCard.value
+  if (!current) return
+  if (agents.some(item => item.appId === current.appId)) return
+  activeAgentCard.value = null
+  activeAgentVars.value = []
+  activeAgentVarValues.value = {}
+}
+
+/**
+ * 智能体对话：不经过 hermes agent 的 run，直接经服务端代理调 FastGPT，
+ * 用户消息与流式回答都写进一个新开的 Studio 会话里。
+ */
+async function submitAgentChat(text: string): Promise<boolean> {
+  const agent = activeAgentCard.value
+  const content = text.trim()
+  if (!agent || !content || agentChatBusy.value) return false
+  agentChatBusy.value = true
+  try {
+    const session = chatStore.newChat({
+      profile: newChatProfile.value,
+      source: 'builtin_agent',
+      agent: 'ekko-agent',
+    });
+    const target = chatStore.sessions.find(item => item.id === session.id)
+    const now = Date.now()
+    target?.messages.push(
+      { id: `agent-${now}-u`, role: 'user', content, timestamp: now },
+      { id: `agent-${now}-a`, role: 'assistant', content: '', timestamp: now + 1 },
+    )
+    const live = target ? target.messages[target.messages.length - 1] : undefined
+    const chatId = agentChatIds.get(session.id) ?? `studio-${session.id}-${now}`
+    agentChatIds.set(session.id, chatId)
+
+    closeNewChatPage()
+    await router.push({ name: 'hermes.session', params: { sessionId: session.id } })
+
+    try {
+      const variables = Object.fromEntries(
+        Object.entries(activeAgentVarValues.value)
+          .map(([key, value]) => [key, String(value ?? '').trim()] as const)
+          .filter(([, value]) => value.length > 0),
+      )
+      await streamFastGptAgentChat({
+        appId: agent.appId,
+        chatId,
+        messages: [{ role: 'user', content }],
+        variables,
+        onDelta: (delta) => { if (live) live.content += delta },
+      })
+      if (live && !live.content.trim()) live.content = t('chat.agentsEmptyReply')
+      // 智能体只负责取数/产结构化结果，解读交给当前会话模型：同一会话里再跑一条 run。
+      if (live && live.content.trim() && !live.content.startsWith('（')) {
+        void chatStore.sendMessage(
+          t('chat.agentsHandoffPrompt', { name: agent.short, result: live.content }),
+        ).catch(() => {
+          message.error(t('chat.agentsChatFailed', { error: 'handoff failed' }))
+        })
+      }
+    } catch (error: any) {
+      const detail = error?.message || 'unknown'
+      const notice = t('chat.agentsChatFailed', { error: detail })
+      if (live) live.content = live.content.trim() ? `${live.content}\n\n${notice}` : notice
+      message.error(notice)
+    }
+    return true
+  } finally {
+    agentChatBusy.value = false
+  }
+}
+
 function openAgentDetail(agent: FastGptAgent) {
   agentDetail.value = agent
+  agentEmbedUrl.value = ''
+  agentEmbedFrameKey.value = 0
+  agentEmbedFailed.value = false
+  agentEmbedTipHidden.value = false
+}
+
+/** 关闭详情/内嵌：几个状态一起收，免得下次打开残留上一页或上一轮的 key。 */
+function closeAgentDetail() {
+  agentDetail.value = null
+  agentEmbedUrl.value = ''
+  agentEmbedFrameKey.value = 0
+  agentEmbedFailed.value = false
+  agentEmbedTipHidden.value = false
 }
 
 function handleAgentDrawerToggle(value: boolean) {
-  if (!value) agentDetail.value = null
+  if (!value) closeAgentDetail()
 }
 
-/** 在 Studio 内打开：新路由 + iframe（FastGPT 官方禁 iframe，走反代）。 */
+/**
+ * 分享链接一般指向 FastGPT 本体（:3000，带 `X-Frame-Options: DENY`），iframe 要换到
+ * 宿主机上去头反代的同一条路径；没配分享渠道时退回登录态的 `?appId=` 页。
+ */
+function toAgentEmbedUrl(agent: FastGptAgent): string {
+  const raw = agent.shareUrl?.trim() ?? ''
+  if (raw) {
+    try {
+      const url = new URL(raw)
+      return `${FASTGPT_EMBED_BASE}${url.pathname}${url.search}`
+    } catch {
+      /* 不是绝对地址就退回 appId 那条路。 */
+    }
+  }
+  return agent.appId ? `${FASTGPT_EMBED_BASE}/chat?appId=${encodeURIComponent(agent.appId)}` : ''
+}
+
+/**
+ * 详情弹层里的主按钮：不跳路由，把分享页塞进弹窗里，关掉/返回都还停在当前场景页，
+ * 当前对话上下文不丢。真拿不到地址时才退回原来那条路由页。
+ */
 function openAgentInStudio(agent: FastGptAgent | null) {
   if (!agent) return
-  agentDetail.value = null
-  void router.push({
-    name: 'hermes.fastgpt',
-    query: { appId: agent.appId, name: agent.name, scene: agent.sceneLabel },
-  })
+  const url = toAgentEmbedUrl(agent)
+  if (!url) {
+    closeAgentDetail()
+    void router.push({
+      name: 'hermes.fastgpt',
+      query: {
+        appId: agent.appId,
+        name: agent.name,
+        scene: agent.sceneLabel,
+        ...(agent.shareUrl ? { share: agent.shareUrl } : {}),
+      },
+    })
+    return
+  }
+  agentEmbedUrl.value = url
+  agentEmbedFailed.value = false
+  agentEmbedTipHidden.value = false
+  agentEmbedFrameKey.value += 1
+}
+
+function reloadAgentEmbed() {
+  agentEmbedFailed.value = false
+  agentEmbedFrameKey.value += 1
+}
+
+/** 内嵌失效时的出口：优先免登录分享链接，其次登录态的对话页。 */
+function openAgentExternal() {
+  const agent = agentDetail.value
+  if (!agent) return
+  const url = agent.shareUrl?.trim() || agent.chatUrl
+  if (!url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function openFastGptAgent(agent: FastGptAgent | null, target: 'chat' | 'manage' = 'chat') {
@@ -243,6 +462,8 @@ function openFastGptAgent(agent: FastGptAgent | null, target: 'chat' | 'manage' 
  */
 onMounted(() => {
   void loadFastGptAgents()
+  // 同上：watch 注册时会先求值一次 getter，放到 mounted 里才不会撞 locale 的 TDZ。
+  watch(sceneAgents, agents => dropAgentIfOutOfScene(agents))
 });
 
 /** id 传 null 就是退出应用：清掉偏好，首页回到默认的三域切换。 */
@@ -541,13 +762,6 @@ async function handleSessionClick(
   }
 }
 
-async function handleRecentSessionClick(sessionId: string) {
-  // Recent is a shortcut; selecting it must not overwrite the real category's saved collapse state.
-  setCategoryRevealSuppressedSessionId(sessionId);
-  await handleSessionClick(sessionId, { preserveCategoryCollapse: true });
-}
-
-
 watch(
   pageSidebarExpanded,
   (expanded) => appStore.setPageSidebarExpanded(expanded),
@@ -677,7 +891,17 @@ onMounted(() => {
   window.addEventListener(OPEN_SUBAGENT_STREAM_EVENT, handleOpenSubagentStreamRequest);
   window.addEventListener(OPEN_PROMPT_TEMPLATES_PANEL_EVENT, handleOpenPromptTemplatesPanelRequest);
   window.addEventListener("resize", handleToolPanelViewportResize);
+  window.addEventListener("resize", updateAgentsScrollState);
   window.addEventListener("keydown", handleNewChatEscape);
+  // 卡片渲染完或列表变化后重新判断有没有溢出；和上面同理，watch 必须挂在 mounted 里注册。
+  watch([sceneAgents, fastGptAgentsLoading], () => {
+    void nextTick(updateAgentsScrollState);
+  });
+  // 智能体数据通常在首页加载完就有了，进入新建页时 sceneAgents 不再变化，得单独量一次。
+  watch(showNewChatPage, (visible) => {
+    if (!visible) return;
+    void nextTick(() => { window.setTimeout(updateAgentsScrollState, 60); });
+  });
   handleToolPanelViewportResize();
   if (profilesStore.profiles.length === 0) {
     void profilesStore.fetchProfiles();
@@ -731,6 +955,7 @@ onUnmounted(() => {
   window.removeEventListener(OPEN_SUBAGENT_STREAM_EVENT, handleOpenSubagentStreamRequest);
   window.removeEventListener(OPEN_PROMPT_TEMPLATES_PANEL_EVENT, handleOpenPromptTemplatesPanelRequest);
   window.removeEventListener("resize", handleToolPanelViewportResize);
+  window.removeEventListener("resize", updateAgentsScrollState);
   window.removeEventListener("keydown", handleNewChatEscape);
   stopToolResize();
   sessionFadeAnimation?.cancel();
@@ -863,31 +1088,6 @@ function sortSessionsForSidebar(items: Session[]): Session[] {
   });
 }
 
-const recentSessionPartition = computed(() => partitionRecentSessions(
-  chatStore.sessions.filter((session) => !session.isPinned),
-  sessionBrowserPrefsStore.recentCount,
-  t("chat.recent"),
-));
-const recentSessions = computed(() => recentSessionPartition.value.group);
-const nonRecentSessions = computed(() => recentSessionPartition.value.remaining);
-const sessionCategoryNames = computed(() => new Map(
-  sessionCategories.value.map(category => [category.id, category.name]),
-));
-
-function recentCategoryLabel(session: Session): string | undefined {
-  return resolveRecentSessionCategoryLabel(
-    session.categoryId,
-    sessionCategoryNames.value,
-    sessionCategoriesLoaded.value,
-    sessionCategoriesLoadFailed.value,
-    t("chat.uncategorized"),
-  );
-}
-
-function toggleRecentGroup() {
-  sessionBrowserPrefsStore.setRecentCollapsed(!sessionBrowserPrefsStore.recentCollapsed);
-}
-
 const pinnedSessions = computed(() =>
   sortSessionsForSidebar(
     chatStore.sessions.filter((session) =>
@@ -898,22 +1098,133 @@ const pinnedSessions = computed(() =>
 
 const unpinnedSessions = computed(() =>
   sortSessionsForSidebar(
-    nonRecentSessions.value.filter(
-      (session) => !session.isPinned,
-    ),
+    chatStore.sessions.filter((session) => !session.isPinned),
   ),
 );
 
-const categorizedSessions = computed(() => buildVisibleSessionCategoryGroups(
-  sessionCategories.value,
-  unpinnedSessions.value,
-  t("chat.uncategorized"),
-));
+/** 侧边栏只有一个「任务」分组：挂了工作空间的会话也在这里。 */
+const taskSessions = computed(() => unpinnedSessions.value);
 
-function openRecentCountModal(event: MouseEvent) {
-  event.stopPropagation();
-  recentCountDraft.value = sessionBrowserPrefsStore.recentCount;
-  showRecentCountModal.value = true;
+/** 视图（分组 / 列表）与来源筛选（全部 / 云端 / 本地）。 */
+const sidebarViewMode = ref<'grouped' | 'flat'>('grouped');
+const sessionSourceFilter = ref<'all' | 'cloud' | 'local'>('all');
+
+/** 「云端」＝没挂目录的纯聊天，「本地」＝绑了工作空间的会话。 */
+const filteredTaskSessions = computed(() => {
+  const filter = sessionSourceFilter.value;
+  if (filter === 'cloud') return taskSessions.value.filter((session) => !(session.workspace || '').trim());
+  if (filter === 'local') return taskSessions.value.filter((session) => Boolean((session.workspace || '').trim()));
+  return taskSessions.value;
+});
+
+/** 任务组里再按工作空间分小节：目录名在上、该目录的会话在下。 */
+const looseTaskSessions = computed(() =>
+  filteredTaskSessions.value.filter((session) => !(session.workspace || '').trim()),
+);
+
+/**
+ * 工作空间的显示名。
+ *
+ * 会话目录形如 `...\workspace\默认空间\mvu9jmz57z9vc`，最后一段是会话 id，
+ * 直接显示出来就是一串随机字符。这里在最后一段明显是 id 时改用父目录名
+ *（「默认空间」），用户看到的是自己认识的名字。
+ */
+function workspaceDisplayLabel(workspace: string): string {
+  const parts = workspace.split(/[\\/]/).filter(Boolean);
+  const last = parts[parts.length - 1] || workspace;
+  const parent = parts[parts.length - 2] || '';
+  if (parent && /^[a-z0-9]{10,}$/i.test(last)) return parent;
+  return last;
+}
+
+const taskSpaceBuckets = computed(() => {
+  // 列表视图把会话平铺，不再分工作空间小节。
+  if (sidebarViewMode.value === 'flat') return [];
+  // 按「显示名」分桶：同一个工作空间下的多个会话合成一组，而不是每个会话一组。
+  const buckets = new Map<string, { label: string; workspace: string; sessions: Session[] }>();
+  for (const session of filteredTaskSessions.value) {
+    const workspace = (session.workspace || '').trim();
+    if (!workspace) continue;
+    const label = workspaceDisplayLabel(workspace);
+    const bucket = buckets.get(label);
+    if (bucket) bucket.sessions.push(session);
+    else buckets.set(label, { label, workspace, sessions: [session] });
+  }
+  return [...buckets.values()]
+    .map((bucket) => ({ ...bucket, sessions: sortSessionsForSidebar(bucket.sessions) }))
+    .sort((a, b) => (b.sessions[0]?.updatedAt || 0) - (a.sessions[0]?.updatedAt || 0));
+});
+
+/** 折叠状态、激活会话自动展开都按这个 key 集合走。 */
+const sidebarGroups = computed(() => [
+  { key: 'tasks', label: t('chat.tasks'), sessions: filteredTaskSessions.value },
+]);
+
+/** 每个工作空间的会话是否收起；默认全部展开（对齐参考图默认态）。 */
+const collapsedSpaces = ref<Set<string>>(new Set());
+
+function toggleSpaceSessions(workspace: string) {
+  const next = new Set(collapsedSpaces.value);
+  if (next.has(workspace)) next.delete(workspace);
+  else next.add(workspace);
+  collapsedSpaces.value = next;
+}
+
+const allSpaceSessionsCollapsed = computed(() =>
+  taskSpaceBuckets.value.length > 0
+  && taskSpaceBuckets.value.every((bucket) => collapsedSpaces.value.has(bucket.workspace)),
+);
+
+/** 组标题右侧那个图标：一键展开或收起所有工作空间里的会话。 */
+function toggleAllSpaceSessions() {
+  collapsedSpaces.value = allSpaceSessionsCollapsed.value
+    ? new Set()
+    : new Set(taskSpaceBuckets.value.map((bucket) => bucket.workspace));
+}
+
+/** 在某个工作空间里新开任务：先切到新建页，再把目录填进去。 */
+async function createTaskInWorkspace(workspace: string) {
+  await openNewChatPage();
+  newChatWorkspace.value = workspace;
+}
+
+async function copyWorkspacePath(workspace: string) {
+  const ok = await copyToClipboard(workspace);
+  if (ok) message.success(t('common.copied'));
+}
+
+/** 组标题右侧的「视图」浮层：分组 / 列表，外加来源筛选。 */
+const sidebarViewMenuOpen = ref(false);
+
+function setSidebarView(mode: 'grouped' | 'flat') {
+  sidebarViewMode.value = mode;
+  sidebarViewMenuOpen.value = false;
+}
+
+function setSessionSourceFilter(filter: 'all' | 'cloud' | 'local') {
+  sessionSourceFilter.value = filter;
+  sidebarViewMenuOpen.value = false;
+}
+
+/** 工作空间行那个「⋯」的菜单。 */
+const workspaceMenuOptions = computed<DropdownOption[]>(() => [
+  { key: 'new-task', label: t('chat.workspaceMenuNewTask') },
+  { key: 'files', label: t('chat.workspaceMenuFiles') },
+  { key: 'copy-path', label: t('chat.copyWorkspacePath') },
+]);
+
+function handleWorkspaceMenuSelect(key: string, workspace: string) {
+  if (key === 'new-task') {
+    void createTaskInWorkspace(workspace);
+    return;
+  }
+  if (key === 'files') {
+    showNewChatPage.value = false;
+    activeToolPanel.value = 'files';
+    showToolPanel.value = true;
+    return;
+  }
+  if (key === 'copy-path') void copyWorkspacePath(workspace);
 }
 
 function saveRecentCount() {
@@ -929,12 +1240,12 @@ const activeSessionCategoryKey = computed(() => {
 watch(
   [
     () => sessionCategoriesLoaded.value,
-    () => categorizedSessions.value.map((group) => group.key).join("\u0000"),
+    () => sidebarGroups.value.map((group) => group.key).join("\u0000"),
     () => chatStore.activeSessionId,
     activeSessionCategoryKey,
   ],
   ([loaded, , sessionId, activeKey], [previousLoaded, , previousSessionId, previousActiveKey]) => {
-    if (!sessionCategoriesLoaded.value || categorizedSessions.value.length === 0) return;
+    if (!sessionCategoriesLoaded.value || sidebarGroups.value.length === 0) return;
     const activeSession = chatStore.sessions.find((session) => session.id === chatStore.activeSessionId);
     if (categoryRevealSuppressedSessionId.value === activeSession?.id) return;
     setCategoryRevealSuppressedSessionId(null);
@@ -950,11 +1261,11 @@ watch(
       persistCollapsedCategories();
     }
     if (localStorage.getItem(COLLAPSED_CATEGORIES_STORAGE_KEY) !== null) return;
-    const expandedKey = categorizedSessions.value.some((group) => group.key === activeKey)
+    const expandedKey = sidebarGroups.value.some((group) => group.key === activeKey)
       ? activeKey
-      : categorizedSessions.value[0]?.key;
+      : sidebarGroups.value[0]?.key;
     collapsedCategories.value = new Set(
-      categorizedSessions.value.map((group) => group.key).filter((key) => key !== expandedKey),
+      sidebarGroups.value.map((group) => group.key).filter((key) => key !== expandedKey),
     );
     persistCollapsedCategories();
   },
@@ -1170,24 +1481,17 @@ const isWorkspacePickerFavorite = computed(() => {
 
 function getFolderName(path: string | null): string {
   if (!path) return '';
-  const parts = path.replace(/\\/g, '/').split('/');
-  return parts[parts.length - 1] || path;
+  const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
+  const last = parts[parts.length - 1] || path;
+  const parent = parts[parts.length - 2] || '';
+  /*
+   * 会话的工作目录形如 `...\workspace\默认空间\mvua16hq33uvh6`，最后一段是
+   * 会话 id，显示出来是一串随机字符。这里只在父目录就是「默认空间」时退回
+   * 父级名字；用户自己挑的普通目录（D:\projects\foo）仍然显示 foo。
+   */
+  if ((parent === '默认空间' || parent === 'default') && /^[a-z0-9]{8,}$/i.test(last)) return parent;
+  return last;
 }
-
-const mostRecentDefaultWorkspace = computed(() => {
-  if (defaultWorkspaces.value.length === 0) return null;
-  
-  // 从最近使用记录中找第一个默认工作区
-  const recent = [...recentWorkspaces.value].sort((a, b) => b.lastUsed - a.lastUsed);
-  for (const entry of recent) {
-    if (defaultWorkspaces.value.includes(entry.path)) {
-      return entry.path;
-    }
-  }
-  
-  // 如果没有使用记录，返回第一个默认工作区
-  return defaultWorkspaces.value[0];
-});
 
 const newChatAgentAvailability = ref<AgentAvailabilitySnapshot | null>(null);
 const newChatAgentOptions = computed(() => AGENT_OPTIONS.filter(option =>
@@ -1503,7 +1807,8 @@ async function openNewChatPage() {
   newChatCategoryId.value = saved?.categoryId ?? null;
   newChatProfile.value = saved?.profile || profilesStore.activeProfileName
     || profilesStore.profiles.find(profile => profile.active)?.name || profilesStore.profiles[0]?.name || "default";
-  newChatWorkspace.value = saved?.workspace || "";
+  // 新建会话默认不带工作空间：目录由用户显式挑，避免把上一次的目录带进新会话。
+  newChatWorkspace.value = "";
   newChatProvider.value = saved?.provider || "";
   newChatModel.value = saved?.model || "";
   newChatCustomModel.value = saved?.customModel || false;
@@ -1515,11 +1820,7 @@ async function openNewChatPage() {
   restoringNewChatForm = false;
   if (isMobile.value) showSessions.value = false;
   showNewChatPage.value = true;
-  void initWorkspaceComposable().then(() => {
-    if (isCurrentNewChatOptionsLoad(sequence) && !saved && !newChatWorkspace.value) {
-      newChatWorkspace.value = mostRecentDefaultWorkspace.value || "";
-    }
-  });
+  void initWorkspaceComposable();
   void refreshNewChatAgentAvailability(sequence);
   void loadSessionCategories().then(() => {
     if (isCurrentNewChatOptionsLoad(sequence) && !sessionCategoriesLoadFailed.value && newChatCategoryId.value !== null
@@ -1535,6 +1836,8 @@ function handleNewChatProfileChange(value: string) {
 }
 
 async function submitNewChat(text: string, attachments?: Attachment[]): Promise<boolean> {
+  // 选中了智能体：这句话是发给它的，不走 hermes agent 的 run 链路。
+  if (activeAgentCard.value) return submitAgentChat(text)
   if (!canConfirmNewChat.value || !showNewChatPage.value) return false;
   const sequence = newChatOptionsLoadSequence;
   newChatLoading.value = true;
@@ -1954,34 +2257,6 @@ const categoryContextMenuOptions = computed<DropdownOption[]>(() => [
 const showRenameCategoryModal = ref(false);
 const renameCategoryValue = ref("");
 const showDeleteCategoryModal = ref(false);
-
-function handleCategoryContextMenu(event: MouseEvent, groupKey: string) {
-  if (groupKey === "category-none") return;
-  const categoryId = Number(groupKey.slice("category-".length));
-  if (!Number.isSafeInteger(categoryId)) return;
-  event.preventDefault();
-  event.stopPropagation();
-  showContextMenu.value = false;
-  categoryContextId.value = categoryId;
-  categoryContextMenuX.value = event.clientX;
-  categoryContextMenuY.value = event.clientY;
-  showCategoryContextMenu.value = true;
-}
-
-function handleCategoryMenuButton(event: MouseEvent, groupKey: string) {
-  if (groupKey === "category-none") return;
-  const categoryId = Number(groupKey.slice("category-".length));
-  if (!Number.isSafeInteger(categoryId)) return;
-  event.preventDefault();
-  event.stopPropagation();
-  const anchor = event.currentTarget as HTMLElement;
-  const rect = anchor.getBoundingClientRect();
-  showContextMenu.value = false;
-  categoryContextId.value = categoryId;
-  categoryContextMenuX.value = rect.left;
-  categoryContextMenuY.value = rect.bottom;
-  showCategoryContextMenu.value = true;
-}
 
 function handleCategoryContextMenuSelect(key: string) {
   showCategoryContextMenu.value = false;
@@ -2632,7 +2907,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
       <div v-if="showSessions" class="page-sidebar-top">
         <PageSidebarNav
           :active="contentMode === 'connections' ? 'connections' : contentMode === 'agents' ? 'agents' : contentMode === 'models' ? 'models' : chatStore.runtimeMode === 'global_agent' ? 'global' : 'chat'"
-          :primary-label="t('chat.newChat')"
+          :primary-label="t('chat.newTask')"
           @primary="openNewChatPage"
         >
           <template #actions>
@@ -2757,7 +3032,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
             v-for="s in pinnedSessions"
             :key="`pinned-${s.id}`"
             :session="s"
-            :active="s.id === chatStore.activeSessionId"
+            :active="!showNewChatPage && s.id === chatStore.activeSessionId"
             :pinned="true"
             :can-delete="
               s.id !== chatStore.activeSessionId ||
@@ -2779,61 +3054,255 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
           />
         </template>
 
-        <template
-          v-if="
-            sessionBrowserPrefsStore.showRecentSessions &&
-            recentSessions.sessions.length > 0
-          "
-        >
-          <div class="session-group-header session-group-header--recent">
-            <button
-              class="session-group-toggle"
-              type="button"
-              :aria-expanded="!sessionBrowserPrefsStore.recentCollapsed"
-              @click="toggleRecentGroup"
-            >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                class="group-chevron"
-                :class="{ collapsed: sessionBrowserPrefsStore.recentCollapsed }"
-                aria-hidden="true"
+        <div class="session-group-header" @click="toggleCategoryGroup('tasks')">
+          <span class="session-group-label">{{ t('chat.tasks') }}</span>
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="group-chevron"
+            :class="{ collapsed: collapsedCategories.has('tasks') }"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          <button
+            type="button"
+            class="session-group-fold"
+            :title="allSpaceSessionsCollapsed ? t('chat.expandAllSpaces') : t('chat.collapseAllSpaces')"
+            :aria-label="allSpaceSessionsCollapsed ? t('chat.expandAllSpaces') : t('chat.collapseAllSpaces')"
+            :aria-pressed="!allSpaceSessionsCollapsed"
+            :disabled="taskSpaceBuckets.length === 0"
+            @click.stop="toggleAllSpaceSessions"
+          >
+            <!-- 会话正展开：点一下收起来（箭头朝内） -->
+            <svg v-if="!allSpaceSessionsCollapsed" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+              aria-hidden="true">
+              <path d="M4 9h4V4M20 9h-4V4M4 15h4v5M20 15h-4v5" />
+            </svg>
+            <!-- 已经收起：点一下全展开（箭头朝外） -->
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4" />
+            </svg>
+          </button>
+          <NPopover
+            v-model:show="sidebarViewMenuOpen"
+            trigger="click"
+            placement="bottom-end"
+            :show-arrow="false"
+            content-style="padding: 0;"
+          >
+            <template #trigger>
+              <button
+                type="button"
+                class="session-group-fold session-group-fold--view"
+                :title="t('chat.sidebarView')"
+                :aria-label="t('chat.sidebarView')"
+                @click.stop
               >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-              <span class="session-group-label">{{ recentSessions.label }}</span>
-              <span class="session-group-count">{{ recentSessions.sessions.length }}</span>
-            </button>
-            <button class="session-group-config" type="button" :title="t('chat.recentCount')" @click="openRecentCountModal">⚙</button>
-          </div>
-          <template v-if="!sessionBrowserPrefsStore.recentCollapsed">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 6h10M4 12h16M4 18h13" />
+                </svg>
+              </button>
+            </template>
+            <div class="sidebar-view-menu">
+              <p class="sidebar-view-section">{{ t('chat.viewSection') }}</p>
+              <button type="button" class="sidebar-view-item"
+                :class="{ 'is-active': sidebarViewMode === 'grouped' }" @click="setSidebarView('grouped')">
+                <svg class="sidebar-view-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <path d="M4 6h4M4 12h4M4 18h4M12 6h8M12 12h8M12 18h8" />
+                </svg>
+                <span class="sidebar-view-item-label">{{ t('chat.viewGrouped') }}</span>
+                <svg v-if="sidebarViewMode === 'grouped'" class="sidebar-view-check" width="14" height="14"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12l5 5L20 6" />
+                </svg>
+              </button>
+              <button type="button" class="sidebar-view-item"
+                :class="{ 'is-active': sidebarViewMode === 'flat' }" @click="setSidebarView('flat')">
+                <svg class="sidebar-view-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                <span class="sidebar-view-item-label">{{ t('chat.viewFlat') }}</span>
+                <svg v-if="sidebarViewMode === 'flat'" class="sidebar-view-check" width="14" height="14"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12l5 5L20 6" />
+                </svg>
+              </button>
+              <div class="sidebar-view-divider"></div>
+              <p class="sidebar-view-section">{{ t('chat.filterSection') }}</p>
+              <button type="button" class="sidebar-view-item"
+                :class="{ 'is-active': sessionSourceFilter === 'all' }" @click="setSessionSourceFilter('all')">
+                <svg class="sidebar-view-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <rect x="4" y="4" width="6" height="6" rx="1.4" />
+                  <rect x="14" y="4" width="6" height="6" rx="1.4" />
+                  <rect x="4" y="14" width="6" height="6" rx="1.4" />
+                  <rect x="14" y="14" width="6" height="6" rx="1.4" />
+                </svg>
+                <span class="sidebar-view-item-label">{{ t('chat.filterAll') }}</span>
+                <svg v-if="sessionSourceFilter === 'all'" class="sidebar-view-check" width="14" height="14"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12l5 5L20 6" />
+                </svg>
+              </button>
+              <button type="button" class="sidebar-view-item"
+                :class="{ 'is-active': sessionSourceFilter === 'cloud' }" @click="setSessionSourceFilter('cloud')">
+                <svg class="sidebar-view-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <path d="M7 18a4 4 0 0 1 0-8 5.5 5.5 0 0 1 10.6 1.5A3.5 3.5 0 0 1 17.5 18z" />
+                </svg>
+                <span class="sidebar-view-item-label">{{ t('chat.filterCloud') }}</span>
+                <svg v-if="sessionSourceFilter === 'cloud'" class="sidebar-view-check" width="14" height="14"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12l5 5L20 6" />
+                </svg>
+              </button>
+              <button type="button" class="sidebar-view-item"
+                :class="{ 'is-active': sessionSourceFilter === 'local' }" @click="setSessionSourceFilter('local')">
+                <svg class="sidebar-view-item-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                  aria-hidden="true">
+                  <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                </svg>
+                <span class="sidebar-view-item-label">{{ t('chat.filterLocal') }}</span>
+                <svg v-if="sessionSourceFilter === 'local'" class="sidebar-view-check" width="14" height="14"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                  stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 12l5 5L20 6" />
+                </svg>
+              </button>
+            </div>
+          </NPopover>
+        </div>
+        <template v-if="!collapsedCategories.has('tasks')">
             <SessionListItem
-              v-for="s in recentSessions.sessions"
-              :key="`recent-${s.id}`"
+              v-for="s in (sidebarViewMode === 'flat' ? filteredTaskSessions : looseTaskSessions)"
+              :key="s.id"
               :session="s"
-              :active="s.id === chatStore.activeSessionId"
-              :pinned="Boolean(s.isPinned)"
+              :active="!showNewChatPage && s.id === chatStore.activeSessionId"
+              :pinned="false"
               :can-delete="s.id !== chatStore.activeSessionId || chatStore.sessions.length > 1"
               :streaming="chatStore.isSessionWorking(s.id)"
               :completed-unread="chatStore.isSessionCompletedUnread(s.id)"
               :selectable="isBatchMode"
               :selected="isSessionSelected(s)"
-              :show-profile="true"
-              :category-label="recentCategoryLabel(s)"
+              :show-profile="false"
               :to="sessionHref(s.id)"
               :intercept-modified-navigation="desktopChatWindowAvailable"
-              @select="handleRecentSessionClick(s.id)"
+              @select="handleSessionClick(s.id)"
               @open-new="openSessionInNewTab(s.id, s.profile || null)"
               @contextmenu="handleContextMenu($event, s.id)"
               @menu="handleContextMenu($event, s.id)"
               @delete="handleDeleteSession(s.id)"
               @toggle-select="toggleSessionSelection(s)"
             />
-          </template>
+            <template v-for="bucket in taskSpaceBuckets" :key="bucket.workspace">
+              <div class="session-task-space" :title="bucket.workspace">
+                <button
+                  type="button"
+                  class="session-task-space-toggle"
+                  :aria-expanded="!collapsedSpaces.has(bucket.workspace)"
+                  :aria-label="bucket.label"
+                  @click="toggleSpaceSessions(bucket.workspace)"
+                >
+                  <!-- 静默时是文件夹，悬停/聚焦时同位置换成可折叠的箭头 -->
+                  <svg class="space-icon space-icon--folder" width="15" height="15" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  </svg>
+                  <svg class="space-icon space-icon--chevron group-chevron"
+                    :class="{ collapsed: collapsedSpaces.has(bucket.workspace) }" width="12" height="12"
+                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                <span class="session-task-space-name">{{ bucket.label }}</span>
+                <span class="session-task-space-actions">
+                  <NDropdown
+                    trigger="click"
+                    placement="bottom-end"
+                    :options="workspaceMenuOptions"
+                    @select="key => handleWorkspaceMenuSelect(String(key), bucket.workspace)"
+                  >
+                    <button
+                      type="button"
+                      class="session-task-space-action"
+                      :title="t('chat.more')"
+                      :aria-label="t('chat.more')"
+                      @click.stop
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <circle cx="5" cy="12" r="1.6" />
+                        <circle cx="12" cy="12" r="1.6" />
+                        <circle cx="19" cy="12" r="1.6" />
+                      </svg>
+                    </button>
+                  </NDropdown>
+                  <button
+                    type="button"
+                    class="session-task-space-action"
+                    :title="t('chat.newTaskInWorkspace')"
+                    :aria-label="t('chat.newTaskInWorkspace')"
+                    @click.stop="createTaskInWorkspace(bucket.workspace)"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M20 11.5a7.5 7.5 0 0 1-10.6 6.8L4.5 20l1.7-4.9A7.5 7.5 0 1 1 20 11.5Z" />
+                      <path d="M12 8.6v5.8M9.1 11.5h5.8" />
+                    </svg>
+                  </button>
+                </span>
+              </div>
+              <template v-if="!collapsedSpaces.has(bucket.workspace)">
+                <SessionListItem
+                  v-for="s in bucket.sessions"
+                  :key="s.id"
+                  :session="s"
+                  :active="!showNewChatPage && s.id === chatStore.activeSessionId"
+                  :pinned="false"
+                  :indent="true"
+                  :can-delete="s.id !== chatStore.activeSessionId || chatStore.sessions.length > 1"
+                  :streaming="chatStore.isSessionWorking(s.id)"
+                  :completed-unread="chatStore.isSessionCompletedUnread(s.id)"
+                  :selectable="isBatchMode"
+                  :selected="isSessionSelected(s)"
+                  :show-profile="false"
+                  :to="sessionHref(s.id)"
+                  :intercept-modified-navigation="desktopChatWindowAvailable"
+                  @select="handleSessionClick(s.id)"
+                  @open-new="openSessionInNewTab(s.id, s.profile || null)"
+                  @contextmenu="handleContextMenu($event, s.id)"
+                  @menu="handleContextMenu($event, s.id)"
+                  @delete="handleDeleteSession(s.id)"
+                  @toggle-select="toggleSessionSelection(s)"
+                />
+              </template>
+            </template>
+            <button v-if="taskSessions.length > 4" type="button" class="session-group-collapse"
+              @click="toggleCategoryGroup('tasks')">
+              {{ t('chat.collapseGroup') }}
+            </button>
         </template>
 
         <div
@@ -2851,74 +3320,6 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
           </button>
         </div>
 
-        <template v-for="group in categorizedSessions" :key="group.key">
-          <div
-            class="session-group-header"
-            @click="toggleCategoryGroup(group.key)"
-            @contextmenu="handleCategoryContextMenu($event, group.key)"
-          >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              class="group-chevron"
-              :class="{ collapsed: collapsedCategories.has(group.key) }"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-            <span class="session-group-label">{{ group.label }}</span>
-            <span class="session-group-count">{{ group.sessions.length }}</span>
-            <button
-              v-if="group.key !== 'category-none'"
-              class="session-category-menu-button"
-              type="button"
-              :aria-label="t('chat.more')"
-              :title="t('chat.more')"
-              @click="handleCategoryMenuButton($event, group.key)"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <circle cx="5" cy="12" r="1.6" />
-                <circle cx="12" cy="12" r="1.6" />
-                <circle cx="19" cy="12" r="1.6" />
-              </svg>
-            </button>
-          </div>
-          <template v-if="!collapsedCategories.has(group.key)">
-            <SessionListItem
-              v-for="s in group.sessions"
-              :key="s.id"
-              :session="s"
-              :active="s.id === chatStore.activeSessionId"
-              :pinned="false"
-              :can-delete="
-                s.id !== chatStore.activeSessionId ||
-                chatStore.sessions.length > 1
-              "
-              :streaming="chatStore.isSessionWorking(s.id)"
-              :completed-unread="chatStore.isSessionCompletedUnread(s.id)"
-              :selectable="isBatchMode"
-              :selected="isSessionSelected(s)"
-              :show-profile="true"
-              :to="sessionHref(s.id)"
-              :intercept-modified-navigation="desktopChatWindowAvailable"
-              @select="handleSessionClick(s.id)"
-              @open-new="openSessionInNewTab(s.id, s.profile || null)"
-              @contextmenu="handleContextMenu($event, s.id)"
-              @menu="handleContextMenu($event, s.id)"
-              @delete="handleDeleteSession(s.id)"
-              @toggle-select="toggleSessionSelection(s)"
-            />
-          </template>
-        </template>
       </div>
       <PageSidebarFooter v-if="showSessions" />
     </aside>
@@ -3394,11 +3795,25 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
               <div class="new-chat-compose">
                 <div class="new-chat-config-bar">
                   <div class="new-chat-config-actions">
-                    <NButton quaternary size="small" class="new-chat-config-icon new-chat-config-icon--labelled" :disabled="newChatLoading" :title="newChatWorkspace || t('chat.chooseWorkspace')"
-                      :aria-label="t('chat.chooseWorkspace')" :aria-expanded="showWorkspaceModal && workspaceIsDraft" @click="openNewChatWorkspace">
+                    <NButton quaternary size="small" class="new-chat-config-icon new-chat-config-icon--labelled"
+                      :class="{ 'is-selected': Boolean(newChatWorkspace) }" :disabled="newChatLoading"
+                      :title="newChatWorkspace || t('chat.chooseWorkspace')"
+                      :aria-label="newChatWorkspace
+                        ? `${t('chat.chooseWorkspace')}: ${newChatWorkspace}`
+                        : t('chat.chooseWorkspace')"
+                      :aria-expanded="showWorkspaceModal && workspaceIsDraft" @click="openNewChatWorkspace">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
-                      <span class="new-chat-config-label">{{ t('chat.chooseWorkspace') }}</span>
+                      <span class="new-chat-config-label">{{
+                        newChatWorkspace ? getFolderName(newChatWorkspace) : t('chat.chooseWorkspace') }}</span>
                     </NButton>
+                    <button v-if="newChatWorkspace && !newChatLoading" type="button" class="new-chat-workspace-clear"
+                      :aria-label="t('chat.clearWorkspace')" :title="t('chat.clearWorkspace')"
+                      @click="newChatWorkspace = ''">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                      </svg>
+                    </button>
                     <DshSessionPresetSelect v-if="newChatAgent === 'dsh'" v-model="newChatAgentPreset" v-model:show="showNewChatPresetMode"
                       compact :disabled="newChatLoading" @valid="newChatPresetReady = $event" />
                     <NButton quaternary circle size="small" class="new-chat-config-icon" :disabled="newChatLoading" :title="t('chat.newChatSettings')"
@@ -3421,16 +3836,86 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                     </div>
                   </div>
                 </div>
-                <ChatInput :key="newChatComposerRevision" ref="chatInputRef" draft :send-disabled="!canConfirmNewChat"
+                <div v-if="activeAgentCard" class="new-chat-agent-banner" role="status">
+                  <span class="new-chat-agent-banner-icon" :style="{ background: activeAgentCard.tint }" aria-hidden="true">{{
+                    activeAgentCard.short.slice(0, 1) }}</span>
+                  <span class="new-chat-agent-banner-text">
+                    {{ t('chat.agentsComposerActive', { name: activeAgentCard.short }) }}
+                  </span>
+                  <span class="new-chat-agent-banner-hint">{{ t('chat.agentsComposerHint') }}</span>
+                  <button type="button" class="new-chat-agent-banner-exit" @click="exitAgentChat">
+                    {{ t('chat.agentsComposerExit') }}
+                  </button>
+                </div>
+                <div v-if="activeAgentCard && activeAgentVars.length" class="new-chat-agent-vars">
+                  <label v-for="item in activeAgentVars" :key="item.key" class="new-chat-agent-var">
+                    <span class="new-chat-agent-var-label">
+                      {{ item.label || item.key }}<em v-if="item.required" class="new-chat-agent-var-req">*</em>
+                    </span>
+                    <input v-model="activeAgentVarValues[item.key]" type="text" class="new-chat-agent-var-input"
+                      :placeholder="item.description || item.key" spellcheck="false" />
+                  </label>
+                </div>
+                <ChatInput :key="newChatComposerRevision" ref="chatInputRef" draft
+                  :send-disabled="activeAgentCard ? agentChatBusy : !canConfirmNewChat"
                   :template-domain="activeTemplateDomain"
-                  :placeholder="newChatPlaceholder"
+                  :placeholder="activeAgentCard
+                    ? t('chat.agentsComposerPlaceholder', { name: activeAgentCard.short })
+                    : newChatPlaceholder"
                   :quick-prompts="newChatQuickPrompts"
                   :draft-config="newChatDraftConfig" v-model:reasoning-effort="newChatComposerReasoningEffort"
                   :native-reasoning-efforts="isNewChatGlobalCodingAgent ? newChatNativeReasoningEfforts : undefined"
                   :native-effort-choices="isNewChatGlobalCodingAgent ? newChatNativeEffortChoices : undefined"
                   :submit="submitNewChat" :model-label="newChatModelLabel" :model-disabled="newChatLoading || (!isNewChatGlobalCodingAgent && newChatModelsLoading)"
                   :model-expanded="showSessionModelPicker && sessionModelIsDraft"
-                  :persist-draft="false" :initial-text="initialComposerText" @model-click="openSessionModelPicker(null, $event)" />
+                  :persist-draft="false" :initial-text="initialComposerText" @model-click="openSessionModelPicker(null, $event)">
+                  <template #toolbar-agents>
+                    <NPopover v-if="sceneAgents.length > 0" v-model:show="agentPickerOpen" trigger="click"
+                      placement="top-start" :show-arrow="false">
+                      <template #trigger>
+                        <button type="button" class="agent-picker-trigger"
+                          :class="{ 'is-active': Boolean(activeAgentCard) }"
+                          :aria-label="t('chat.agentsPicker')" :aria-expanded="agentPickerOpen">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="4" y="8" width="16" height="12" rx="3" />
+                            <path d="M12 8V5M9 14h.01M15 14h.01M9.5 17h5" />
+                          </svg>
+                          <span class="agent-picker-trigger-label">
+                            {{ activeAgentCard ? activeAgentCard.short : t('chat.agentsPicker') }}
+                          </span>
+                          <svg class="toolbar-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </button>
+                      </template>
+                      <div class="agent-picker">
+                        <div class="agent-picker-head">
+                          <span class="agent-picker-title">{{ t('chat.agentsPickerTitle') }}</span>
+                          <span class="agent-picker-count">{{ sceneAgents.length }}</span>
+                        </div>
+                        <div class="agent-picker-list">
+                          <button v-for="agent in sceneAgents" :key="agent.appId" type="button"
+                            class="agent-picker-item" :class="{ 'is-active': activeAgentCard?.appId === agent.appId }"
+                            :title="agent.name" @click="selectAgentFromPicker(agent)">
+                            <span class="agent-picker-icon" :style="{ background: agent.tint }" aria-hidden="true">{{
+                              agent.short.slice(0, 1) }}</span>
+                            <span class="agent-picker-text">
+                              <span class="agent-picker-name">{{ agent.short }}</span>
+                              <span class="agent-picker-desc">{{ agent.desc }}</span>
+                            </span>
+                          </button>
+                          <p v-if="sceneAgents.length === 0" class="agent-picker-empty">{{ t('chat.agentsEmpty') }}</p>
+                        </div>
+                        <button v-if="activeAgentCard" type="button" class="agent-picker-clear"
+                          @click="exitAgentChat(); agentPickerOpen = false">
+                          {{ t('chat.agentsPickerClear') }}
+                        </button>
+                      </div>
+                    </NPopover>
+                  </template>
+                </ChatInput>
                 <button v-if="newChatHasNoModels" type="button" class="new-chat-config-hint" @click="openNewChatModelSettings">
                   {{ t('models.noModels') }} · {{ t('models.noProviderPromptAction') }}
                 </button>
@@ -3450,24 +3935,34 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                   <div v-if="fastGptAgentsLoading && sceneAgents.length === 0" class="new-chat-agents-track" aria-hidden="true">
                     <span v-for="index in 4" :key="index" class="new-chat-agent-skeleton"></span>
                   </div>
-                  <div v-else-if="sceneAgents.length > 0" class="new-chat-agents-track">
-                    <button
-                      v-for="agent in sceneAgents"
-                      :key="agent.appId"
-                      type="button"
-                      class="new-chat-agent"
-                      :title="agent.name"
-                      @click="openAgentDetail(agent)"
-                    >
-                      <span class="new-chat-agent-icon" :style="{ background: agent.tint }" aria-hidden="true">{{ agent.short.slice(0, 1) }}</span>
-                      <span class="new-chat-agent-text">
-                        <span class="new-chat-agent-name">{{ agent.name }}</span>
-                        <span class="new-chat-agent-desc">{{ agent.desc }}</span>
-                      </span>
-                      <svg class="new-chat-agent-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M7 17L17 7" />
-                        <path d="M9 7h8v8" />
+                  <div v-else-if="sceneAgents.length > 0" class="new-chat-agents-viewport">
+                    <div ref="agentsTrackRef" class="new-chat-agents-track" @scroll.passive="updateAgentsScrollState">
+                      <div v-for="agent in sceneAgents" :key="agent.appId" class="new-chat-agent"
+                        :class="{ 'is-active': activeAgentCard?.appId === agent.appId }">
+                        <button type="button" class="new-chat-agent-hit" :aria-label="agent.name" :title="agent.name"
+                          @click="openAgentDetail(agent)"></button>
+                        <span class="new-chat-agent-icon" :style="{ background: agent.tint }" aria-hidden="true">{{
+                          agent.short.slice(0, 1) }}</span>
+                        <span class="new-chat-agent-text">
+                          <span class="new-chat-agent-name">{{ agent.short }}</span>
+                          <span class="new-chat-agent-desc">{{ agent.desc }}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <button v-if="agentsOverflow && !agentsAtStart" type="button"
+                      class="new-chat-agents-pager is-prev" :aria-label="t('chat.agentsScrollPrev')"
+                      :title="t('chat.agentsScrollPrev')" @click="scrollAgentsBy(-1)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m14 6-6 6 6 6" />
+                      </svg>
+                    </button>
+                    <button v-if="agentsOverflow && !agentsAtEnd" type="button"
+                      class="new-chat-agents-pager is-next" :aria-label="t('chat.agentsScrollNext')"
+                      :title="t('chat.agentsScrollNext')" @click="scrollAgentsBy(1)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m10 6 6 6-6 6" />
                       </svg>
                     </button>
                   </div>
@@ -3476,52 +3971,121 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 
                 <NModal :show="agentDetail !== null" :auto-focus="false" :mask-closable="true"
                   @update:show="handleAgentDrawerToggle">
-                  <div v-if="agentDetail" class="agent-sheet" role="dialog" aria-modal="true">
-                    <button type="button" class="agent-sheet-close" :aria-label="t('common.close')"
-                      @click="agentDetail = null">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M6 6l12 12M18 6L6 18" />
-                      </svg>
-                    </button>
-
-                    <div class="agent-sheet-head">
-                      <span class="agent-sheet-icon" :style="{ background: agentDetail.tint }" aria-hidden="true">{{ agentDetail.short.slice(0, 1) }}</span>
-                      <div class="agent-sheet-heading">
-                        <h3 class="agent-sheet-title">{{ agentDetail.name }}</h3>
-                        <span class="agent-sheet-scene">{{ agentDetail.sceneLabel }}</span>
+                  <div v-if="agentDetail" class="agent-sheet" :class="{ 'is-embed': agentEmbedUrl }" role="dialog" aria-modal="true">
+                    <!-- 分享页直接嵌在弹窗里：不跳路由，关掉/返回都还停在当前场景页。 -->
+                    <template v-if="agentEmbedUrl">
+                      <div class="agent-embed-bar">
+                        <button type="button" class="agent-embed-back" @click="agentEmbedUrl = ''">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M15 5l-7 7 7 7" />
+                          </svg>
+                          {{ t('chat.agentsBack') }}
+                        </button>
+                        <span class="agent-embed-name">{{ agentDetail.name }}</span>
+                        <div class="agent-embed-actions">
+                          <button type="button" class="agent-embed-action" :title="t('chat.agentsReload')"
+                            :aria-label="t('chat.agentsReload')" @click="reloadAgentEmbed">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M20 11a8 8 0 1 0-2.4 6.2" />
+                              <path d="M20 5v6h-6" />
+                            </svg>
+                          </button>
+                          <button type="button" class="agent-embed-action" @click="openAgentExternal">
+                            {{ t('chat.agentsOpenExternal') }}
+                          </button>
+                          <button type="button" class="agent-embed-close" :aria-label="t('common.close')"
+                            @click="closeAgentDetail">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M6 6l12 12M18 6L6 18" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                      <div v-if="!agentEmbedTipHidden" class="agent-embed-tip" role="note">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="M12 11v5M12 7.6v.6" />
+                        </svg>
+                        <span class="agent-embed-tip-text">{{ t('chat.agentsEmbedTip') }}</span>
+                        <button type="button" class="agent-embed-tip-close" :aria-label="t('common.close')"
+                          :title="t('common.close')" @click="agentEmbedTipHidden = true">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 6l12 12M18 6L6 18" />
+                          </svg>
+                        </button>
+                      </div>
+                      <iframe
+                        v-if="!agentEmbedFailed"
+                        :key="agentEmbedFrameKey"
+                        class="agent-embed-frame"
+                        :src="agentEmbedUrl"
+                        :title="agentDetail.name"
+                        allow="microphone; camera; clipboard-read; clipboard-write; fullscreen"
+                        referrerpolicy="no-referrer"
+                        @error="agentEmbedFailed = true"
+                      />
+                      <div v-else class="agent-embed-fallback">
+                        <p>{{ t('chat.agentsEmbedFailed') }}</p>
+                        <NButton size="small" type="primary" @click="openAgentExternal">
+                          {{ t('chat.agentsOpenExternal') }}
+                        </NButton>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <button type="button" class="agent-sheet-close" :aria-label="t('common.close')"
+                        @click="closeAgentDetail">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M6 6l12 12M18 6L6 18" />
+                        </svg>
+                      </button>
 
-                    <p class="agent-sheet-desc">{{ agentDetail.desc }}</p>
+                      <div class="agent-sheet-head">
+                        <span class="agent-sheet-icon" :style="{ background: agentDetail.tint }" aria-hidden="true">{{
+                          agentDetail.short.slice(0, 1) }}</span>
+                        <div class="agent-sheet-heading">
+                          <h3 class="agent-sheet-title">{{ agentDetail.name }}</h3>
+                          <span class="agent-sheet-scene">{{ agentDetail.sceneLabel }}</span>
+                        </div>
+                      </div>
 
-                    <div v-if="activeChatScene && activeChatScene.quickPrompts.length" class="agent-sheet-suggest">
-                      <p class="agent-sheet-subtitle">{{ t('chat.agentsSuggest') }}</p>
-                      <div class="agent-sheet-pills">
-                        <span v-for="prompt in activeChatScene.quickPrompts" :key="prompt.label" class="agent-sheet-pill">
-                          {{ prompt.label }}
+                      <p class="agent-sheet-desc">{{ agentDetail.desc }}</p>
+
+                      <div v-if="activeChatScene && activeChatScene.quickPrompts.length" class="agent-sheet-suggest">
+                        <p class="agent-sheet-subtitle">{{ t('chat.agentsSuggest') }}</p>
+                        <div class="agent-sheet-pills">
+                          <span v-for="prompt in activeChatScene.quickPrompts" :key="prompt.label"
+                            class="agent-sheet-pill">
+                            {{ prompt.label }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div class="agent-sheet-meta">
+                        <span class="agent-sheet-meta-item">
+                          <span class="agent-sheet-meta-label">{{ t('chat.agentsSource') }}</span>FastGPT
+                        </span>
+                        <span class="agent-sheet-meta-item">
+                          <span class="agent-sheet-meta-label">{{ t('chat.agentsAppId') }}</span>
+                          <code>{{ agentDetail.appId }}</code>
                         </span>
                       </div>
-                    </div>
 
-                    <div class="agent-sheet-meta">
-                      <span class="agent-sheet-meta-item">
-                        <span class="agent-sheet-meta-label">{{ t('chat.agentsSource') }}</span>FastGPT
-                      </span>
-                      <span class="agent-sheet-meta-item">
-                        <span class="agent-sheet-meta-label">{{ t('chat.agentsAppId') }}</span>
-                        <code>{{ agentDetail.appId }}</code>
-                      </span>
-                    </div>
-
-                    <div class="agent-sheet-actions">
-                      <NButton type="primary" size="large" class="agent-sheet-primary" @click="openAgentInStudio(agentDetail)">
-                        {{ t('chat.agentsOpen') }}
-                      </NButton>
-                      <NButton quaternary size="large" @click="openFastGptAgent(agentDetail)">
-                        {{ t('chat.agentsOpenExternal') }}
-                      </NButton>
-                    </div>
+                      <div class="agent-sheet-actions">
+                        <NButton type="primary" size="large" class="agent-sheet-primary"
+                          @click="openAgentInStudio(agentDetail)">
+                          {{ t('chat.agentsOpen') }}
+                        </NButton>
+                        <NButton quaternary size="large" @click="openFastGptAgent(agentDetail)">
+                          {{ t('chat.agentsOpenExternal') }}
+                        </NButton>
+                      </div>
+                    </template>
                   </div>
                 </NModal>
               </div>
@@ -3981,9 +4545,9 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 
   :deep(.discover-apps) { display: flex; width: 100%; }
   :deep(.discover-apps-trigger) {
-    width: 100%; height: 34px; padding: 7px 10px; gap: 8px;
+    width: 100%; height: 36px; padding: 0 10px; gap: 8px;
     border: 0; border-radius: $radius-sm; background: transparent;
-    color: $text-secondary; justify-content: flex-start; font-size: 13px;
+    color: $text-primary; justify-content: flex-start; font-size: 14px;
   }
   :deep(.discover-apps-trigger:hover),
   :deep(.discover-apps-trigger-open) {
@@ -4050,23 +4614,62 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
   &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 2px; }
 }
 
-/* 一屏 4 张，超出横向滚动；卡片对齐到列首，滑动时有落点。 */
+/* 卡片带：宽屏一屏 3 张，滚动条隐掉，翻页交给两侧按钮。 */
+.new-chat-agents-viewport {
+  position: relative;
+  min-width: 0;
+}
+
 .new-chat-agents-track {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 36px) / 4);
+  grid-auto-columns: calc((100% - 24px) / 3);
   gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 2px 2px 8px;
+  padding: 2px 2px 6px;
+  scroll-behavior: smooth;
   scroll-snap-type: x proximity;
   scroll-padding: 2px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   text-align: start;
+
+  &::-webkit-scrollbar { display: none; }
+}
+
+/* 两侧翻页按钮：贴在卡片边缘浮起，滚到头自动藏起来。 */
+.new-chat-agents-pager {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid $border-light;
+  border-radius: 10px;
+  background: $bg-card;
+  color: $text-secondary;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  transition: color $transition-fast, border-color $transition-fast, box-shadow $transition-fast;
+
+  &.is-prev { left: -8px; }
+  &.is-next { right: -8px; }
+
+  &:hover {
+    border-color: rgba(var(--accent-primary-rgb), 0.45);
+    color: $text-primary;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+  }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 2px; }
 }
 
 .new-chat-agent-skeleton {
-  min-height: 96px;
+  min-height: 92px;
   border: 1px solid $border-light;
   border-radius: 14px;
   background: linear-gradient(100deg, rgba(var(--text-primary-rgb), 0.035) 25%, rgba(var(--text-primary-rgb), 0.075) 42%, rgba(var(--text-primary-rgb), 0.035) 60%);
@@ -4078,37 +4681,309 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
   to { background-position: -30% 0; }
 }
 
+/* 卡片：整块是热区 = 选中该智能体对话；右上角小按钮才进详情弹层。 */
 .new-chat-agent {
   position: relative;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 16px;
+  grid-template-columns: 38px minmax(0, 1fr);
   grid-template-rows: auto 1fr;
-  column-gap: 11px;
-  row-gap: 4px;
+  column-gap: 12px;
+  row-gap: 7px;
   align-items: start;
   min-width: 0;
-  min-height: 96px;
-  padding: 14px 13px;
+  min-height: 104px;
+  padding: 15px;
   border: 1px solid $border-light;
   border-radius: 14px;
   background: $bg-card;
   color: inherit;
   text-align: start;
   scroll-snap-align: start;
-  cursor: pointer;
   transition: border-color $transition-fast, box-shadow $transition-fast, transform $transition-fast;
 
   &:hover {
-    border-color: rgba(var(--accent-primary-rgb), 0.42);
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+    border-color: rgba(var(--accent-primary-rgb), 0.38);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07);
     transform: translateY(-2px);
   }
-  &:active { transform: translateY(0); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06); }
-  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 2px; }
+  &:active { transform: translateY(0); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05); }
 }
 
-/* 图标用场景色实底 + 一圈内高光，比纯色块更像一个「应用」而不是标签。 */
+/* 选中态：整卡描边加粗 + 淡蓝底，和输入框上方的「正在对话」条呼应。 */
+.new-chat-agent.is-active {
+  border-color: rgba(var(--accent-primary-rgb), 0.55);
+  background: rgba(var(--accent-primary-rgb), 0.07);
+  box-shadow: 0 6px 18px rgba(var(--accent-primary-rgb), 0.14);
+}
+
+/* 右上角的详情入口：不抢主热区，悬停卡片才明显。 */
+.new-chat-agent-info {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  width: 22px;
+  height: 22px;
+  margin: -2px -2px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: $text-muted;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity $transition-fast, background $transition-fast, color $transition-fast;
+
+  &:hover { opacity: 1; background: rgba(var(--text-primary-rgb), 0.08); color: $text-primary; }
+  &:focus-visible { opacity: 1; outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
+
+.new-chat-agent:hover .new-chat-agent-info { opacity: 1; }
+
+.new-chat-agent.is-active .new-chat-agent-info { color: $accent-primary; opacity: 1; }
+
+/* 输入框上方的对话指示条：谁在接消息、怎么退出，一眼看清。 */
+.new-chat-agent-banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.28);
+  border-radius: 10px;
+  background: rgba(var(--accent-primary-rgb), 0.07);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.new-chat-agent-banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.new-chat-agent-banner-text {
+  flex: none;
+  color: $text-primary;
+  font-weight: 600;
+}
+
+.new-chat-agent-banner-hint {
+  overflow: hidden;
+  min-width: 0;
+  color: $text-secondary;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-chat-agent-banner-exit {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 2px 9px;
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.35);
+  border-radius: 7px;
+  background: transparent;
+  color: $accent-primary;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--accent-primary-rgb), 0.12); }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
+
+/* 智能体运行时变量：这类应用靠 record_id 这种参数取数，不填就只能报错。 */
+.new-chat-agent-vars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: -2px 0 8px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(var(--accent-primary-rgb), 0.3);
+  border-radius: 10px;
+  background: rgba(var(--text-primary-rgb), 0.02);
+}
+
+.new-chat-agent-var {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 190px;
+  min-width: 0;
+}
+
+.new-chat-agent-var-label { flex: none; color: $text-secondary; font-size: 12px; }
+
+.new-chat-agent-var-req { margin-inline-start: 2px; color: $accent-primary; font-style: normal; }
+
+.new-chat-agent-var-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid $border-light;
+  border-radius: 7px;
+  background: $bg-card;
+  color: $text-primary;
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+
+  &::placeholder { color: $text-muted; }
+  &:focus { border-color: rgba(var(--accent-primary-rgb), 0.5); }
+}
+
+/* 输入框工具栏里的智能体选择器：不占额外一行，和「设置 / 模型」同一排。 */
+.agent-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: $text-secondary;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.07); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+
+  &.is-active {
+    border-color: rgba(var(--accent-primary-rgb), 0.4);
+    background: rgba(var(--accent-primary-rgb), 0.09);
+    color: $accent-primary;
+  }
+}
+
+.agent-picker-trigger-label {
+  overflow: hidden;
+  max-width: 110px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+}
+
+.agent-picker-head { display: flex; align-items: center; gap: 8px; padding: 2px 2px 4px; }
+
+.agent-picker-title { color: $text-primary; font-size: 12.5px; font-weight: 600; }
+
+.agent-picker-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(var(--text-primary-rgb), 0.06);
+  color: $text-muted;
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.agent-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.agent-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background $transition-fast, border-color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.05); }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: -2px; }
+
+  &.is-active {
+    border-color: rgba(var(--accent-primary-rgb), 0.45);
+    background: rgba(var(--accent-primary-rgb), 0.08);
+  }
+}
+
+.agent-picker-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.agent-picker-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.agent-picker-name { color: $text-primary; font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+.agent-picker-desc {
+  overflow: hidden;
+  color: $text-secondary;
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-picker-empty { margin: 0; padding: 10px 4px; color: $text-muted; font-size: 12px; text-align: center; }
+
+.agent-picker-clear {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border: 1px solid $border-light;
+  border-radius: 7px;
+  background: transparent;
+  color: $text-secondary;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color $transition-fast, color $transition-fast;
+
+  &:hover { border-color: rgba(var(--accent-primary-rgb), 0.4); color: $accent-primary; }
+}
+
+/* 铺满整卡的透明按钮：结构上比嵌套 button 合法，点击区域也最大。 */
+.new-chat-agent-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: -2px; }
+}
+
+/* 图标用场景色实底 + 一圈内高光；文字层不吃点击，交给下面的热区。 */
 .new-chat-agent-icon {
+  position: relative;
+  z-index: 2;
   grid-row: 1 / span 2;
   display: inline-flex;
   align-items: center;
@@ -4116,57 +4991,46 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
+  pointer-events: none;
 }
 
 .new-chat-agent-text {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
   grid-column: 2;
+  pointer-events: none;
 }
 
+/* 标题用短名（编排调度、认证…），不再被「数据采集-」前缀挤到省略号。 */
 .new-chat-agent-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $text-primary;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .new-chat-agent-desc {
   color: $text-secondary;
-  font-size: 11.5px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* 箭头常驻淡显，hover 才点亮：不点开也知道这卡能进详情。 */
-.new-chat-agent-arrow {
-  grid-column: 3;
-  grid-row: 1;
-  margin-top: 2px;
-  color: $text-muted;
-  opacity: 0.32;
-  transition: opacity $transition-fast, transform $transition-fast, color $transition-fast;
-}
-
-.new-chat-agent:hover .new-chat-agent-arrow,
-.new-chat-agent:focus-visible .new-chat-agent-arrow {
-  opacity: 1;
-  transform: translate(1px, -1px);
-  color: $accent-primary;
-}
 
 .new-chat-agents-empty {
   margin: 0;
@@ -4178,7 +5042,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
   text-align: center;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .new-chat-agents-track { grid-auto-columns: calc((100% - 12px) / 2); }
 }
 
@@ -4196,6 +5060,128 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
   color: $text-primary;
   text-align: start;
 }
+
+/* 内嵌分享页时卡片撑成面板：工具栏定高，iframe 吃掉剩余高度，滚动交给页面自己。 */
+.agent-sheet.is-embed {
+  display: flex;
+  flex-direction: column;
+  width: min(1180px, calc(100vw - 32px));
+  height: calc(100vh - 72px);
+  max-height: calc(100vh - 72px);
+  overflow: hidden;
+  padding: 0;
+  border-radius: 16px;
+}
+
+.agent-embed-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  height: 52px;
+  padding: 0 12px;
+  border-bottom: 1px solid $border-light;
+}
+
+.agent-embed-back,
+.agent-embed-action,
+.agent-embed-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: none;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: $text-secondary;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.07); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 2px; }
+}
+
+.agent-embed-back { padding: 0 10px 0 8px; font-size: 13px; }
+.agent-embed-close { width: 30px; padding: 0; }
+
+.agent-embed-name {
+  overflow: hidden;
+  min-width: 0;
+  color: $text-primary;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-embed-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-inline-start: auto; }
+
+/* 内嵌页顶部的操作说明：FastGPT 的变量型应用填完变量提交后还要再发一句才会跑。 */
+.agent-embed-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: none;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid $border-light;
+  background: rgba(var(--accent-primary-rgb), 0.06);
+  color: $text-secondary;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.agent-embed-tip > svg { flex: none; margin-top: 2px; color: $accent-primary; }
+
+.agent-embed-tip-text { flex: 1; min-width: 0; }
+
+.agent-embed-tip-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: -2px -2px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: $text-muted;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.08); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
+
+.agent-embed-frame {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: $bg-primary;
+}
+
+.agent-embed-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+  color: $text-secondary;
+  font-size: 13px;
+  text-align: center;
+}
+
+.agent-embed-fallback p { margin: 0; }
 
 .agent-sheet-close {
   position: absolute;
@@ -4326,6 +5312,31 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 // 带文字的那一枚（选择工作空间）：宽度随内容，图标与文字之间留缝
 .new-chat-config-icon--labelled { width: auto; padding: 0 8px; gap: 6px; }
 .new-chat-config-label { font-size: 12px; line-height: 18px; white-space: nowrap; }
+
+// 选中工作空间后按钮点亮，显示的是目录名而不是「选择工作空间」
+.new-chat-config-icon.is-selected {
+  background: rgba(var(--accent-primary-rgb), 0.1);
+  color: $accent-primary;
+}
+
+.new-chat-workspace-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-inline-start: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: $text-muted;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.08); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
 .new-chat-launch-toggle {
   display: inline-flex; flex: none; gap: 2px; margin: 0 2px; padding: 2px;
   border-radius: 8px; background: rgba(var(--text-primary-rgb), .045);
@@ -4385,8 +5396,8 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 .session-group-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px 4px;
+  gap: 5px;
+  padding: 12px 8px 6px;
   cursor: pointer;
   user-select: none;
 }
@@ -4411,20 +5422,255 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 
 .group-chevron {
   flex-shrink: 0;
+  color: $text-muted;
   transition: transform 0.15s ease;
-  transform: rotate(90deg);
+  transform: rotate(0deg);
 
   &.collapsed {
-    transform: rotate(0deg);
+    transform: rotate(-90deg);
   }
 }
 
-.session-group-label {
-  font-size: 10px;
-  font-weight: 600;
+/* 组标题右侧的折叠开关：参考图里就是两个安静的小图标。 */
+.session-group-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-inline-start: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: $text-muted;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.07); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
+
+.session-group-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-secondary;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* 任务列表里的小节标题：工作空间目录在上，该目录的会话在下。 */
+/* 与下面的会话行同高同圆角：两行胶囊叠在一起时高度必须一致。 */
+.session-task-space {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  margin: 8px 0 1px;
+  padding: 0 6px 0 6px;
+  border-radius: 8px;
+  color: $text-secondary;
+  font-size: 13px;
+  font-weight: 500;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.04); }
+
+  svg {
+    flex: none;
+    color: $text-muted;
+  }
+}
+
+.session-task-space-name {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-task-space-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: $text-muted;
+  cursor: pointer;
+
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
+
+/* 同一个位置叠两个图标：平时文件夹，悬停换成折叠箭头。 */
+.space-icon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  transition: opacity $transition-fast;
+}
+
+.space-icon--chevron {
+  opacity: 0;
+  transition: opacity $transition-fast, transform 0.15s ease;
+}
+
+.session-task-space:hover .space-icon--folder,
+.session-task-space:focus-within .space-icon--folder { opacity: 0; }
+
+.session-task-space:hover .space-icon--chevron,
+.session-task-space:focus-within .space-icon--chevron { opacity: 1; }
+
+/* 第二个图标（视图菜单）紧挨着第一个，不抢 auto 间距。 */
+.session-group-fold--view { margin-inline-start: 2px; }
+
+.session-group-fold:disabled { opacity: 0.4; cursor: default; }
+
+/* 视图/筛选浮层：小标题 + 图标项 + 右侧勾选，对齐参考图的层级。 */
+.sidebar-view-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 216px;
+  padding: 6px;
+}
+
+.sidebar-view-section {
+  margin: 0;
+  padding: 8px 8px 4px;
+  color: $text-muted;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sidebar-view-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: $text-secondary;
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.06); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: -2px; }
+
+  &.is-active {
+    color: $text-primary;
+    font-weight: 500;
+  }
+}
+
+.sidebar-view-item-icon { flex: none; color: $text-muted; }
+
+.sidebar-view-item.is-active .sidebar-view-item-icon { color: $text-secondary; }
+
+.sidebar-view-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-view-check { flex: none; color: $accent-primary; }
+
+.sidebar-view-divider {
+  height: 1px;
+  margin: 4px 2px;
+  background: $border-light;
+}
+
+/* 工作空间行的两个小操作：悬停才出现，不吃走整行点击。 */
+.session-task-space-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: auto;
+  opacity: 0;
+  transition: opacity $transition-fast;
+}
+
+.session-task-space:hover .session-task-space-actions,
+.session-task-space:focus-within .session-task-space-actions {
+  opacity: 1;
+}
+
+.session-task-space-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: $text-muted;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.08); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
+
+/* 分组底部那行「收起」：参考里就是一行灰字，不用按钮边框。 */
+.session-group-collapse {
+  align-self: flex-start;
+  margin: 2px 0 4px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: $text-muted;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.05); color: $text-secondary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: 1px; }
+}
+
+/* 空间分组：外层一个静态总标题，每个工作空间一条可折叠的小标题。 */
+.session-space { display: flex; flex-direction: column; }
+
+.session-space-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px 4px 16px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: $text-secondary;
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+  transition: background $transition-fast, color $transition-fast;
+
+  &:hover { background: rgba(var(--text-primary-rgb), 0.05); color: $text-primary; }
+  &:focus-visible { outline: 2px solid $accent-primary; outline-offset: -2px; }
+}
+
+.session-space-name {
+  overflow: hidden;
+  min-width: 0;
+  color: inherit;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-group-config {
@@ -4437,7 +5683,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 }
 
 .session-group-count {
-  font-size: 10px;
+  font-size: 12px;
   color: $text-muted;
   font-weight: 400;
 }

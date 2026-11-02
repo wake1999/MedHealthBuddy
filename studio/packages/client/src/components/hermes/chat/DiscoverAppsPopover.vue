@@ -35,6 +35,8 @@ interface PanelItem {
   desc: string
   tint: string
   iconPaths?: readonly string[]
+  /** 图片图标：有值时整块封面用图片，svg 与文字都不再有意义。 */
+  iconImage?: string
   /** 没有 svg 图标时，圆形封面上的那一个字。 */
   glyph: string
 }
@@ -52,6 +54,7 @@ const items = computed<PanelItem[]>(() => props.apps.map(app => ({
   desc: app.desc,
   tint: app.tint,
   iconPaths: app.iconPaths,
+  iconImage: app.iconImage,
   glyph: glyphOf(app.name),
 })))
 
@@ -176,7 +179,8 @@ onBeforeUnmount(() => {
     >
       <template v-if="activeItem">
         <span class="discover-apps-trigger-icon" :style="{ background: activeItem.tint }" aria-hidden="true">
-          <svg v-if="activeItem.iconPaths?.length" width="13" height="13" viewBox="0 0 24 24" fill="none"
+          <img v-if="activeItem.iconImage" class="discover-apps-img" :src="activeItem.iconImage" alt="" />
+          <svg v-else-if="activeItem.iconPaths?.length" width="13" height="13" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path v-for="(path, index) in activeItem.iconPaths" :key="index" :d="path" />
           </svg>
@@ -236,7 +240,8 @@ onBeforeUnmount(() => {
               @click="pick(item)"
             >
               <span class="discover-apps-recent-icon" :style="{ background: item.tint }" aria-hidden="true">
-                <svg v-if="item.iconPaths?.length" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                <img v-if="item.iconImage" class="discover-apps-img" :src="item.iconImage" alt="" />
+                <svg v-else-if="item.iconPaths?.length" width="18" height="18" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                   <path v-for="(path, index) in item.iconPaths" :key="index" :d="path" />
                 </svg>
@@ -260,7 +265,8 @@ onBeforeUnmount(() => {
             @click="pick(item)"
           >
             <span class="discover-apps-icon" :style="{ background: item.tint }" aria-hidden="true">
-              <svg v-if="item.iconPaths?.length" width="16" height="16" viewBox="0 0 24 24" fill="none"
+              <img v-if="item.iconImage" class="discover-apps-img" :src="item.iconImage" alt="" />
+              <svg v-else-if="item.iconPaths?.length" width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                 <path v-for="(path, index) in item.iconPaths" :key="index" :d="path" />
               </svg>
@@ -291,46 +297,49 @@ onBeforeUnmount(() => {
 
 .discover-apps {
   position: relative;
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   max-width: 100%;
 }
 
+/* 与「新建任务」「任务」同一套行高/字号，不再单独做成胶囊，避免一行大一行小。 */
 .discover-apps-trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
   max-width: 100%;
   padding: 0 10px;
-  border: 1px solid rgba(128, 128, 128, 0.24);
-  border-radius: 999px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
-  color: $text-secondary;
+  color: $text-primary;
   font: inherit;
-  font-size: 13px;
-  line-height: 1;
+  font-size: 14px;
+  line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
-  transition: color $transition-fast, border-color $transition-fast, background $transition-fast;
+  transition: color $transition-fast, background-color $transition-fast;
+
+  svg { flex: none; }
 
   &:hover,
   &-open {
-    color: $text-primary;
-    border-color: rgba(var(--text-primary-rgb), 0.28);
-    background: rgba(var(--text-primary-rgb), 0.04);
+    background: rgba(var(--accent-primary-rgb), 0.06);
   }
 
   &:focus-visible {
     outline: 2px solid $accent-primary;
-    outline-offset: 2px;
+    outline-offset: -2px;
   }
 }
 
-/* 选中后：触发器变成「图标 + 名称 + ⊗」的胶囊，⊗ 直接退出。 */
+/* 选中后：行内显示「图标 + 名称 + ⊗」，尺寸与未选中完全一致。 */
 .discover-apps-trigger--active {
   gap: 8px;
-  height: 32px;
-  padding: 0 4px;
+  height: 36px;
+  padding: 0 10px;
   border-color: transparent;
   background: rgba(var(--text-primary-rgb), 0.06);
   color: $text-primary;
@@ -539,6 +548,15 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+/* 图片图标铺满圆形封面；tint 底色只在图片加载出来之前可见。 */
+.discover-apps-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 
 .discover-apps-name {

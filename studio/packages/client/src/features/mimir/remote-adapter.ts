@@ -260,6 +260,9 @@ function metricValue(raw: string): number | string {
 
 function paperRecord(paper: ResearchPaper) {
   return {
+    // 面板里的 `arxivId` 历史上被当成通用主键用（没 arXiv id 时回落成 row id）；
+    // `id` 单独给出来，凡是按记录定位的地方（综述、笔记、知识）都用它。
+    id: paper.id,
     arxivId: paper.arxivId || paper.id,
     title: paper.title,
     authors: splitAuthors(paper.authors),
@@ -278,6 +281,15 @@ function paperRecord(paper: ResearchPaper) {
     ...(paper.doi ? { doi: paper.doi } : {}),
     // 上游用 `pdfPath` 判断"这篇的 PDF 已经在本地"，没抓过就别给 null。
     ...(paper.pdfPath ? { pdfPath: paper.pdfPath } : {}),
+    // 全文与 AI 摘要：卡片据此决定「AI 摘要 / 提问」能不能点、摘要要不要显示。
+    ...(paper.fulltextPath ? { fulltextPath: paper.fulltextPath } : {}),
+    ...(typeof paper.fulltextChars === 'number' ? { fulltextChars: paper.fulltextChars } : {}),
+    ...(paper.aiSummary ? { aiSummary: paper.aiSummary } : {}),
+    // 卡片右上角的书签/置顶状态与「已翻译」标识。
+    ...(paper.favorite === true ? { favorite: true } : {}),
+    ...(paper.pinned === true ? { pinned: true } : {}),
+    ...(typeof paper.translatedAt === 'number' ? { translatedAt: paper.translatedAt } : {}),
+    ...(paper.folderId ? { folderId: paper.folderId } : {}),
   }
 }
 
@@ -1776,6 +1788,11 @@ function updatePaper(request: {
   tags?: readonly string[]
   projectIds?: readonly string[]
   score?: number
+  favorite?: boolean
+  pinned?: boolean
+  status?: 'new' | 'reading' | 'read'
+  translatedAt?: number
+  folderId?: string
 }): Promise<Carried<Business<{ paper: unknown }>>> {
   return guard(async () => {
     const { store } = await fetchResearchState()
@@ -1784,6 +1801,13 @@ function updatePaper(request: {
     const patch: Record<string, unknown> = {}
     if (request.notes !== undefined) patch.notes = request.notes
     if (request.title !== undefined) patch.title = request.title
+    // 收藏 / 置顶 / 阅读状态 / 翻译时间戳：卡片上的书签、菜单与徽章读它们。
+    if (request.favorite !== undefined) patch.favorite = request.favorite
+    if (request.pinned !== undefined) patch.pinned = request.pinned
+    if (request.status !== undefined) patch.status = request.status
+    if (request.translatedAt !== undefined) patch.translatedAt = request.translatedAt
+    // 文件夹归属：空串表示移回「未分类」，所以要透传空值而不是删键。
+    if (request.folderId !== undefined) patch.folderId = request.folderId
     /* ekko 的记录本来没有 tags 字段（面板的 chips 是 venue/year/status 派生的），
        这里补一个真正可编辑的标签列表。 */
     if (request.tags !== undefined) patch.tags = [...request.tags]

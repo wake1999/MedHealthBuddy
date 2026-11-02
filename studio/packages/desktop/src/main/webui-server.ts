@@ -562,6 +562,10 @@ async function getFreeTcpPortInRange(min: number, max: number): Promise<number> 
 }
 
 export async function startWebUiServer(port = DEFAULT_PORT): Promise<string> {
+  const startupStartedAt = Date.now()
+  const markStartup = (label: string) => {
+    console.log(`[desktop-startup] +${Date.now() - startupStartedAt}ms ${label}`)
+  }
   ensureNativeModules()
   const token = ensureToken()
   currentServerPort = port
@@ -588,6 +592,7 @@ export async function startWebUiServer(port = DEFAULT_PORT): Promise<string> {
     process.env.Path,
     COMMON_USER_BIN_DIRS.join(delimiter),
   )
+  markStartup('ports and PATH ready')
   const primaryRuntimeDirectory = desktopRuntimeDir()
   const primaryPythonRoot = pythonDir()
   const primaryPythonEnvironment = pythonEnvironmentDir()
@@ -638,6 +643,7 @@ export async function startWebUiServer(port = DEFAULT_PORT): Promise<string> {
     hermesHome: agentHome,
     managedRuntimes: runtimeCandidates,
   })
+  markStartup(`Hermes selection ready source=${hermesSelection.source}`)
   const selectedManagedRuntime = hermesSelection.source === 'managed-runtime'
     ? runtimeCandidates.find(candidate => resolve(candidate.path) === resolve(hermesSelection.path))
     : undefined
@@ -729,14 +735,18 @@ export async function startWebUiServer(port = DEFAULT_PORT): Promise<string> {
     PATH: runtimePath,
   }, hermesSelection)
 
+  markStartup('server environment ready')
   const released = await releaseOccupiedWebUiPort(port, token)
   if (released) {
     console.warn(`[webui] released an orphaned Desktop Web UI on port ${port}`)
   }
+  markStartup('port release check done')
 
   const fallbackWebUiDir = defaultWebuiDir()
   try {
-    return await launchWebUiServer(primaryWebUiDir, primaryEntry, env, port)
+    const url = await launchWebUiServer(primaryWebUiDir, primaryEntry, env, port)
+    markStartup('Web UI ready')
+    return url
   } catch (err) {
     if (resolve(primaryWebUiDir) === resolve(fallbackWebUiDir)) throw err
 

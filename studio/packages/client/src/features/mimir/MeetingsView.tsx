@@ -280,7 +280,7 @@ export function MeetingsView({
 
   if (projectId === null) {
     return (
-      <section>
+      <section className={css.meetings}>
         <ViewHead title={t('tab.meetings')} subtitle={t('view.meetings.subtitle')} />
         <EmptyState glyph="🎞️">{t('meetings.noProject')}</EmptyState>
       </section>
@@ -288,7 +288,7 @@ export function MeetingsView({
   }
 
   return (
-    <section>
+    <section className={css.meetings}>
       <ViewHead title={t('tab.meetings')} subtitle={t('view.meetings.subtitle')}>
         <button type="button" className={css.btnPrimary} disabled={busy} onClick={generate}>
           {busy ? t('meetings.generating') : t('meetings.generate')}

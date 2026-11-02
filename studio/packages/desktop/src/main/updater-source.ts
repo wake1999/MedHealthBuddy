@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-
-const PRIMARY_FEED = 'https://download.ekkolearnai.com/latest'
-const FALLBACK_FEED = 'https://github.com/EKKOLearnAI/ekko-studio/releases/latest/download'
+import { isLegacyUpstreamUrl, resolveUpdateFeed } from './release-sources'
 
 export type DesktopUpdateSource =
-  | { channel: 'stable'; url: string; fallbackUrl: string }
+  | { channel: 'stable'; url: string; fallbackUrl: string | null }
   | { channel: 'test'; url: string }
 
 export function validateTestUpdateUrl(value: unknown): string {
@@ -21,22 +19,28 @@ export function validateTestUpdateUrl(value: unknown): string {
   if (path.endsWith('.yml') || path.endsWith('.yaml')) {
     throw new Error('Use the feed directory URL, not the update manifest URL')
   }
-  if ((url.hostname === 'download.ekkolearnai.com' && (!path || path === '/latest' || path.startsWith('/latest/')))
-    || (url.hostname === 'github.com' && path.startsWith('/ekkolearnai/ekko-studio/releases'))) {
+  if (isLegacyUpstreamUrl(value.trim())) {
     throw new Error('The production update source cannot be used for test builds')
   }
   url.pathname = `${url.pathname.replace(/\/+$/, '')}/`
   return url.href
 }
 
-export function resolveDesktopUpdateSource(metadata: unknown): DesktopUpdateSource {
+/**
+ * Null means this build has no update feed: `MEDHEALTHBUDDY_UPDATE_FEED` is
+ * unset and the package metadata selects no test feed, so no update request is
+ * made at all. Production feeds are never guessed, which is what used to point
+ * this app at the upstream Ekko Studio releases.
+ */
+export function resolveDesktopUpdateSource(metadata: unknown): DesktopUpdateSource | null {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     throw new Error('Invalid desktop package metadata')
   }
   // Only package metadata can select a test feed. No runtime environment or UI
   // setting can switch a production installation to a test server.
   if (!Object.prototype.hasOwnProperty.call(metadata, 'desktopUpdate')) {
-    return { channel: 'stable', url: PRIMARY_FEED, fallbackUrl: FALLBACK_FEED }
+    const feed = resolveUpdateFeed()
+    return feed ? { channel: 'stable', url: feed.url, fallbackUrl: feed.fallbackUrl } : null
   }
   const config = (metadata as { desktopUpdate: unknown }).desktopUpdate
   if (!config || typeof config !== 'object' || !('channel' in config) || config.channel !== 'test' || !('url' in config)) {
@@ -45,7 +49,7 @@ export function resolveDesktopUpdateSource(metadata: unknown): DesktopUpdateSour
   return { channel: 'test', url: validateTestUpdateUrl(config.url) }
 }
 
-export function readDesktopUpdateSource(appPath: string): DesktopUpdateSource {
+export function readDesktopUpdateSource(appPath: string): DesktopUpdateSource | null {
   // Read/parse errors deliberately propagate: broken test metadata must not
   // silently turn a test installation back into a production installation.
   return resolveDesktopUpdateSource(JSON.parse(readFileSync(join(appPath, 'package.json'), 'utf8')))

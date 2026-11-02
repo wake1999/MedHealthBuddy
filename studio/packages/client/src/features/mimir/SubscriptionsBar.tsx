@@ -81,6 +81,8 @@ export function SubscriptionsBar({
   readonly t: ResearchT
 }) {
   const [query, setQuery] = useState('')
+  // 订阅区默认收起：它占着近 150px 的垂直空间，而检索与文献列表才是常用入口。
+  const [open, setOpen] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
@@ -160,13 +162,22 @@ export function SubscriptionsBar({
   return (
     <section className={css.subscriptionsBar}>
       <div className={css.subscriptionsHead}>
-        <h3 className={css.sectionTitle}>{t('subscriptions.title')}</h3>
+        <button
+          type="button"
+          className={css.subscriptionsToggle}
+          aria-expanded={open}
+          onClick={() => { setOpen((value) => !value) }}
+        >
+          <span className={css.subscriptionsChevron} data-open={open || undefined} aria-hidden="true">⌄</span>
+          <h3 className={css.sectionTitle}>{t('subscriptions.title')}</h3>
+        </button>
         {newTotal > 0 && (
           <span className={css.subscriptionBadge} role="status">
             {t('subscriptions.newBadge', { count: newTotal })}
           </span>
         )}
       </div>
+      {open && (<>
       <form
         className={css.subscriptionsForm}
         onSubmit={(event) => {
@@ -280,6 +291,7 @@ export function SubscriptionsBar({
           })}
         </div>
       )}
+      </>)}
     </section>
   )
 }

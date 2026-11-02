@@ -8,7 +8,7 @@ import { t } from './desktop-i18n'
 import { isWindowsUpdaterLockError, pendingUpdateDirectories } from './updater-helpers'
 import type { DesktopUpdateState } from './updater-types'
 import { bindUpdateRequestCancellation } from './updater-cancellation'
-import { readDesktopUpdateSource } from './updater-source'
+import { readDesktopUpdateSource, type DesktopUpdateSource } from './updater-source'
 
 let initialized = false
 let checking = false
@@ -151,8 +151,7 @@ function configureUpdateFeed(url: string): void {
   })
 }
 
-async function checkForUpdatesWithFallback(): Promise<void> {
-  const source = readDesktopUpdateSource(app.getAppPath())
+async function checkForUpdatesWithFallback(source: DesktopUpdateSource): Promise<void> {
   configureUpdateFeed(source.url)
   if (source.channel === 'test') {
     console.log(`[updater] using packaged test update feed: ${source.url}`)
@@ -162,7 +161,8 @@ async function checkForUpdatesWithFallback(): Promise<void> {
   try {
     await autoUpdater.checkForUpdates()
   } catch (err) {
-    console.warn(`[updater] Cloudflare update feed failed, trying GitHub: ${err instanceof Error ? err.message : String(err)}`)
+    if (!source.fallbackUrl) throw err
+    console.warn(`[updater] primary update feed failed, trying the configured fallback ${source.fallbackUrl}: ${err instanceof Error ? err.message : String(err)}`)
     configureUpdateFeed(source.fallbackUrl)
     await autoUpdater.checkForUpdates()
   }
@@ -422,6 +422,22 @@ export async function checkForDesktopUpdates(manual: boolean): Promise<void> {
   }
   if (checkInProgress || downloadPromptOpen) return
 
+  // A build without a configured feed must not fall back to an upstream one;
+  // broken test metadata still throws and aborts the check.
+  const source = readDesktopUpdateSource(app.getAppPath())
+  if (!source) {
+    console.log('[updater] no update feed configured for this build; automatic updates are off')
+    if (manual) {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: t('update.checkingTitle'),
+        message: t('update.notConfiguredMessage'),
+        buttons: [t('common.ok')],
+      })
+    }
+    return
+  }
+
   checkInProgress = true
   try {
     if (manual) {
@@ -434,7 +450,7 @@ export async function checkForDesktopUpdates(manual: boolean): Promise<void> {
     }
 
     checking = manual
-    await checkForUpdatesWithFallback()
+    await checkForUpdatesWithFallback(source)
   } catch (err) {
     if (manual) showUpdateCheckFailed()
     throw err

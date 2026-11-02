@@ -8,7 +8,8 @@ import { FASTGPT_EMBED_BASE } from '@/api/studio/fastgpt-agents'
 /**
  * 在 Studio 内打开一个 FastGPT 智能体。
  *
- * iframe 指向 FastGPT 宿主机上的去头反代（同域不同端口，登录态共享），
+ * 优先用免登录分享链接（`/chat/share?shareId=…`），没有时退回登录态的
+ * `/chat?appId=…`。iframe 一律指向 FastGPT 宿主机上的去头反代（同域不同端口），
  * 因为 FastGPT 本体带 `X-Frame-Options: DENY`，直连会被浏览器拒绝。
  */
 const route = useRoute()
@@ -18,11 +19,29 @@ const { t } = useI18n()
 const appId = computed(() => String(route.query.appId ?? '').trim())
 const agentName = computed(() => String(route.query.name ?? '').trim() || appId.value)
 const sceneLabel = computed(() => String(route.query.scene ?? '').trim())
+const shareUrl = computed(() => String(route.query.share ?? '').trim())
 const frameKey = ref(0)
 const failed = ref(false)
 
-const embedUrl = computed(() => (appId.value ? `${FASTGPT_EMBED_BASE}/chat?appId=${encodeURIComponent(appId.value)}` : ''))
-const externalUrl = computed(() => (appId.value ? `${FASTGPT_EMBED_BASE.replace(/:3010$/, ':3000')}/chat?appId=${encodeURIComponent(appId.value)}` : ''))
+/** 分享链接一般指向 FastGPT 本体（:3000），iframe 要换到去头反代的同一条路径。 */
+function toEmbedUrl(raw: string): string {
+  try {
+    const url = new URL(raw)
+    return `${FASTGPT_EMBED_BASE}${url.pathname}${url.search}`
+  } catch {
+    return ''
+  }
+}
+
+const embedUrl = computed(() => {
+  const shared = shareUrl.value ? toEmbedUrl(shareUrl.value) : ''
+  if (shared) return shared
+  return appId.value ? `${FASTGPT_EMBED_BASE}/chat?appId=${encodeURIComponent(appId.value)}` : ''
+})
+const externalUrl = computed(() => {
+  if (shareUrl.value) return shareUrl.value
+  return appId.value ? `${FASTGPT_EMBED_BASE.replace(/:3010$/, ':3000')}/chat?appId=${encodeURIComponent(appId.value)}` : ''
+})
 
 function back() {
   if (window.history.length > 1) router.back()

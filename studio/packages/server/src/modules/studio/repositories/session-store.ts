@@ -1096,6 +1096,26 @@ export function getSessionMessageCountByRole(sessionId: string, role: string): n
   return Number(row?.count || 0)
 }
 
+/**
+ * 删除某条消息及其之后的全部消息，用于会话回退。
+ * 返回删除条数；目标消息不属于该会话时返回 -1。
+ */
+export function deleteMessagesFrom(sessionId: string, messageId: string | number): number {
+  if (!isSqliteAvailable()) return 0
+  const db = getDb()!
+  const target = db.prepare(
+    `SELECT id FROM ${MESSAGES_TABLE} WHERE session_id = ? AND id = ?`,
+  ).get(sessionId, messageId) as { id: number | string } | undefined
+  if (!target) return -1
+  const result = db.prepare(
+    `DELETE FROM ${MESSAGES_TABLE} WHERE session_id = ? AND id >= ?`,
+  ).run(sessionId, target.id)
+  // 压缩摘要包含被回退的内容，必须一起失效，否则下一次模型调用仍会带上旧上下文。
+  db.prepare(`DELETE FROM ${COMPRESSION_SNAPSHOT_TABLE} WHERE session_id = ?`).run(sessionId)
+  updateSessionStats(sessionId)
+  return Number(result.changes || 0)
+}
+
 export function updateSessionStats(id: string): void {
   if (!isSqliteAvailable()) return
   const db = getDb()!

@@ -26,6 +26,7 @@ export class WikiNoteTool implements AgentTool {
       'Read and write the research wiki of this workspace: projects, papers, idea lanes, experiments, journal lines and evidence edges.',
       'This is the workbench panel data, not a file: writes appear in the panel and in its change log immediately.',
       'Call "list" first to learn ids; every write needs a project_id. Paper ids look like "paper_...", arXiv ids like "1706.03762".',
+      'Reading a paper: "search_library" finds it across notes and full text, "read_paper_fulltext" returns the extracted text (cite page numbers), "export_citation" gives BibTeX/RIS/APA.',
     ].join(' '),
     parameters: {
       type: 'object',
@@ -43,6 +44,9 @@ export class WikiNoteTool implements AgentTool {
             'set_experiment',
             'add_journal',
             'add_evidence',
+            'search_library',
+            'read_paper_fulltext',
+            'export_citation',
           ],
           description: 'Operation to run.',
 
@@ -112,6 +116,20 @@ export class WikiNoteTool implements AgentTool {
         src_label: { type: 'string', description: 'add_evidence: human label for src.' },
         dst_label: { type: 'string', description: 'add_evidence: human label for dst.' },
         note: { type: 'string', description: 'add_evidence: why the edge holds.' },
+
+        query: {
+          type: 'string',
+          description: 'search_library: free text. Matches titles, authors, tags, notes, AI summaries and extracted full text; numbers ignore thousands separators.',
+        },
+        format: {
+          type: 'string',
+          enum: ['bibtex', 'ris', 'apa'],
+          description: 'export_citation: output format. Defaults to bibtex.',
+        },
+        max_chars: {
+          type: 'number',
+          description: 'read_paper_fulltext: cap on returned characters (default 20000, max 60000).',
+        },
       },
       required: ['action'],
       additionalProperties: false,

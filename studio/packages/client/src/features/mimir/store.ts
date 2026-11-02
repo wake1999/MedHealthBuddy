@@ -15,6 +15,19 @@ export type ResearchTab = 'overview' | 'paper' | 'papers' | 'experiments' | 'fig
 /** The paper-view pane holding fullscreen, or null. */
 export type PaperFullscreen = 'editor' | 'preview'
 
+/** 上次停留的视图；只认已知标签，坏值一律回到总览。 */
+function readTabPreference(): ResearchTab {
+  try {
+    const saved = localStorage.getItem('mimir.activeTab')
+    if (saved === 'papers' || saved === 'overview' || saved === 'experiments'
+      || saved === 'figures' || saved === 'meetings' || saved === 'servers'
+      || saved === 'ledger' || saved === 'brief' || saved === 'paper') {
+      return saved as ResearchTab
+    }
+  } catch { /* 私有模式 */ }
+  return 'overview'
+}
+
 /** Shared panel viewing state. */
 export interface ResearchPanelState {
   /** Whether the overlay panel is on screen. */
@@ -46,13 +59,20 @@ type ResearchPanelActions = {
 export function createResearchPanelStore(): EngineStoreHandle<ResearchPanelState, ResearchPanelActions> {
   return defineStore({
     init: (): ResearchPanelState => ({
-      open: false, selectedProjectId: null, activeTab: 'overview', paperFullscreen: null,
+      open: false,
+      selectedProjectId: null,
+      // 记住上次停在哪个视图：面板被重挂（上传后强制刷新）时不会跳回总览。
+      activeTab: readTabPreference(),
+      paperFullscreen: null,
     }),
     actions: {
       toggleOpen: (d) => { d.open = !d.open },
       setOpen: (d, open: boolean) => { d.open = open },
       select: (d, projectId: string | null) => { d.selectedProjectId = projectId },
-      setTab: (d, tab: ResearchTab) => { d.activeTab = tab },
+      setTab: (d, tab: ResearchTab) => {
+        d.activeTab = tab
+        try { localStorage.setItem('mimir.activeTab', tab) } catch { /* 私有模式 */ }
+      },
       setPaperFullscreen: (d, pane: PaperFullscreen | null) => { d.paperFullscreen = pane },
     },
   })

@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, readonly, ref, shallowRef, watch, type Ref } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, provide, readonly, ref, shallowRef, watch, type Ref } from 'vue'
 import { pageLoadingKey, pageLoadingTaskKey } from '@/composables/usePageLoading'
-import StudioLoading from './StudioLoading.vue'
 
 const props = defineProps<{ show: boolean; initialOnly?: boolean }>()
 const parentTask = inject(pageLoadingTaskKey, undefined)
@@ -25,17 +24,10 @@ provide(pageLoadingTaskKey, task => {
 })
 let sequence = 0
 let frame: number | undefined
-let timer: ReturnType<typeof setTimeout> | undefined
-let shownAt = performance.now()
-
-onMounted(() => { if (visible.value) shownAt = performance.now() })
-watch(visible, show => { if (show) shownAt = performance.now() }, { flush: 'post' })
 
 function cancelHide() {
   if (frame !== undefined) cancelAnimationFrame(frame)
-  if (timer !== undefined) clearTimeout(timer)
   frame = undefined
-  timer = undefined
 }
 
 watch(pending, async show => {
@@ -43,7 +35,6 @@ watch(pending, async show => {
   const current = ++sequence
   cancelHide()
   if (show) {
-    if (!visible.value) shownAt = performance.now()
     visible.value = true
     return
   }
@@ -61,9 +52,9 @@ watch(pending, async show => {
       frame = undefined
     })
   }
-  const remaining = 1000 - (performance.now() - shownAt)
-  if (remaining > 0) timer = setTimeout(hideAfterPaint, remaining)
-  else hideAfterPaint()
+  // 数据一到就切换页面，不再强制最短显示 1 秒：单聊/群聊/工作流/历史这些页面
+  // 的数据大多已缓存，1 秒保底等于每次点导航都要盯着 logo 转一圈。
+  hideAfterPaint()
 }, { flush: 'sync' })
 
 onBeforeUnmount(() => {
@@ -74,12 +65,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <!--
+    不再渲染整页加载动画：单聊 / 群聊 / 工作流 / 历史这些页面直接呈现内容，
+    数据到齐后由各自的 store 填充。之前这里会先盖一整层 logo 动画，
+    并把内容区 visibility:hidden，所以每次切页面都要先看它转一下。
+  -->
   <div class="page-loading" :aria-busy="parentVisible ?? visible">
-    <div class="page-loading-content" :class="{ 'page-loading-content--hidden': !parentTask && visible }" :inert="(!parentTask && visible) || undefined" :aria-hidden="(!parentTask && visible) || undefined">
+    <div class="page-loading-content">
       <slot />
-    </div>
-    <div v-if="!parentTask && visible" class="page-loading-overlay">
-      <StudioLoading size="large" />
     </div>
   </div>
 </template>

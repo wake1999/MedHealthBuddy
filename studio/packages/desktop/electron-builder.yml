@@ -1,14 +1,16 @@
-appId: com.hermeswebui.studio
-productName: Ekko Studio
-copyright: Copyright © 2026
+appId: com.medhealthbuddy.studio
+productName: MedHealthBuddy
+copyright: Copyright © 2026 MedHealthBuddy
 
 directories:
   output: release
   buildResources: build
 
-publish:
-  provider: generic
-  url: https://download.ekkolearnai.com
+# No update feed is baked into the package: the app only checks for updates
+# when the installed build was given one (MEDHEALTHBUDDY_UPDATE_FEED at launch,
+# or the packaged `desktopUpdate` test metadata). Publishing this build
+# somewhere means adding that provider back and setting the same URL.
+publish: null
 
 # Don't auto-prune our root node_modules; we curate `files` and `extraResources` ourselves.
 buildDependenciesFromSource: false
@@ -74,9 +76,9 @@ asarUnpack:
   - "**/*.node"
 
 mac:
-  # Xcode 26 compiles this Icon Composer source into Assets.car and also
-  # generates the legacy ICNS fallback for pre-Tahoe macOS releases.
-  icon: build/icon.icon
+  # A 1024px PNG; electron-builder converts it to icon.icns (and the Assets.car
+  # the modern macOS app bundle expects) at build time.
+  icon: build/icon.png
   target:
     - target: dmg
       arch: [arm64, x64]
@@ -89,26 +91,27 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   extendInfo:
-    NSMicrophoneUsageDescription: "Ekko Studio uses the microphone for voice conversations and speech transcription."
-  artifactName: "Ekko.Studio-${version}-${arch}.${ext}"
+    NSMicrophoneUsageDescription: "MedHealthBuddy uses the microphone for voice conversations and speech transcription."
+  artifactName: "MedHealthBuddy-${version}-${arch}.${ext}"
 
 win:
   icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]
-  artifactName: "Ekko.Studio-${version}-${arch}.${ext}"
+  artifactName: "MedHealthBuddy-${version}-${arch}.${ext}"
 
 linux:
   syncDesktopName: true
-  icon: build/icons
+  # A single 1024px PNG; electron-builder generates the freedesktop icon set.
+  icon: build/icon.png
   target:
     - target: AppImage
       arch: [x64, arm64]
     - target: deb
       arch: [x64]   # fpm has no arm64 binary; deb only on x64
   category: Development
-  artifactName: "Ekko.Studio-${version}-${arch}.${ext}"
+  artifactName: "MedHealthBuddy-${version}-${arch}.${ext}"
 
 deb:
   afterInstall: build/linux-after-install.tpl
@@ -118,4 +121,5 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   perMachine: false
+  shortcutName: MedHealthBuddy
   include: build/installer.nsh

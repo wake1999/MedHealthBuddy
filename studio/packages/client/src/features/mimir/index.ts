@@ -312,6 +312,7 @@ function panelApply(ctx: ClientContext): void {
       editSource: (content) => { controller.edit(content) },
       reloadSource: () => { controller.reloadSource() },
       ensurePapers: () => { controller.ensurePapers() },
+      refreshPapers: () => controller.refreshPapers(),
       ensureSubscriptions: () => { controller.ensureSubscriptions() },
       saveArxivSubscription: query => controller.saveArxivSubscription(query),
       deleteArxivSubscription: id => controller.deleteArxivSubscription(id),

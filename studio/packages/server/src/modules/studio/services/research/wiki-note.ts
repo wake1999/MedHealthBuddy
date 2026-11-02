@@ -11,10 +11,54 @@ import {
   type ResearchPaper,
   type ResearchStore,
 } from './store'
+import { readPaperFulltext } from './fulltext'
+import { searchLibrary } from './library-search'
 
 const PAPER_STATUS = new Set(['new', 'reading', 'read'])
 const EXPERIMENT_STATUS = new Set(['planned', 'running', 'done', 'failed'])
 const IDEA_KINDS = new Set(['idea', 'decision', 'result'])
+
+/** One paper as a citation string in the format the caller asked for. */
+function buildCitation(paper: ResearchPaper, format: string): string {
+  const firstAuthor = (paper.authors || '').split(',')[0].trim()
+  const surname = firstAuthor.split(/\s+/).pop() || 'anon'
+  const year = paper.year || 'n.d.'
+  const key = `${surname.toLowerCase().replace(/[^a-z0-9]/g, '')}${year.replace(/[^0-9]/g, '') || 'nd'}`
+
+  if (format === 'apa') {
+    return [
+      paper.authors,
+      `(${year}).`,
+      `${paper.title}.`,
+      paper.venue,
+      paper.doi ? `https://doi.org/${paper.doi}` : paper.url,
+    ].filter(Boolean).join(' ')
+  }
+
+  if (format === 'ris') {
+    return [
+      'TY  - JOUR',
+      `TI  - ${paper.title}`,
+      `AU  - ${paper.authors}`,
+      `PY  - ${year}`,
+      paper.venue ? `JO  - ${paper.venue}` : '',
+      paper.doi ? `DO  - ${paper.doi}` : '',
+      paper.url ? `UR  - ${paper.url}` : '',
+      'ER  - ',
+    ].filter(Boolean).join('\n')
+  }
+
+  const fields = [
+    `  title = {${paper.title}}`,
+    `  author = {${paper.authors}}`,
+    `  year = {${year}}`,
+    paper.venue ? `  howpublished = {${paper.venue}}` : '',
+    paper.doi ? `  doi = {${paper.doi}}` : '',
+    paper.arxivId ? `  eprint = {${paper.arxivId}}` : '',
+    paper.url ? `  url = {${paper.url}}` : '',
+  ].filter(Boolean)
+  return `@misc{${key},\n${fields.join(',\n')}\n}`
+}
 
 function text(input: Record<string, unknown>, key: string): string {
   const value = input[key]
@@ -184,6 +228,39 @@ export function installWikiNoteHandler(): void {
     if (action === 'get') {
       const store = await readStore(profile)
       return { record: pickById(store, requiredText(input, 'collection'), requiredText(input, 'id')) }
+    }
+
+    if (action === 'search_library') {
+      // 本地文献库检索：标题、作者、标签、笔记、AI 摘要和已抽取的全文。
+      const query = requiredText(input, 'query')
+      const result = await searchLibrary(profile, query, projectId ? { projectId } : {})
+      return { query, scanned: result.scanned, hits: result.hits }
+    }
+
+    if (action === 'read_paper_fulltext') {
+      // 让 agent 直接读全文，而不是靠猜；按需截断，避免一次塞爆上下文。
+      const id = text(input, 'paper_id') || text(input, 'arxiv_id') || text(input, 'id')
+      if (id === '') throw new Error('wiki_note: read_paper_fulltext needs paper_id or arxiv_id')
+      const { paper, text: full } = await readPaperFulltext(profile, id)
+      const requested = Number(input.max_chars)
+      const cap = Number.isFinite(requested) && requested > 0 ? Math.min(requested, 60000) : 20000
+      return {
+        paper_id: paper.id,
+        title: paper.title,
+        chars: full.length,
+        truncated: full.length > cap,
+        text: full.slice(0, cap),
+      }
+    }
+
+    if (action === 'export_citation') {
+      const store = await readStore(profile)
+      const id = text(input, 'paper_id') || text(input, 'arxiv_id') || text(input, 'id')
+      if (id === '') throw new Error('wiki_note: export_citation needs paper_id or arxiv_id')
+      const paper = store.papers.find(item => item.id === id || item.arxivId === id)
+      if (paper === undefined) throw new Error(`wiki_note: paper ${id} not found`)
+      const format = (text(input, 'format') || 'bibtex').toLowerCase()
+      return { paper_id: paper.id, format, citation: buildCitation(paper, format) }
     }
 
     if (action === 'add_paper') {

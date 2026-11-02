@@ -5,7 +5,7 @@ import { isKnownEkkoSessionCommand } from '@/utils/hermes/bridge-session-command
 import { normalizeRunUsage, type RunUsageSummary } from '@/utils/run-usage'
 import { mergeTaskPlanMessages, type TaskPlanSnapshot } from '@/utils/task-plan'
 import { startRunViaSocket, resumeSession, registerSessionHandlers, unregisterSessionHandlers, getChatRunSocket, respondToolApproval, onPeerUserMessage, onSessionCommand, onSessionTitleUpdated, onSessionWorkspaceUpdated, onSessionSettingsUpdated, onRunUsageUpdated, respondClarify, type ChatRunTransport, type RunEvent, type ResumeSessionPayload, type StartRunRequest, type ContentBlock as ContentBlockImport } from '@/api/studio/chat'
-import { archiveSession as archiveSessionApi, deleteSession as deleteSessionApi, fetchSessionMessagesPage, fetchSessions, fetchWorkspaceRunChangeFile, setSessionModel, setSessionPushEnabled as persistSessionPushEnabled, setSessionReasoningEffort as persistSessionReasoningEffort, type HermesMessage, type SessionSummary, type WorkspaceRunChangeFileDetail, type WorkspaceRunChangeSummary } from '@/api/studio/sessions'
+import { archiveSession as archiveSessionApi, deleteSession as deleteSessionApi, fetchSessionMessagesPage, fetchSessions, fetchWorkspaceRunChangeFile, rewindSession as rewindSessionApi, setSessionModel, setSessionPushEnabled as persistSessionPushEnabled, setSessionReasoningEffort as persistSessionReasoningEffort, type HermesMessage, type SessionSummary, type WorkspaceRunChangeFileDetail, type WorkspaceRunChangeSummary } from '@/api/studio/sessions'
 import { getActiveProfileName } from '@/api/client'
 import { onAuthInvalidated } from '@/api/auth-invalidation'
 import { inferCodingAgentApiMode, normalizeCodingAgentApiMode, type ChatCodingAgentId } from '@/api/coding-agents'
@@ -1994,6 +1994,19 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+
+  /**
+   * 回退当前会话到某条消息之前：服务端删除该消息及之后的所有消息，
+   * 客户端重新拉取，确保不是只改了界面。
+   */
+  async function rewindToMessage(messageId: string): Promise<boolean> {
+    const sid = activeSessionId.value
+    if (!sid || isStreaming.value) return false
+    const ok = await rewindSessionApi(sid, messageId)
+    if (!ok) return false
+    await refreshActiveSession()
+    return true
+  }
 
   function createSession(options: {
     profile?: string
@@ -5671,6 +5684,7 @@ export const useChatStore = defineStore('chat', () => {
     loadSessions,
     refreshSessionListOnly,
     refreshActiveSession,
+    rewindToMessage,
     getThinkingObservation,
     noteThinkingDelta,
     noteReasoningStart,

@@ -301,6 +301,14 @@ export async function requestBlob(path: string, options: RequestInit = {}): Prom
   return res.blob()
 }
 
+/**
+ * Streaming responses (SSE): same auth/profile handling, but the caller reads
+ * the body itself instead of waiting for JSON.
+ */
+export async function requestStream(path: string, options: RequestInit = {}): Promise<Response> {
+  return performRequest(path, options)
+}
+
 export function getBaseUrlValue(): string {
   return getBaseUrl()
 }

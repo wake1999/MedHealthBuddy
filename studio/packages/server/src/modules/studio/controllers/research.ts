@@ -126,6 +126,9 @@ function collectionOf(ctx: any): ResearchCollection | null {
 // GET /api/studio/research/state
 export async function getState(ctx: any) {
   const profile = profileOf(ctx)
+  // 列表在每次上传后会立刻回读：明确禁止缓存，避免浏览器把上传前的快照再
+  // 返回给前端（那会让新导入的文献要切走再回来才出现）。
+  ctx.set('Cache-Control', 'no-store, max-age=0')
   const store = await readStore(profile)
   // `root` 让面板能拼出工程的绝对目录：会话里的 agent 跑在别的 cwd 上，
   // 相对路径 `projects/<id>` 到它手里会指空（见 mimir 的 prompt builder）。
@@ -763,9 +766,14 @@ export async function getPaperPdf(ctx: any) {
 export async function getPaperFilePdf(ctx: any) {
   const arxivId = String(ctx.query.arxivId || '')
   try {
-    const { bytes, file } = await readPaperPdfFile(profileOf(ctx), arxivId)
-    ctx.set('Content-Type', 'application/pdf')
-    ctx.set('Content-Disposition', `inline; filename="${encodeURIComponent(file)}"`)
+    const { bytes } = await readPaperPdfFile(profileOf(ctx), arxivId)
+    /*
+     * 这是给 pdf.js / 封面渲染读取 arrayBuffer 的内部 API，不是用户下载入口。
+     * 之前返回 application/pdf + inline *.pdf，IDM 会把它当成下载任务接管，
+     * 导致前端拿不到字节，下次渲染封面又重试。改为纯字节流并禁止 MIME 嗅探。
+     */
+    ctx.set('Content-Type', 'application/octet-stream')
+    ctx.set('X-Content-Type-Options', 'nosniff')
     ctx.set('Content-Length', String(bytes.length))
     ctx.set('Cache-Control', 'private, max-age=0, must-revalidate')
     ctx.body = bytes

@@ -33,6 +33,8 @@ export interface ChatAppScenePayload {
 
 export interface ChatAppPayload {
   iconPaths: string[]
+  /** 图片图标（站内路径或 URL）。有值时优先于 `iconPaths` 的 svg 线条。 */
+  iconImage: string
   tint: string
   text: Record<string, ChatAppText>
   scenes: ChatAppScenePayload[]
@@ -62,6 +64,17 @@ function asString(value: unknown, fallback = ''): string {
 
 function asStringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+/**
+ * 图片图标只接受站内路径（`/apps/x.png`）或 http(s) URL：这个值最终进 `<img src>`，
+ * 其它协议一律丢弃。
+ */
+function parseIconImage(value: unknown): string {
+  const raw = asString(value).trim()
+  if (raw === '') return ''
+  if (raw.startsWith('/') && !raw.startsWith('//')) return raw
+  return /^https?:\/\//i.test(raw) ? raw : ''
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -131,6 +144,7 @@ export function parseChatAppPayload(raw: unknown): ChatAppPayload | null {
   if (Object.values(text).every(entry => entry.name === '' && entry.heroTitle === '')) return null
   return {
     iconPaths: asStringList(record.iconPaths),
+    iconImage: parseIconImage(record.iconImage),
     tint: asString(record.tint).trim(),
     text,
     scenes: parseScenes(record.scenes),
@@ -154,6 +168,7 @@ export function normalizeChatAppPayload(
     ok: true,
     payload: {
       iconPaths: asStringList(record.iconPaths),
+      iconImage: parseIconImage(record.iconImage),
       tint: asString(record.tint).trim() || 'linear-gradient(135deg, #4aa3f0, #2f6fe0)',
       text,
       scenes,

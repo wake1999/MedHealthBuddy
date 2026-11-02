@@ -12,13 +12,30 @@ const host = ref<HTMLDivElement | null>(null)
 const booted = ref(false)
 let workbench: MimirWorkbench | null = null
 
-onMounted(() => {
+function boot(): void {
   if (!host.value) return
   workbench = createMimirWorkbench(host.value)
   booted.value = true
+}
+
+/**
+ * 面板内的数据刷新在 React 侧不一定能推到界面（实测要「切走再回来」才更新）。
+ * 由岛内抛出 `mimir:remount`，这里整块重挂一次——等价于用户手动切模块，
+ * 但停留的视图由 localStorage 记住，重挂后仍回到原来的标签页。
+ */
+function remount(): void {
+  workbench?.unmount()
+  workbench = null
+  boot()
+}
+
+onMounted(() => {
+  boot()
+  window.addEventListener('mimir:remount', remount)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('mimir:remount', remount)
   workbench?.unmount()
   workbench = null
 })

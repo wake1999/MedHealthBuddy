@@ -1,11 +1,12 @@
 /**
  * Where a MedHealthBuddy build fetches its own releases and runtime assets.
  *
- * The upstream Ekko Studio hosts are deliberately *not* used as defaults: they
- * serve Ekko artefacts, so auto-updating from them (or downloading their
- * runtime) would replace this build with a differently branded app. Nothing is
- * fetched unless a build opts in, either through the packaged `desktopUpdate`
- * metadata (test channel, see updater-source.ts) or the environment:
+ * The upstream Ekko Studio hosts are deliberately *not* used for application
+ * updates: they serve differently branded Electron installers. Runtime assets
+ * are different — Hermes Runtime is published upstream and is safe to reuse —
+ * so `resolveRuntimeRepo()` falls back to the upstream runtime release repo.
+ * Auto-update stays off unless a build opts in through the packaged
+ * `desktopUpdate` metadata (test channel, see updater-source.ts) or env:
  *
  *   MEDHEALTHBUDDY_UPDATE_FEED            generic feed directory for auto-update
  *   MEDHEALTHBUDDY_UPDATE_FALLBACK_FEED   optional second feed, tried on failure
@@ -28,6 +29,11 @@ const LEGACY_HOST = 'download.ekkolearnai.com'
 const LEGACY_GITHUB_OWNER = 'ekkolearnai'
 const LEGACY_GITHUB_REPO = 'ekko-studio'
 const REPO_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/
+/**
+ * Hermes Runtime 仍由上游发布。这里只把 Runtime 资产源接回上游，
+ * 自动更新仍然保持 `publish: null`，不会把应用替换成上游品牌。
+ */
+const DEFAULT_RUNTIME_REPO = 'EKKOLearnAI/ekko-studio'
 
 /**
  * True for a URL that serves the upstream Ekko Studio releases (the CDN, or the
@@ -109,5 +115,5 @@ export function resolveRuntimeBaseUrl(): string | null {
 
 /** GitHub `owner/repo` hosting runtime archives, or null when that source is off. */
 export function resolveRuntimeRepo(): string | null {
-  return readRepo(RUNTIME_REPO_ENV) ?? readRepo(LEGACY_RUNTIME_REPO_ENV)
+  return readRepo(RUNTIME_REPO_ENV) ?? readRepo(LEGACY_RUNTIME_REPO_ENV) ?? DEFAULT_RUNTIME_REPO
 }

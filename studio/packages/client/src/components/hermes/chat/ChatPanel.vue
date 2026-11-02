@@ -1847,11 +1847,13 @@ async function submitNewChat(text: string, attachments?: Attachment[]): Promise<
       try {
         const status = await fetchAgentAvailabilitySnapshot();
         if (agentInstallationState(status, "hermes") === "not-installed") {
-          showNewChatPage.value = false;
-          if (isSuperAdmin.value) {
-            await router.push({ name: "hermes.agentManager", query: { runtime: "install" } });
-          } else {
-            message.warning(t("codingAgents.installRequired", { agent: "Hermes" }));
+          // Hermes 只是可选的本地 Runtime。未安装时静默回退到内置 Agent，
+          // 不再打断新会话，也不把用户强制带到 Runtime 安装页。
+          const fallback = newChatAgentOptions.value.find(option => option.value === "ekko-agent")
+            || newChatAgentOptions.value[0];
+          if (fallback) {
+            newChatAgent.value = fallback.value;
+            console.info("Hermes Agent is not installed; using the built-in agent.");
           }
           return false;
         }

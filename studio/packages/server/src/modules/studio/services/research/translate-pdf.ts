@@ -218,27 +218,37 @@ async function runPdf2zh(
   let lastError = ''
   for (const bin of PDF2ZH_CANDIDATES) {
     /*
-     * `--babeldoc`：换成版面感知后端。
-     *
-     * 默认的 pdfminer 后端是「按字符框替换」，中文比英文窄，替换后
-     * 正文会和公式、表格、页边注挤在一起重叠。babeldoc 先做版面分析
-     * （段落 / 图 / 表 / 公式分开），只重排正文段落，公式表格整块原样保留。
-     * 代价是首次要下载 ONNX 模型（已指向 hf-mirror）。
+     * Prefer babeldoc's layout-aware backend, then fall back to pdf2zh's
+     * standard backend. Some local Python environments make babeldoc exit
+     * successfully without writing any PDF (e.g. NumPy 2 removed
+     * `np.fromstring`); an exit code alone is not proof of success.
      */
-    const args = [
-      '-li', sourceLang, '-lo', targetLang, '-s', service,
-      '--babeldoc',
-      '-o', outDir, inputPath,
+    const modes = [
+      {
+        label: 'babeldoc',
+        args: ['-li', sourceLang, '-lo', targetLang, '-s', service, '--babeldoc', '-o', outDir, inputPath],
+      },
+      {
+        label: 'standard',
+        args: ['-li', sourceLang, '-lo', targetLang, '-s', service, '-o', outDir, inputPath],
+      },
     ]
-    const result = await run(bin, args, { env, timeoutMs: 30 * 60 * 1000, signal: options.signal })
-    if (options.signal?.aborted) throw new Error('translation_aborted')
-    if (result.code === 0) {
-      await relocateProducts(inputPath, outDir, targetLang)
-      return mono
+    for (const mode of modes) {
+      const result = await run(bin, mode.args, { env, timeoutMs: 30 * 60 * 1000, signal: options.signal })
+      if (options.signal?.aborted) throw new Error('translation_aborted')
+      const detail = (result.stderr || result.stdout).trim().slice(-500)
+      if (result.code === 0) {
+        await relocateProducts(inputPath, outDir, targetLang)
+        const produced = await fs.stat(mono).then(() => true).catch(() => false)
+        if (produced) return mono
+        lastError = `${bin} (${mode.label}): exit 0 but no ${path.basename(mono)} — ${detail}`
+        console.warn(`[pdf2zh] ${lastError}`)
+        continue
+      }
+      lastError = `${bin} (${mode.label}): exit ${String(result.code)} — ${detail}`
+      // ENOENT (-1) means this candidate is not installed; try the next one.
+      if (result.code === -1) break
     }
-    lastError = `${bin}: exit ${String(result.code)} — ${(result.stderr || result.stdout).trim().slice(-400)}`
-    // ENOENT (-1) means this candidate is not installed; try the next one.
-    if (result.code !== -1) break
   }
   throw new Error(`pdf2zh failed: ${lastError || 'no candidate ran'}`)
 }

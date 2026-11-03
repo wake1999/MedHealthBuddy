@@ -5737,9 +5737,11 @@ export function PapersView({
                 const progress = translationProgress[key]
                 const percent = progress?.percent ?? null
                 const rawPhase = progress?.phase?.trim() || ''
-                const phase = rawPhase === '' || rawPhase === 'preparing' || rawPhase === 'translating'
-                  ? t('papers.translationRunning')
-                  : rawPhase
+                const phase = rawPhase.startsWith('installing-runtime')
+                  ? t('papers.translationInstalling')
+                  : rawPhase === '' || rawPhase === 'preparing' || rawPhase === 'translating'
+                    ? t('papers.translationRunning')
+                    : rawPhase
                 return (
                   <div key={key} className={css.translationProgressItem}>
                     <div className={css.translationProgressHead}>

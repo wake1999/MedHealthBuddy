@@ -109,6 +109,7 @@ researchRoutes.post('/api/studio/research/papers/:id/translate', paperCtrl.trans
 // Whole-document translation that keeps the original layout (pdf2zh → *-dual.pdf)
 researchRoutes.post('/api/studio/research/papers/:id/translate-pdf', paperCtrl.translatePaperPdfHandler)
 researchRoutes.get('/api/studio/research/papers/:id/translate-status', paperCtrl.translatePaperStatusHandler)
+researchRoutes.get('/api/studio/translation/health', paperCtrl.translationRuntimeHealthHandler)
 researchRoutes.post('/api/studio/research/papers/:id/fulltext', paperCtrl.extractPaperFulltextHandler)
 researchRoutes.get('/api/studio/research/papers/:id/fulltext', paperCtrl.readPaperFulltextHandler)
 researchRoutes.post('/api/studio/research/papers/:id/summary', paperCtrl.summarizePaperHandler)

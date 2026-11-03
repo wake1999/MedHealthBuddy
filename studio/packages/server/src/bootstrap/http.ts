@@ -5,9 +5,9 @@ import type { Context } from 'koa'
 import cors from '@koa/cors'
 import serve from 'koa-static'
 import send from 'koa-send'
-import { relative, resolve } from 'path'
+import { dirname, relative, resolve } from 'path'
 import { mkdir } from 'fs/promises'
-import { readFileSync } from 'fs'
+import { createReadStream, existsSync, readFileSync, statSync } from 'fs'
 import { config, shouldCreateWebUiDataDir } from '../modules/studio/public/config'
 import { initLoginLimiter } from '../modules/studio/services/auth/login-limiter'
 import { createShutdownHandler } from './lifecycle'
@@ -565,6 +565,24 @@ export async function bootstrap() {
   // Register all routes (handles auth internally)
   registerRoutes(app, [requireUserJwt, resolveUserProfile])
   console.log('[bootstrap] routes registered')
+
+  // Translation runtime plugin download. Kept outside dist/client so a rebuild
+  // does not delete a several-hundred-MB archive.
+  const translationPluginPath = process.env.MHB_TRANSLATION_PLUGIN_FILE
+    || '/opt/ekko-downloads/translation-runtime-win-x64.tar.gz'
+  app.use(async (ctx, next) => {
+    if (ctx.method === 'GET' && ctx.path === '/downloads/translation-runtime-win-x64.tar.gz'
+      && existsSync(translationPluginPath)) {
+      const size = statSync(translationPluginPath).size
+      ctx.set('Content-Type', 'application/gzip')
+      ctx.set('Content-Length', String(size))
+      ctx.set('Content-Disposition', 'attachment; filename="translation-runtime-win-x64.tar.gz"')
+      ctx.set('Cache-Control', 'public, max-age=3600')
+      ctx.body = createReadStream(translationPluginPath)
+      return
+    }
+    await next()
+  })
 
   // SPA fallback
   const distDir = resolve(__dirname, '..', 'client')

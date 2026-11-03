@@ -21,20 +21,29 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { translationRuntimeBinaries } from './translation-runtime'
 
-/** Where pdf2zh might live. An explicit env var always wins. */
-const PDF2ZH_CANDIDATES = [
-  process.env.PDF2ZH_BIN,
-  'pdf2zh',
-  process.platform === 'win32' ? 'D:\\python3.11\\Scripts\\pdf2zh.exe' : '/usr/local/bin/pdf2zh',
-].filter((value): value is string => typeof value === 'string' && value !== '')
+/** Where pdf2zh might live. The managed plugin wins over system installs. */
+function pdf2zhCandidates(): string[] {
+  const managed = translationRuntimeBinaries().pdf2zh
+  return [
+    process.env.PDF2ZH_BIN,
+    managed,
+    'pdf2zh',
+    process.platform === 'win32' ? 'D:\\python3.11\\Scripts\\pdf2zh.exe' : '/usr/local/bin/pdf2zh',
+  ].filter((value): value is string => typeof value === 'string' && value !== '')
+}
 
 /** PyMuPDF is used for the compare spread; it ships with pdf2zh's environment. */
-const PYTHON_CANDIDATES = [
-  process.env.PYTHON_BIN,
-  process.platform === 'win32' ? 'D:\\python3.11\\python.exe' : 'python3',
-  'python',
-].filter((value): value is string => typeof value === 'string' && value !== '')
+function pythonCandidates(): string[] {
+  const managed = translationRuntimeBinaries().python
+  return [
+    process.env.PYTHON_BIN,
+    managed,
+    process.platform === 'win32' ? 'D:\\python3.11\\python.exe' : 'python3',
+    'python',
+  ].filter((value): value is string => typeof value === 'string' && value !== '')
+}
 
 /** Hard cap: a paper translation should not hang a request forever. */
 const TRANSLATE_TIMEOUT_MS = 8 * 60 * 1000
@@ -152,6 +161,8 @@ function run(
     }
     const child = spawn(command, args, {
       windowsHide: true,
+      // Windows .cmd launchers (the managed plugin) need cmd.exe.
+      shell: process.platform === 'win32' && /\.(cmd|bat)$/i.test(command),
       env: options.env ? { ...process.env, ...options.env } : process.env,
     })
     let stdout = ''
@@ -226,7 +237,7 @@ async function buildComparePdf(
   await fs.writeFile(scriptPath, COMPARE_SCRIPT, 'utf-8')
   let lastError = ''
   try {
-    for (const bin of PYTHON_CANDIDATES) {
+    for (const bin of pythonCandidates()) {
       const result = await run(
         bin,
         [scriptPath, sourcePath, translatedPath, outPath],
@@ -283,7 +294,7 @@ async function runPdf2zh(
   const allowLayoutFallback = ['1', 'true', 'on', 'yes'].includes(
     (process.env.PDF2ZH_ALLOW_LAYOUT_FALLBACK || '').trim().toLowerCase(),
   )
-  for (const bin of PDF2ZH_CANDIDATES) {
+  for (const bin of pdf2zhCandidates()) {
     /*
      * Prefer babeldoc's layout-aware backend. The standard backend replaces
      * glyph boxes and makes Chinese text overlap formulas and columns, so it

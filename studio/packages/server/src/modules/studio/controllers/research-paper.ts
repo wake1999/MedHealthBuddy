@@ -29,6 +29,7 @@ import {
   translationJobKey,
   updateTranslationJob,
 } from '../services/research/translation-progress'
+import { ensureTranslationRuntime, translationRuntimeHealth } from '../services/research/translation-runtime'
 import { resolveLlmTarget } from '../services/research/llm'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -363,6 +364,18 @@ export async function translatePaperPdfHandler(ctx: any) {
   ctx.res?.once('close', onResponseClosed)
 
   try {
+    // Windows installs get a self-contained translation runtime on first use.
+    // Linux/remote hosts use the runtime supplied by the deployment.
+    if (process.platform === 'win32') {
+      updateTranslationJob(jobKey, { phase: 'installing-runtime' })
+      await ensureTranslationRuntime((progress) => {
+        updateTranslationJob(jobKey, {
+          phase: `installing-runtime:${progress.phase}`,
+          percent: progress.percent,
+        })
+      })
+      updateTranslationJob(jobKey, { phase: 'translating' })
+    }
     // Reuse a cached translation when it is at least as new as the source.
     const [sourceStat, targetStat] = await Promise.all([
       fs.stat(source),
@@ -437,6 +450,12 @@ export async function translatePaperPdfHandler(ctx: any) {
     ctx.req?.removeListener('aborted', onRequestAborted)
     ctx.res?.removeListener('close', onResponseClosed)
   }
+}
+
+/** GET `/api/studio/translation/health` — managed translation runtime status. */
+export async function translationRuntimeHealthHandler(ctx: any) {
+  ctx.set('Cache-Control', 'no-store')
+  ctx.body = { ok: true, ...(await translationRuntimeHealth()) }
 }
 
 /** GET `/api/studio/research/papers/:id/translate-status?variant=...` */

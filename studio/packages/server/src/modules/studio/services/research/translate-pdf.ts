@@ -47,6 +47,13 @@ export interface TranslateModel {
   model: string
 }
 
+export interface TranslateProgress {
+  phase: string
+  current: number | null
+  total: number | null
+  percent: number | null
+}
+
 export interface TranslateOptions {
   /** When present, translation goes through this OpenAI-compatible endpoint. */
   readonly model?: TranslateModel
@@ -54,6 +61,8 @@ export interface TranslateOptions {
   readonly targetLang?: string
   /** Aborted when the reader clicks "stop translation". */
   readonly signal?: AbortSignal
+  /** Best-effort page/phase progress parsed from pdf2zh's tqdm output. */
+  readonly onProgress?: (progress: TranslateProgress) => void
 }
 
 /**
@@ -87,10 +96,54 @@ function killProcessTree(child: ReturnType<typeof spawn>): void {
   try { child.kill('SIGTERM') } catch { /* already gone */ }
 }
 
+const PDF2ZH_PHASES: Array<{ name: string; from: number; to: number }> = [
+  { name: 'Parse Page Layout', from: 5, to: 20 },
+  { name: 'Translate Paragraphs', from: 20, to: 70 },
+  { name: 'Typesetting', from: 70, to: 85 },
+  { name: 'Add Fonts', from: 85, to: 90 },
+  { name: 'Generate drawing instructions', from: 90, to: 95 },
+  { name: 'Subset font', from: 95, to: 98 },
+  { name: 'Save PDF', from: 98, to: 100 },
+]
+
+function parsePdf2zhProgress(text: string): TranslateProgress | null {
+  const tail = text.slice(-4000).replace(/\r/g, '\n')
+  // babeldoc emits stable phase lines such as:
+  // `Translate Paragraphs (1/1) ----- 55/55`
+  // `Typesetting (1/1) ----- 3/3`
+  // Ignore noisy ONNX lines such as `CPUExecutionProvider`.
+  for (let index = PDF2ZH_PHASES.length - 1; index >= 0; index -= 1) {
+    const phase = PDF2ZH_PHASES[index]
+    const pattern = new RegExp(
+      `${phase.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(?:\\([^)]*\\))?[^\\n]*?(\\d+)\\s*\\/\\s*(\\d+)`,
+      'g',
+    )
+    const matches = [...tail.matchAll(pattern)]
+    const match = matches[matches.length - 1]
+    if (!match) continue
+    const current = Number(match[1])
+    const total = Number(match[2])
+    if (!Number.isFinite(current) || !Number.isFinite(total) || total <= 0) continue
+    const ratio = Math.max(0, Math.min(1, current / total))
+    return {
+      phase: phase.name,
+      current,
+      total,
+      percent: Math.round(phase.from + (phase.to - phase.from) * ratio),
+    }
+  }
+  return null
+}
+
 function run(
   command: string,
   args: readonly string[],
-  options: { env?: NodeJS.ProcessEnv; timeoutMs?: number; signal?: AbortSignal } = {},
+  options: {
+    env?: NodeJS.ProcessEnv
+    timeoutMs?: number
+    signal?: AbortSignal
+    onOutput?: (chunk: string) => void
+  } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     if (options.signal?.aborted) {
@@ -119,8 +172,14 @@ function run(
       killProcessTree(child)
     }, options.timeoutMs ?? TRANSLATE_TIMEOUT_MS)
     options.signal?.addEventListener('abort', onAbort, { once: true })
-    child.stdout?.on('data', (chunk) => { stdout += String(chunk) })
-    child.stderr?.on('data', (chunk) => { stderr += String(chunk) })
+    child.stdout?.on('data', (chunk) => {
+      stdout += String(chunk)
+      options.onOutput?.(String(chunk))
+    })
+    child.stderr?.on('data', (chunk) => {
+      stderr += String(chunk)
+      options.onOutput?.(String(chunk))
+    })
     child.on('error', (error) => {
       stderr += String(error?.message || error)
       finish(-1)
@@ -203,7 +262,12 @@ async function runPdf2zh(
   // mainland China. PDF2ZH_SERVICE still overrides the fallback.
   const useModel = options.model !== undefined && options.model.apiKey !== ''
   const service = useModel ? 'openai' : ((process.env.PDF2ZH_SERVICE ?? 'bing').trim() || 'bing')
-  const env: NodeJS.ProcessEnv = {}
+  const env: NodeJS.ProcessEnv = {
+    // babeldoc/rich writes phase progress to stdout; without this the pipe
+    // buffers until the process exits and the UI only sees the final state.
+    PYTHONUNBUFFERED: '1',
+    PYTHONIOENCODING: 'utf-8',
+  }
   if (useModel && options.model) {
     env.OPENAI_BASE_URL = options.model.baseUrl
     env.OPENAI_API_KEY = options.model.apiKey
@@ -241,7 +305,20 @@ async function runPdf2zh(
         : []),
     ]
     for (const mode of modes) {
-      const result = await run(bin, mode.args, { env, timeoutMs: 30 * 60 * 1000, signal: options.signal })
+      let progressLog = ''
+      const onOutput = mode.label === 'babeldoc'
+        ? (chunk: string): void => {
+            progressLog = (progressLog + chunk).slice(-4000)
+            const progress = parsePdf2zhProgress(progressLog)
+            if (progress) options.onProgress?.(progress)
+          }
+        : undefined
+      const result = await run(bin, mode.args, {
+        env,
+        timeoutMs: 30 * 60 * 1000,
+        signal: options.signal,
+        onOutput,
+      })
       if (options.signal?.aborted) throw new Error('translation_aborted')
       const detail = (result.stderr || result.stdout).trim().slice(-500)
       if (result.code === 0) {

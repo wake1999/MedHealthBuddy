@@ -2195,6 +2195,11 @@ li.dropIndicator {
   animation: translationSweep 1.2s ease-in-out infinite;
 }
 
+.translationProgressBar[data-determinate] {
+  animation: none;
+  transition: width 0.3s ease;
+}
+
 @keyframes translationSweep {
   0% { transform: translateX(-110%); }
   100% { transform: translateX(280%); }

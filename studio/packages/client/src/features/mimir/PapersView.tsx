@@ -1677,6 +1677,8 @@ function PaperPdfReader({ paper, url, page, onPageChange, onNotesChanged, onSele
   const [translatedPdf, setTranslatedPdf] = useState<{ variant: PdfVariantView; bytes: Uint8Array } | null>(null)
   const [dualLoading, setDualLoading] = useState(false)
   const [dualError, setDualError] = useState('')
+  const [dualCancelled, setDualCancelled] = useState(false)
+  const dualAbortRef = useRef<AbortController | null>(null)
 
   // Load once per url; the bytes go through our own fetch so auth headers apply.
   useEffect(() => {
@@ -2202,12 +2204,15 @@ function normalizePdfSearchText(raw: string): string {
       setTranslatedPdf(null)
       return
     }
+    const controller = new AbortController()
+    dualAbortRef.current = controller
     setDualLoading(true)
     setDualError('')
+    setDualCancelled(false)
     try {
       const response = await fetch(
         `/api/studio/research/papers/${encodeURIComponent(paperKey(paper))}/translate-pdf?variant=${variant}&format=base64`,
-        { method: 'POST', headers: researchApiHeaders() },
+        { method: 'POST', headers: researchApiHeaders(), signal: controller.signal },
       )
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -2219,11 +2224,25 @@ function normalizePdfSearchText(raw: string): string {
       for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
       setTranslatedPdf({ variant, bytes })
     } catch (error) {
-      setDualError((error as Error).message)
+      if (controller.signal.aborted || (error as Error).name === 'AbortError') {
+        setDualCancelled(true)
+      } else {
+        setDualError((error as Error).message)
+      }
     } finally {
+      if (dualAbortRef.current === controller) dualAbortRef.current = null
       setDualLoading(false)
     }
   }
+
+  const cancelWholePdfTranslation = (): void => {
+    dualAbortRef.current?.abort()
+  }
+
+  useEffect(() => () => {
+    dualAbortRef.current?.abort()
+    dualAbortRef.current = null
+  }, [])
 
   const goTo = (next: number): void => {
     const clamped = Math.min(Math.max(next, 1), pageCount || 1)
@@ -2909,6 +2928,17 @@ function normalizePdfSearchText(raw: string): string {
         >
           <ToolIcon name="dual" />
         </button>
+        {dualLoading && (
+          <button
+            type="button"
+            className={css.paperReaderToolBtn}
+            data-tip={t('papers.cancelTranslation')}
+            aria-label={t('papers.cancelTranslation')}
+            onClick={cancelWholePdfTranslation}
+          >
+            <span className={css.paperReaderToolIcon} aria-hidden="true">×</span>
+          </button>
+        )}
         {pageInkStrokes.length > 0 && (
           <>
             <span className={css.paperReaderToolsDivider} aria-hidden="true" />
@@ -3301,6 +3331,9 @@ function normalizePdfSearchText(raw: string): string {
           )}
           {dualError !== '' && (
             <p className={css.failure} role="alert">{t('papers.dualFailed')}：{dualError}</p>
+          )}
+          {dualCancelled && (
+            <p className={css.hint} role="status">{t('papers.translationCancelled')}</p>
           )}
           <div className={css.paperReaderContinuous}>
             {docRef.current && Array.from({ length: pageCount }, (_, index) => index + 1).map(pageNumber => {
@@ -4425,11 +4458,18 @@ export function PapersView({
   const [summarizingIds, setSummarizingIds] = useState<ReadonlySet<string>>(new Set())
   /** One AbortController per running whole-paper translation. */
   const translationControllersRef = useRef(new Map<string, AbortController>())
+  const translationProgressTimersRef = useRef(new Map<string, number>())
   const [translationStartedAt, setTranslationStartedAt] = useState<Record<string, number>>({})
+  const [translationProgress, setTranslationProgress] = useState<Record<string, {
+    phase: string
+    current: number | null
+    total: number | null
+    percent: number | null
+  }>>({})
   const [translationNotice, setTranslationNotice] = useState<{
     key: string
     title: string
-    status: 'cancelled'
+    status: 'cancelled' | 'cached'
   } | null>(null)
   const [translationClock, setTranslationClock] = useState(Date.now())
   /** 正在查看的已生成摘要（null = 弹窗关闭）。 */
@@ -4794,9 +4834,48 @@ export function PapersView({
       })
   }
 
-  const startTranslate = (paper: PaperRecord): void => {
+  const stopTranslationProgress = (key: string): void => {
+    const timer = translationProgressTimersRef.current.get(key)
+    if (timer !== undefined) window.clearInterval(timer)
+    translationProgressTimersRef.current.delete(key)
+    setTranslationProgress(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
+  const pollTranslationProgress = (key: string): void => {
+    void fetch(`/api/studio/research/papers/${encodeURIComponent(key)}/translate-status?variant=mono`, {
+      headers: researchApiHeaders(),
+      cache: 'no-store',
+    })
+      .then(async response => (response.ok ? response.json() : null))
+      .then((body) => {
+        const job = body?.job
+        if (!job || job.state !== 'running') return
+        setTranslationProgress(prev => ({
+          ...prev,
+          [key]: {
+            phase: String(job.phase || ''),
+            current: typeof job.current === 'number' ? job.current : null,
+            total: typeof job.total === 'number' ? job.total : null,
+            percent: typeof job.percent === 'number' ? job.percent : null,
+          },
+        }))
+      })
+      .catch(() => { /* progress is best-effort */ })
+  }
+
+  const startTranslate = (paper: PaperRecord, force = false): void => {
     const key = paperKey(paper)
     if (translatingIds.has(key) || translationControllersRef.current.has(key)) return
+    if (!force && extraOf(paper).translatedAt !== undefined) {
+      // 已翻译的文献直接复用缓存，避免无意义地再次跑 pdf2zh。
+      setTranslationNotice({ key, title: paper.title, status: 'cached' })
+      setCardMenuId(null)
+      return
+    }
     setCardMenuId(null)
     setActionError(null)
     setTranslationNotice(null)
@@ -4804,6 +4883,13 @@ export function PapersView({
     translationControllersRef.current.set(key, controller)
     setTranslationStartedAt(prev => ({ ...prev, [key]: Date.now() }))
     setTranslatingIds(prev => new Set(prev).add(key))
+    setTranslationProgress(prev => ({
+      ...prev,
+      [key]: { phase: t('papers.translationRunning'), current: null, total: null, percent: null },
+    }))
+    pollTranslationProgress(key)
+    const progressTimer = window.setInterval(() => { pollTranslationProgress(key) }, 900)
+    translationProgressTimersRef.current.set(key, progressTimer)
     let succeeded = false
     void fetch(`/api/studio/research/papers/${encodeURIComponent(key)}/translate-pdf?variant=mono&format=json`, {
       method: 'POST',
@@ -4829,6 +4915,7 @@ export function PapersView({
       })
       .finally(() => {
         translationControllersRef.current.delete(key)
+        stopTranslationProgress(key)
         setTranslationStartedAt(prev => {
           const next = { ...prev }
           delete next[key]
@@ -4853,6 +4940,7 @@ export function PapersView({
     if (!controller) return
     controller.abort()
     translationControllersRef.current.delete(key)
+    stopTranslationProgress(key)
     setTranslationStartedAt(prev => {
       const next = { ...prev }
       delete next[key]
@@ -4876,6 +4964,8 @@ export function PapersView({
   useEffect(() => () => {
     for (const controller of translationControllersRef.current.values()) controller.abort()
     translationControllersRef.current.clear()
+    for (const timer of translationProgressTimersRef.current.values()) window.clearInterval(timer)
+    translationProgressTimersRef.current.clear()
   }, [])
 
   /** 菜单「AI 摘要」与徽章共用同一条链路。 */
@@ -4883,9 +4973,9 @@ export function PapersView({
     startSummarize(paper)
   }
 
-  /** 菜单「一键全本翻译」与徽章共用同一条链路，同样会显示「翻译中」。 */
+  /** 菜单「一键全本翻译」/「重新翻译全文」；已翻译时显式重跑才允许绕过缓存。 */
   const translateWholeFromMenu = (paper: PaperRecord): void => {
-    startTranslate(paper)
+    startTranslate(paper, extraOf(paper).translatedAt !== undefined)
   }
 
   const removeEntry = (paper: PaperRecord): void => {
@@ -5644,14 +5734,29 @@ export function PapersView({
                 const key = paperKey(paper)
                 const startedAt = translationStartedAt[key] ?? translationClock
                 const seconds = Math.max(0, Math.floor((translationClock - startedAt) / 1000))
+                const progress = translationProgress[key]
+                const percent = progress?.percent ?? null
+                const rawPhase = progress?.phase?.trim() || ''
+                const phase = rawPhase === '' || rawPhase === 'preparing' || rawPhase === 'translating'
+                  ? t('papers.translationRunning')
+                  : rawPhase
                 return (
                   <div key={key} className={css.translationProgressItem}>
                     <div className={css.translationProgressHead}>
                       <strong title={paper.title}>{paper.title}</strong>
-                      <span>{t('papers.translationRunning')} · {t('papers.translationElapsed', { seconds })}</span>
+                      <span>
+                        {phase}
+                        {percent !== null ? ` ${percent}%` : ''}
+                        {' · '}
+                        {t('papers.translationElapsed', { seconds })}
+                      </span>
                     </div>
                     <div className={css.translationProgressTrack} aria-hidden="true">
-                      <span className={css.translationProgressBar} />
+                      <span
+                        className={css.translationProgressBar}
+                        data-determinate={percent !== null || undefined}
+                        style={percent !== null ? { width: `${percent}%` } : undefined}
+                      />
                     </div>
                     <button
                       type="button"
@@ -5667,14 +5772,16 @@ export function PapersView({
                 <div className={css.translationNotice} data-status={translationNotice.status}>
                   <div className={css.translationNoticeText}>
                     <strong>{translationNotice.title}</strong>
-                    <span>{t('papers.translationCancelled')}</span>
+                    <span>{t(translationNotice.status === 'cached'
+                      ? 'papers.translationCached'
+                      : 'papers.translationCancelled')}</span>
                   </div>
                   <div className={css.translationNoticeActions}>
                     {noticePaper !== undefined && (
                       <button
                         type="button"
                         className={css.translationCancelButton}
-                        onClick={() => { startTranslate(noticePaper) }}
+                        onClick={() => { startTranslate(noticePaper, true) }}
                       >
                         {t('papers.restartTranslation')}
                       </button>
@@ -5827,7 +5934,9 @@ export function PapersView({
                                 className={css.papersMenuItem}
                                 onClick={() => { translateWholeFromMenu(paper) }}
                               >
-                                {t('papers.translateWhole')}
+                                {t(extraOf(paper).translatedAt === undefined
+                                  ? 'papers.translateWhole'
+                                  : 'papers.retranslateWhole')}
                               </button>
                               <button
                                 type="button"

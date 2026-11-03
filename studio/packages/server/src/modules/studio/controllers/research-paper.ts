@@ -22,6 +22,13 @@ import { extractFigureRefs } from '../services/research/caption-index'
 import { importPaperFromPdf } from '../services/research/intake'
 import { isResearchCollection, readStore, researchRoot, updateStore } from '../services/research/store'
 import { translatePdf, variantPdfPathFor, type PdfVariant } from '../services/research/translate-pdf'
+import {
+  beginTranslationJob,
+  finishTranslationJob,
+  getTranslationJob,
+  translationJobKey,
+  updateTranslationJob,
+} from '../services/research/translation-progress'
 import { resolveLlmTarget } from '../services/research/llm'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -341,6 +348,10 @@ export async function translatePaperPdfHandler(ctx: any) {
   const requested = String(ctx.query?.variant ?? 'compare').trim()
   const variant: PdfVariant = requested === 'mono' || requested === 'dual' ? requested : 'compare'
   const target = variantPdfPathFor(source, outDir, variant)
+  const jobKey = translationJobKey(String(profile || 'default'), paper.id || paper.arxivId || paperId, variant)
+  if (beginTranslationJob(jobKey) === null) {
+    return fail(ctx, 409, '这篇文献正在翻译中', 'translation_in_progress')
+  }
   const abort = new AbortController()
   const onRequestAborted = (): void => { abort.abort() }
   const onResponseClosed = (): void => {
@@ -364,12 +375,24 @@ export async function translatePaperPdfHandler(ctx: any) {
       const model = llm !== null && llm.apiKey !== ''
         ? { baseUrl: llm.baseUrl, apiKey: llm.apiKey, model: llm.model }
         : undefined
+      updateTranslationJob(jobKey, { phase: 'translating' })
       await translatePdf(source, outDir, variant, {
         ...(model === undefined ? {} : { model }),
         signal: abort.signal,
+        onProgress: progress => {
+          updateTranslationJob(jobKey, {
+            phase: progress.phase,
+            current: progress.current,
+            total: progress.total,
+            percent: progress.percent,
+          })
+        },
       })
     }
-    if (abort.signal.aborted) return
+    if (abort.signal.aborted) {
+      finishTranslationJob(jobKey, 'cancelled')
+      return
+    }
     const bytes = await fs.readFile(target)
     // 记下翻译时间：卡片据此显示「已翻译」徽章，菜单也能避免重复翻译。
     await updateStore(profile, 'papers.translated', draft => {
@@ -394,20 +417,38 @@ export async function translatePaperPdfHandler(ctx: any) {
       ctx.body = JSON.stringify(responseFormat === 'json'
         ? { ok: true, variant }
         : { ok: true, variant, base64: bytes.toString('base64') })
+      finishTranslationJob(jobKey, 'done')
       return
     }
     ctx.set('Content-Type', 'application/pdf')
     ctx.set('Cache-Control', 'no-store')
     ctx.body = bytes
+    finishTranslationJob(jobKey, 'done')
   } catch (error: any) {
     // The reader already disconnected; there is no response to write. Keep any
     // earlier completed translation on disk instead of deleting it.
-    if (abort.signal.aborted || /translation_aborted/.test(String(error?.message || ''))) return
+    if (abort.signal.aborted || /translation_aborted/.test(String(error?.message || ''))) {
+      finishTranslationJob(jobKey, 'cancelled')
+      return
+    }
+    finishTranslationJob(jobKey, 'error', String(error?.message || error))
     return fail(ctx, 500, String(error?.message || '整篇翻译失败'), 'translate_pdf_failed')
   } finally {
     ctx.req?.removeListener('aborted', onRequestAborted)
     ctx.res?.removeListener('close', onResponseClosed)
   }
+}
+
+/** GET `/api/studio/research/papers/:id/translate-status?variant=...` */
+export async function translatePaperStatusHandler(ctx: any) {
+  const paperId = String(ctx.params.id || '').trim()
+  if (paperId === '') return fail(ctx, 400, '缺少论文 id')
+  const variant: PdfVariant = ['mono', 'dual', 'compare'].includes(String(ctx.query?.variant))
+    ? String(ctx.query.variant) as PdfVariant
+    : 'compare'
+  const job = getTranslationJob(translationJobKey(String(profileOf(ctx) || 'default'), paperId, variant))
+  ctx.set('Cache-Control', 'no-store')
+  ctx.body = { ok: true, job }
 }
 
 /**

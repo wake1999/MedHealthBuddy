@@ -5,7 +5,7 @@ import type { Context } from 'koa'
 import cors from '@koa/cors'
 import serve from 'koa-static'
 import send from 'koa-send'
-import { dirname, relative, resolve } from 'path'
+import { basename, dirname, relative, resolve } from 'path'
 import { mkdir } from 'fs/promises'
 import { createReadStream, existsSync, readFileSync, statSync } from 'fs'
 import { config, shouldCreateWebUiDataDir } from '../modules/studio/public/config'
@@ -568,17 +568,26 @@ export async function bootstrap() {
 
   // Translation runtime plugin download. Kept outside dist/client so a rebuild
   // does not delete a several-hundred-MB archive.
-  const translationPluginPath = process.env.MHB_TRANSLATION_PLUGIN_FILE
-    || '/opt/ekko-downloads/translation-runtime-win-x64.tar.gz'
+  const translationPluginDir = dirname(process.env.MHB_TRANSLATION_PLUGIN_FILE
+    || '/opt/ekko-downloads/translation-runtime-win-x64.tar.gz')
+  const translationPluginNames = new Set([
+    'translation-runtime-win-x64.tar.gz',
+    'translation-runtime-linux-x64.tar.gz',
+  ])
   app.use(async (ctx, next) => {
-    if (ctx.method === 'GET' && ctx.path === '/downloads/translation-runtime-win-x64.tar.gz'
-      && existsSync(translationPluginPath)) {
-      const size = statSync(translationPluginPath).size
+    const name = basename(ctx.path)
+    const file = resolve(translationPluginDir, name)
+    if ((ctx.method === 'GET' || ctx.method === 'HEAD')
+      && ctx.path.startsWith('/downloads/translation-runtime-')
+      && translationPluginNames.has(name)
+      && existsSync(file)) {
+      const size = statSync(file).size
       ctx.set('Content-Type', 'application/gzip')
       ctx.set('Content-Length', String(size))
-      ctx.set('Content-Disposition', 'attachment; filename="translation-runtime-win-x64.tar.gz"')
+      ctx.set('Content-Disposition', `attachment; filename="${name}"`)
       ctx.set('Cache-Control', 'public, max-age=3600')
-      ctx.body = createReadStream(translationPluginPath)
+      if (ctx.method === 'GET') ctx.body = createReadStream(file)
+      else ctx.status = 200
       return
     }
     await next()

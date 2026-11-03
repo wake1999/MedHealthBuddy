@@ -364,18 +364,16 @@ export async function translatePaperPdfHandler(ctx: any) {
   ctx.res?.once('close', onResponseClosed)
 
   try {
-    // Windows installs get a self-contained translation runtime on first use.
-    // Linux/remote hosts use the runtime supplied by the deployment.
-    if (process.platform === 'win32') {
-      updateTranslationJob(jobKey, { phase: 'installing-runtime' })
-      await ensureTranslationRuntime((progress) => {
-        updateTranslationJob(jobKey, {
-          phase: `installing-runtime:${progress.phase}`,
-          percent: progress.percent,
-        })
+    // Both desktop and web deployments get a self-contained translation
+    // runtime on first use. A deployment-provided runtime short-circuits this.
+    updateTranslationJob(jobKey, { phase: 'installing-runtime' })
+    await ensureTranslationRuntime((progress) => {
+      updateTranslationJob(jobKey, {
+        phase: `installing-runtime:${progress.phase}`,
+        percent: progress.percent,
       })
-      updateTranslationJob(jobKey, { phase: 'translating' })
-    }
+    })
+    updateTranslationJob(jobKey, { phase: 'translating' })
     // Reuse a cached translation when it is at least as new as the source.
     const [sourceStat, targetStat] = await Promise.all([
       fs.stat(source),

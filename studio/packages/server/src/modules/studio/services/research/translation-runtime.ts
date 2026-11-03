@@ -13,8 +13,16 @@ import { createWriteStream } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const DEFAULT_PLUGIN_URL = 'http://36.140.151.191:8648/downloads/translation-runtime-win-x64.tar.gz'
-const DEFAULT_PLUGIN_SHA256 = '4c9c6b172f34f49ea7158e65f3258c9d74219d518a645f1bad4b75196915a952'
+const PLUGIN_DEFAULTS: Record<string, { url: string; sha256: string }> = {
+  'win-x64': {
+    url: 'http://36.140.151.191:8648/downloads/translation-runtime-win-x64.tar.gz',
+    sha256: '4c9c6b172f34f49ea7158e65f3258c9d74219d518a645f1bad4b75196915a952',
+  },
+  'linux-x64': {
+    url: 'http://36.140.151.191:8648/downloads/translation-runtime-linux-x64.tar.gz',
+    sha256: '1f7ccbb9abc9dcd0c3ecba18241393b6d8f0f982971e0adb229731811f12f34f',
+  },
+}
 const INSTALL_LOCK_WAIT_MS = 30_000
 
 function platformKey(): string {
@@ -172,14 +180,13 @@ export async function ensureTranslationRuntime(
 ): Promise<TranslationRuntimeHealth> {
   const current = await translationRuntimeHealth()
   if (current.installed) return current
-  if (process.platform !== 'win32') {
-    throw new Error('translation_runtime_unavailable: install pdf2zh/babeldoc on this host')
-  }
   if (installPromise !== null) return installPromise
 
   installPromise = (async () => {
-    const url = (process.env.MHB_TRANSLATION_PLUGIN_URL || DEFAULT_PLUGIN_URL).trim()
-    const expectedSha = (process.env.MHB_TRANSLATION_PLUGIN_SHA256 || DEFAULT_PLUGIN_SHA256).trim().toLowerCase()
+    const defaults = PLUGIN_DEFAULTS[platformKey()]
+    if (defaults === undefined) throw new Error('translation_runtime_platform_unsupported')
+    const url = (process.env.MHB_TRANSLATION_PLUGIN_URL || defaults.url).trim()
+    const expectedSha = (process.env.MHB_TRANSLATION_PLUGIN_SHA256 || defaults.sha256).trim().toLowerCase()
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mhb-translation-plugin-'))
     const archive = path.join(tempDir, 'runtime.tar.gz')
     const extracted = path.join(tempDir, 'extracted')
@@ -197,6 +204,10 @@ export async function ensureTranslationRuntime(
       await fs.mkdir(targetRoot, { recursive: true })
       // Extraction contains the runtime files at its root.
       await fs.cp(extracted, targetRoot, { recursive: true, force: true })
+      if (process.platform !== 'win32') {
+        await fs.chmod(binaries.pdf2zh, 0o755).catch(() => null)
+        await fs.chmod(binaries.python, 0o755).catch(() => null)
+      }
       onProgress?.({ phase: 'validating', percent: 100, message: 'Checking translation plugin' })
       const health = await translationRuntimeHealth()
       if (!health.installed) throw new Error(`plugin_validation_failed: ${health.error}`)

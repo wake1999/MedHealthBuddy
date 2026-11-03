@@ -18,13 +18,22 @@ export function packNpmReleases(rootDir, outputDir, npmCli = process.env.npm_exe
   const stagingRoot = mkdtempSync(join(tmpdir(), 'ekko-npm-releases-'))
   try {
     const packages = []
-    for (const name of ['ekko-studio', 'hermes-web-ui']) {
+    for (const name of ['ekko-studio', 'hermes-web-ui', 'medhealthbuddy', 'medhealthbuddy-webui']) {
       const staging = join(stagingRoot, name)
       mkdirSync(staging)
       for (const path of ['bin', 'dist', 'README.md', 'LICENSE']) {
         cpSync(join(rootDir, path), join(staging, path), { recursive: true })
       }
-      writeFileSync(join(staging, 'package.json'), `${JSON.stringify({ ...pkg, name }, null, 2)}\n`)
+      const branded = name.startsWith('medhealthbuddy')
+      writeFileSync(join(staging, 'package.json'), `${JSON.stringify({
+        ...pkg,
+        name,
+        ...(branded ? {
+          description: 'MedHealthBuddy WebUI: a local-first AI research workspace.',
+          repository: { type: 'git', url: 'https://github.com/wake1999/MHB-Studio.git' },
+          homepage: 'https://github.com/wake1999/MHB-Studio',
+        } : {}),
+      }, null, 2)}\n`)
       const [packed] = JSON.parse(execFileSync(process.execPath, [npmCli, 'pack', '--ignore-scripts', '--json',
         '--pack-destination', resolve(outputDir)], { cwd: staging, encoding: 'utf8' }))
       const files = new Set(packed.files.map(file => file.path))

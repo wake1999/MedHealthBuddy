@@ -13,7 +13,11 @@ const pkgDir = resolve(__dirname, '..')
 const pkg = JSON.parse(readFileSync(resolve(pkgDir, 'package.json'), 'utf-8'))
 const VERSION = pkg.version
 const PACKAGE_NAME = pkg.name
-const CLI_NAME = PACKAGE_NAME === 'ekko-studio' ? 'ekko-studio-web' : 'hermes-web-ui'
+const CLI_NAME = PACKAGE_NAME === 'ekko-studio'
+  ? 'ekko-studio-web'
+  : PACKAGE_NAME.startsWith('medhealthbuddy')
+    ? 'medhealthbuddy-webui'
+    : 'hermes-web-ui'
 const WEB_UI_HOME = process.env.HERMES_WEB_UI_HOME?.trim()
   ? resolve(process.env.HERMES_WEB_UI_HOME.trim())
   : resolve(homedir(), '.hermes-web-ui')
@@ -423,7 +427,15 @@ function startDaemon(port) {
 
   const logStream = openSync(LOG_FILE, 'a')
   const windowsShell = process.platform === 'win32' ? getWindowsShell() : null
-  const serverEnv = { ...process.env, NODE_ENV: 'production', PORT: String(port), AUTH_TOKEN: token }
+  const serverEnv = {
+    ...process.env,
+    NODE_ENV: 'production',
+    PORT: String(port),
+    AUTH_TOKEN: token,
+    // npm installs do not carry the 858MB offline runtime archives; allow the
+    // managed plugin to be fetched on first translation.
+    MHB_TRANSLATION_PLUGIN_ALLOW_DOWNLOAD: process.env.MHB_TRANSLATION_PLUGIN_ALLOW_DOWNLOAD || '1',
+  }
   if (windowsShell) {
     serverEnv.SHELL = serverEnv.SHELL?.trim() || windowsShell
     serverEnv.ComSpec = serverEnv.ComSpec?.trim() || windowsShell
@@ -730,6 +742,7 @@ Options:
         ...process.env,
         NODE_ENV: 'production',
         PORT: String(port),
+        MHB_TRANSLATION_PLUGIN_ALLOW_DOWNLOAD: process.env.MHB_TRANSLATION_PLUGIN_ALLOW_DOWNLOAD || '1',
       }
       if (windowsShell) {
         serverEnv.SHELL = serverEnv.SHELL?.trim() || windowsShell
@@ -748,7 +761,7 @@ Options:
 }
 
 function doUpdate() {
-  if (!['ekko-studio', 'hermes-web-ui'].includes(PACKAGE_NAME)) {
+  if (!['ekko-studio', 'hermes-web-ui', 'medhealthbuddy', 'medhealthbuddy-webui'].includes(PACKAGE_NAME)) {
     throw new Error(`Unsupported Studio npm package: ${PACKAGE_NAME}`)
   }
   console.log(`  ⬆ Updating ${PACKAGE_NAME}...`)

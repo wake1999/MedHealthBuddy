@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { packNpmReleases } from './pack-npm-releases.mjs'
 
-const packageNames = ['ekko-studio', 'hermes-web-ui']
+const packageNames = ['ekko-studio', 'hermes-web-ui', 'medhealthbuddy', 'medhealthbuddy-webui']
 
 export function parsePublishOptions(args) {
   const options = { dryRun: false, help: false, packageName: null, tag: null }
@@ -65,7 +65,7 @@ if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
   try {
     const options = parsePublishOptions(process.argv.slice(2))
     if (options.help) {
-      console.log('Usage: npm run publish:npm -- [--dry-run] [--package ekko-studio|hermes-web-ui] [--tag latest|next|...]')
+      console.log('Usage: npm run publish:npm -- [--dry-run] [--package ekko-studio|hermes-web-ui|medhealthbuddy|medhealthbuddy-webui] [--tag latest|next|...]')
       console.log('Build once, pack both names, and publish using your local npm login. Does not change the version.')
       console.log('--dry-run builds and packs, then prints publish commands without executing them.')
     } else {

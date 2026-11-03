@@ -18,3 +18,8 @@ promo-video/
 # Desktop installer output: local build artifacts, never deploy them.
 studio/packages/desktop/release/
 studio/packages/desktop/release-*/
+
+# Translation runtime archives are bundled into the offline installer, but
+# must never be committed or uploaded by the source deploy script.
+studio/packages/desktop/translation-runtime/
+.translation-plugin-build/

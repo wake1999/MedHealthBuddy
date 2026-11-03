@@ -730,6 +730,10 @@ export async function startWebUiServer(port = DEFAULT_PORT): Promise<string> {
     HERMES_HOME: agentHome,
     HERMES_WEB_UI_HOME: home,
     HERMES_WEBUI_STATE_DIR: home,
+    MHB_TRANSLATION_PLUGIN_BUNDLE_DIR: join(
+      app.isPackaged ? process.resourcesPath : app.getAppPath(),
+      'translation-runtime',
+    ),
     AUTH_TOKEN: token,
     PORT: String(port),
     // The selected Hermes/Python pair is first. Bundled auxiliary tools remain

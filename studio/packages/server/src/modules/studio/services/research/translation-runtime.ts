@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
-import { createWriteStream } from 'node:fs'
+import { createReadStream, createWriteStream } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -125,6 +125,23 @@ export interface TranslationRuntimeProgress {
 
 let installPromise: Promise<TranslationRuntimeHealth> | null = null
 
+function bundledArchiveDir(): string {
+  const dir = (process.env.MHB_TRANSLATION_PLUGIN_BUNDLE_DIR || '').trim()
+  return dir === '' ? '' : path.resolve(dir)
+}
+
+function bundledArchivePath(): string {
+  const dir = bundledArchiveDir()
+  if (dir === '') return ''
+  return path.join(dir, `translation-runtime-${platformKey()}.tar.gz`)
+}
+
+async function hashFile(file: string): Promise<string> {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer)
+  return hash.digest('hex')
+}
+
 async function download(url: string, target: string, onProgress?: (p: TranslationRuntimeProgress) => void): Promise<string> {
   const response = await fetch(url, { redirect: 'follow' })
   if (!response.ok || response.body === null) throw new Error(`plugin_download_http_${response.status}`)
@@ -185,18 +202,27 @@ export async function ensureTranslationRuntime(
   installPromise = (async () => {
     const defaults = PLUGIN_DEFAULTS[platformKey()]
     if (defaults === undefined) throw new Error('translation_runtime_platform_unsupported')
-    const url = (process.env.MHB_TRANSLATION_PLUGIN_URL || defaults.url).trim()
+    const allowDownload = ['1', 'true', 'on', 'yes'].includes(
+      (process.env.MHB_TRANSLATION_PLUGIN_ALLOW_DOWNLOAD || '').trim().toLowerCase(),
+    )
     const expectedSha = (process.env.MHB_TRANSLATION_PLUGIN_SHA256 || defaults.sha256).trim().toLowerCase()
+    const bundled = bundledArchivePath()
+    const useBundled = bundled !== '' && await fileExists(bundled)
+    if (!useBundled && !allowDownload) {
+      throw new Error(`translation_plugin_bundle_missing: ${path.basename(bundled || 'translation-runtime')}`)
+    }
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mhb-translation-plugin-'))
-    const archive = path.join(tempDir, 'runtime.tar.gz')
+    const archive = useBundled ? bundled : path.join(tempDir, 'runtime.tar.gz')
     const extracted = path.join(tempDir, 'extracted')
     try {
       await fs.mkdir(extracted)
-      const actualSha = await download(url, archive, onProgress)
+      const actualSha = useBundled
+        ? await hashFile(archive)
+        : await download((process.env.MHB_TRANSLATION_PLUGIN_URL || defaults.url).trim(), archive, onProgress)
       if (expectedSha !== '' && actualSha !== expectedSha) {
         throw new Error(`plugin_checksum_mismatch: expected ${expectedSha}, got ${actualSha}`)
       }
-      onProgress?.({ phase: 'extracting', percent: 99, message: 'Extracting translation plugin' })
+      onProgress?.({ phase: 'extracting', percent: useBundled ? 0 : 99, message: 'Extracting translation plugin' })
       await extractArchive(archive, extracted)
       const binaries = translationRuntimeBinaries()
       const targetRoot = path.dirname(binaries.pdf2zh)

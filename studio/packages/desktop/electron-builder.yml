@@ -76,6 +76,10 @@ extraResources:
       - "!node-pty/build/**"
       - "node-pty/build/Release/pty.node"
       - "!**/*.md"
+  # Fully offline translation runtimes. Both platform archives are bundled so
+  # the desktop and both web deployments never download Python/pdf2zh.
+  - from: "translation-runtime"
+    to: "translation-runtime"
 
 asarUnpack:
   - "**/*.node"

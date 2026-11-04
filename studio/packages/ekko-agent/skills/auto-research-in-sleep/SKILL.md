@@ -77,14 +77,16 @@ Hypothesis and plan are artifacts, not free-form chat. Define a metric contract
 in `experiment-plan`, for example:
 
 ```text
-metricSchema: "F1:max:required:0.85, Acc:max:required:0.80, Loss:min:optional:0.2"
+metricSchema: "F1:max:required:0.85:0.83:0.01, Loss:min:optional:0.2"
 ```
 
-The fourth field is a target. A result write-back must include the outcome
-(`supported|contradicted|mixed|inconclusive`), summary, required metrics, and
-`confirmedFinal: true`; the server adds a linked evidence row and claim and
-rejects missing required metrics. When targets are present the server suggests
-an automatic outcome; overriding that outcome requires `overrideReason`. `refresh-experiment` also returns
+Fields are `name:direction:required:target:baseline:minDelta`; later fields are
+optional. A result write-back must include the outcome
+(`supported|contradicted|mixed|inconclusive`), summary, required metric samples,
+and `confirmedFinal: true`. The server computes mean/std/95% CI/delta, rejects
+missing required metrics, and suggests an outcome from targets and baselines;
+overriding that outcome requires `overrideReason`. A single sample cannot prove
+significance; provide multiple seeds when making a significance claim. `refresh-experiment` also returns
 `insight.metrics` and `insight.failureClass` parsed from the job log; treat them
 as a preview, not as a verdict. Never approve the evidence gate or invent a
 result yourself.

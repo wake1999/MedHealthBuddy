@@ -411,6 +411,22 @@ export interface ResearchMetricSpec {
   required: boolean
   /** Optional target; when present the server can suggest an outcome. */
   target?: number
+  /** Optional baseline value for a delta gate. */
+  baseline?: number
+  /** Minimum improvement over the baseline (absolute units). */
+  minDelta?: number
+}
+
+export interface ResearchMetricStats {
+  name: string
+  n: number
+  mean: number
+  std: number
+  ciLow: number | null
+  ciHigh: number | null
+  baseline: number | null
+  delta: number | null
+  significant: boolean | null
 }
 
 export interface ResearchRunExperimentPlan {
@@ -434,6 +450,7 @@ export interface ResearchRunResult {
   confirmedFinal: boolean
   autoOutcome: 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
   overrideReason: string
+  metricStats: ResearchMetricStats[]
   at: number
 }
 

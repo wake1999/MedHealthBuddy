@@ -10752,6 +10752,21 @@ button.paperNoteBlockMeta:hover {
   font-size: 11px;
 }
 
+.runsMetricStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.runsMetricStats span {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgb(80 130 90 / 8%);
+  color: #3f7049;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
 .runsResultForm {
   display: flex;
   flex-direction: column;

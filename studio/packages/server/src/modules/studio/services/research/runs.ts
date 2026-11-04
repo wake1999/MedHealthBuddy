@@ -1,4 +1,4 @@
-import { assessMetricOutcome, inspectExperimentLog, parseMetricSchema, parseMetricValues } from './experiment-log'
+import { assessMetricOutcome, inspectExperimentLog, parseMetricSchema, parseMetricValues, summarizeMetricSamples } from './experiment-log'
 import { jobState, submitJob } from './ssh'
 import {
   newId,
@@ -71,6 +71,7 @@ export interface ResultInput {
   summary?: string
   metrics?: string
   metricValues?: Record<string, number>
+  metricSamples?: Record<string, number[]>
   confirmedFinal?: boolean
   overrideReason?: string
   confidence?: number
@@ -542,12 +543,22 @@ export async function recordExperimentResult(profile: string, runId: string, inp
     const metricValues = input.metricValues && typeof input.metricValues === 'object'
       ? input.metricValues
       : parseMetricValues(clean(input.metrics, 4000))
+    const rawSamples = input.metricSamples && typeof input.metricSamples === 'object'
+      ? input.metricSamples
+      : Object.fromEntries(Object.entries(metricValues).map(([name, value]) => [name, [value]]))
+    const metricSamples: Record<string, number[]> = {}
+    for (const [name, values] of Object.entries(rawSamples)) {
+      if (!Array.isArray(values)) continue
+      const cleanValues = values.map(Number).filter(value => Number.isFinite(value))
+      if (cleanValues.length > 0) metricSamples[name.toLowerCase()] = cleanValues
+    }
     const schema = run.experimentPlan?.metricSchema || []
     const missing = schema
-      .filter(spec => spec.required && !(spec.name.toLowerCase() in metricValues))
+      .filter(spec => spec.required && !(spec.name.toLowerCase() in metricSamples))
       .map(spec => spec.name)
     if (missing.length > 0) throw new Error(`research_result_missing_metrics:${missing.join(',')}`)
-    const autoOutcome = assessMetricOutcome(schema, metricValues)
+    const metricStats = summarizeMetricSamples(schema, metricSamples)
+    const autoOutcome = assessMetricOutcome(schema, metricSamples)
     const outcome = ['supported', 'contradicted', 'mixed', 'inconclusive'].includes(input.outcome || '')
       ? (input.outcome as ResearchRunResult['outcome'])
       : autoOutcome
@@ -584,9 +595,9 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       createdAt: now,
       updatedAt: now,
     })
-    const metricText = Object.entries(metricValues)
-      .map(([name, value]) => `${name}=${value}`)
-      .join(', ')
+    const metricText = metricStats.length > 0
+      ? metricStats.map(stat => `${stat.name}=${stat.mean.toFixed(4)}±${stat.std.toFixed(4)} (n=${stat.n})`).join(', ')
+      : Object.entries(metricValues).map(([name, value]) => `${name}=${value}`).join(', ')
     run.result = {
       outcome,
       summary,
@@ -595,6 +606,7 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       confirmedFinal: true,
       autoOutcome,
       overrideReason,
+      metricStats,
       at: now,
     }
     run.stage = 'analysis'

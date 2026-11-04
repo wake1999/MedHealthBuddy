@@ -101,29 +101,104 @@ export function parseMetricSchema(text: string): ResearchMetricSpec[] {
     const direction = parts[1] === 'min' || parts[1] === 'none' ? parts[1] : 'max'
     const required = parts[2] === 'optional' ? false : true
     const target = parts[3] !== undefined && Number.isFinite(Number(parts[3])) ? Number(parts[3]) : undefined
-    out.push({ name, direction, required, ...(target === undefined ? {} : { target }) })
+    const baseline = parts[4] !== undefined && Number.isFinite(Number(parts[4])) ? Number(parts[4]) : undefined
+    const minDelta = parts[5] !== undefined && Number.isFinite(Number(parts[5])) ? Number(parts[5]) : undefined
+    out.push({
+      name,
+      direction,
+      required,
+      ...(target === undefined ? {} : { target }),
+      ...(baseline === undefined ? {} : { baseline }),
+      ...(minDelta === undefined ? {} : { minDelta }),
+    })
   }
   return out.slice(0, 24)
 }
 
 export type MetricVerdict = 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
 
+function statsForSamples(
+  spec: ResearchMetricSpec,
+  samples: number[],
+): {
+  name: string
+  n: number
+  mean: number
+  std: number
+  ciLow: number | null
+  ciHigh: number | null
+  baseline: number | null
+  delta: number | null
+  significant: boolean | null
+} {
+  const n = samples.length
+  const mean = samples.reduce((sum, value) => sum + value, 0) / n
+  const variance = n > 1
+    ? samples.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (n - 1)
+    : 0
+  const std = Math.sqrt(Math.max(0, variance))
+  const half = n > 1 ? 1.96 * std / Math.sqrt(n) : null
+  const baseline = spec.baseline === undefined ? null : spec.baseline
+  const delta = baseline === null ? null : spec.direction === 'min' ? baseline - mean : mean - baseline
+  const significant = baseline === null || n < 2 || half === null
+    ? null
+    : spec.direction === 'min'
+      ? mean + half < baseline
+      : mean - half > baseline
+  return {
+    name: spec.name,
+    n,
+    mean,
+    std,
+    ciLow: half === null ? null : mean - half,
+    ciHigh: half === null ? null : mean + half,
+    baseline,
+    delta,
+    significant,
+  }
+}
+
+/** Compute mean/std/CI/delta for every metric with samples. */
+export function summarizeMetricSamples(
+  schema: ResearchMetricSpec[],
+  samples: Record<string, number[]>,
+): ReturnType<typeof statsForSamples>[] {
+  return schema
+    .filter(spec => Array.isArray(samples[spec.name.toLowerCase()]) && samples[spec.name.toLowerCase()].length > 0)
+    .map(spec => statsForSamples(spec, samples[spec.name.toLowerCase()]))
+}
+
 /**
- * Compare required metric values against their targets.
- * No targets means the system must not pretend to know the answer.
+ * Compare required metric samples against targets, baseline deltas, and
+ * approximate 95% confidence intervals. One sample cannot prove significance;
+ * target/delta checks still apply, while the significance check only runs when
+ * at least two samples exist.
  */
 export function assessMetricOutcome(
   schema: ResearchMetricSpec[],
-  values: Record<string, number>,
+  samples: Record<string, number[]>,
 ): MetricVerdict {
-  const decisive = schema.filter(spec => spec.required && spec.target !== undefined && spec.direction !== 'none')
+  const decisive = schema.filter(spec =>
+    spec.required
+    && spec.direction !== 'none'
+    && (spec.target !== undefined || (spec.baseline !== undefined && spec.minDelta !== undefined)),
+  )
   if (decisive.length === 0) return 'inconclusive'
   let pass = 0
   let fail = 0
   for (const spec of decisive) {
-    const value = values[spec.name.toLowerCase()]
-    if (value === undefined || !Number.isFinite(value)) return 'inconclusive'
-    const ok = spec.direction === 'max' ? value >= Number(spec.target) : value <= Number(spec.target)
+    const values = samples[spec.name.toLowerCase()]
+    if (!Array.isArray(values) || values.length === 0) return 'inconclusive'
+    const stat = statsForSamples(spec, values)
+    let ok = true
+    if (spec.target !== undefined) {
+      ok = spec.direction === 'max' ? stat.mean >= spec.target : stat.mean <= spec.target
+    }
+    if (ok && spec.baseline !== undefined && spec.minDelta !== undefined) {
+      const delta = spec.direction === 'max' ? stat.mean - spec.baseline : spec.baseline - stat.mean
+      ok = delta >= spec.minDelta
+    }
+    if (ok && stat.significant === false) ok = false
     if (ok) pass += 1
     else fail += 1
   }

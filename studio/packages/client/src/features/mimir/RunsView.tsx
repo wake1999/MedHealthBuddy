@@ -47,6 +47,20 @@ interface RunMetricSpec {
   direction: 'max' | 'min' | 'none'
   required: boolean
   target?: number
+  baseline?: number
+  minDelta?: number
+}
+
+interface RunMetricStats {
+  name: string
+  n: number
+  mean: number
+  std: number
+  ciLow: number | null
+  ciHigh: number | null
+  baseline: number | null
+  delta: number | null
+  significant: boolean | null
 }
 
 interface RunExperimentPlan {
@@ -69,6 +83,7 @@ interface RunResult {
   confirmedFinal?: boolean
   autoOutcome?: RunResult['outcome']
   overrideReason?: string
+  metricStats?: RunMetricStats[]
 }
 
 interface RunJobInsight {
@@ -145,18 +160,74 @@ function parseMetricValuesClient(text: string): Record<string, number> {
   return values
 }
 
-function assessMetricOutcomeClient(
+function parseMetricSamplesClient(text: string): Record<string, number[]> {
+  const samples: Record<string, number[]> = {}
+  const pattern = /(?:^|[\s,;])([A-Za-z][A-Za-z0-9 _./-]{0,40})\s*[:=]\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?%?)/g
+  for (const match of text.matchAll(pattern)) {
+    const name = match[1].trim().replace(/\s+/g, ' ').toLowerCase()
+    const value = Number(match[2].replace(/%$/, ''))
+    if (name === '' || !Number.isFinite(value)) continue
+    samples[name] = [...(samples[name] || []), value]
+  }
+  return samples
+}
+
+function summarizeMetricSamplesClient(
   schema: RunMetricSpec[],
-  values: Record<string, number>,
+  samples: Record<string, number[]>,
+): RunMetricStats[] {
+  return schema
+    .filter(spec => Array.isArray(samples[spec.name.toLowerCase()]) && samples[spec.name.toLowerCase()].length > 0)
+    .map((spec) => {
+      const values = samples[spec.name.toLowerCase()]
+      const n = values.length
+      const mean = values.reduce((sum, value) => sum + value, 0) / n
+      const variance = n > 1 ? values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (n - 1) : 0
+      const std = Math.sqrt(Math.max(0, variance))
+      const half = n > 1 ? 1.96 * std / Math.sqrt(n) : null
+      const baseline = spec.baseline === undefined ? null : spec.baseline
+      const delta = baseline === null ? null : spec.direction === 'min' ? baseline - mean : mean - baseline
+      const significant = baseline === null || n < 2 || half === null
+        ? null
+        : spec.direction === 'min' ? mean + half < baseline : mean - half > baseline
+      return {
+        name: spec.name,
+        n,
+        mean,
+        std,
+        ciLow: half === null ? null : mean - half,
+        ciHigh: half === null ? null : mean + half,
+        baseline,
+        delta,
+        significant,
+      }
+    })
+}
+
+function assessMetricSamplesClient(
+  schema: RunMetricSpec[],
+  samples: Record<string, number[]>,
 ): RunResult['outcome'] {
-  const decisive = schema.filter(spec => spec.required && spec.target !== undefined && spec.direction !== 'none')
+  const decisive = schema.filter(spec =>
+    spec.required
+    && spec.direction !== 'none'
+    && (spec.target !== undefined || (spec.baseline !== undefined && spec.minDelta !== undefined)),
+  )
   if (decisive.length === 0) return 'inconclusive'
   let pass = 0
   let fail = 0
   for (const spec of decisive) {
-    const value = values[spec.name.toLowerCase()]
-    if (value === undefined || !Number.isFinite(value)) return 'inconclusive'
-    const ok = spec.direction === 'max' ? value >= Number(spec.target) : value <= Number(spec.target)
+    const values = samples[spec.name.toLowerCase()]
+    if (!Array.isArray(values) || values.length === 0) return 'inconclusive'
+    const stat = summarizeMetricSamplesClient([spec], samples)[0]
+    let ok = true
+    if (spec.target !== undefined) {
+      ok = spec.direction === 'max' ? stat.mean >= spec.target : stat.mean <= spec.target
+    }
+    if (ok && spec.baseline !== undefined && spec.minDelta !== undefined) {
+      ok = (stat.delta ?? -Infinity) >= spec.minDelta
+    }
+    if (ok && stat.significant === false) ok = false
     if (ok) pass += 1
     else fail += 1
   }
@@ -243,10 +314,10 @@ export function RunsView({
   const selected = runs.find(run => run.id === selectedId) || null
   const stageIndex = selected ? STAGES.indexOf(selected.stage) : 0
   const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
-  const autoVerdict = assessMetricOutcomeClient(
-    selected?.experimentPlan?.metricSchema || [],
-    parseMetricValuesClient(resultDraft.metrics),
-  )
+  const resultSchema = selected?.experimentPlan?.metricSchema || []
+  const resultSamples = parseMetricSamplesClient(resultDraft.metrics)
+  const resultStats = summarizeMetricSamplesClient(resultSchema, resultSamples)
+  const autoVerdict = assessMetricSamplesClient(resultSchema, resultSamples)
   const outcomeOverridden = autoVerdict !== 'inconclusive' && resultDraft.outcome !== autoVerdict
 
   useEffect(() => {
@@ -262,7 +333,14 @@ export function RunsView({
       dataset: '', baselines: '', metrics: '', seeds: '', command: '', resources: '', stopCondition: '', successCriteria: '',
     })
     setMetricSchemaText((selected.experimentPlan?.metricSchema || [])
-      .map(spec => `${spec.name}:${spec.direction}:${spec.required ? 'required' : 'optional'}${spec.target === undefined ? '' : `:${spec.target}`}`)
+      .map(spec => [
+        spec.name,
+        spec.direction,
+        spec.required ? 'required' : 'optional',
+        spec.target ?? '',
+        spec.baseline ?? '',
+        spec.minDelta ?? '',
+      ].join(':'))
       .join(', '))
     setResultDraft(selected.result
       ? {
@@ -575,7 +653,7 @@ export function RunsView({
 
   async function recordResult() {
     if (!selected || resultDraft.summary.trim() === '' || !resultDraft.confirmedFinal) return
-    const values = parseMetricValuesClient(resultDraft.metrics)
+    const values = parseMetricSamplesClient(resultDraft.metrics)
     const missing = (selected.experimentPlan?.metricSchema || [])
       .filter(spec => spec.required && !(spec.name.toLowerCase() in values))
     if (missing.length > 0) {
@@ -592,7 +670,7 @@ export function RunsView({
     try {
       const body = await request<{ run: ResearchRun }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/result`,
-        { method: 'POST', body: JSON.stringify({ ...resultDraft, metricValues: parseMetricValuesClient(resultDraft.metrics) }) },
+        { method: 'POST', body: JSON.stringify({ ...resultDraft, metricSamples: resultSamples }) },
       )
       replaceRun(body.run)
       setNotice(t('runs.resultSaved'))
@@ -1122,7 +1200,24 @@ export function RunsView({
                         />
                       )}
                       <textarea className={css.runsTextarea} value={resultDraft.summary} onChange={event => setResultDraft({ ...resultDraft, summary: event.target.value })} placeholder={t('runs.resultPlaceholder')} rows={3} />
-                      <input className={css.runsInput} value={resultDraft.metrics} onChange={event => setResultDraft({ ...resultDraft, metrics: event.target.value })} placeholder={t('runs.resultMetrics')} />
+                      <textarea
+                        className={css.runsTextarea}
+                        value={resultDraft.metrics}
+                        onChange={event => setResultDraft({ ...resultDraft, metrics: event.target.value })}
+                        placeholder={t('runs.resultMetricsSamples')}
+                        rows={3}
+                      />
+                      {resultStats.length > 0 && (
+                        <div className={css.runsMetricStats}>
+                          {resultStats.map(stat => (
+                            <span key={stat.name}>
+                              {stat.name} μ={stat.mean.toFixed(4)} σ={stat.std.toFixed(4)} n={stat.n}
+                              {stat.delta !== null ? ` Δ=${stat.delta.toFixed(4)}` : ''}
+                              {stat.significant === null ? '' : ` ${stat.significant ? 'CI+' : 'CI-'}`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <label className={css.runsConfirm}>
                         <input
                           type="checkbox"

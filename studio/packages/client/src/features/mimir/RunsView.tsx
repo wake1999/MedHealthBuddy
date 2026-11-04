@@ -42,10 +42,17 @@ interface RunHypothesis {
   falsification: string
 }
 
+interface RunMetricSpec {
+  name: string
+  direction: 'max' | 'min' | 'none'
+  required: boolean
+}
+
 interface RunExperimentPlan {
   dataset: string
   baselines: string
   metrics: string
+  metricSchema?: RunMetricSpec[]
   seeds: string
   command: string
   resources: string
@@ -58,6 +65,7 @@ interface RunResult {
   summary: string
   metrics: string
   experimentId: string
+  confirmedFinal?: boolean
 }
 
 interface RunJobInsight {
@@ -123,6 +131,17 @@ function formatDate(value: number): string {
   return new Date(value).toLocaleString()
 }
 
+function parseMetricValuesClient(text: string): Record<string, number> {
+  const values: Record<string, number> = {}
+  const pattern = /(?:^|[\s,;])([A-Za-z][A-Za-z0-9 _./-]{0,40})\s*[:=]\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?%?)/g
+  for (const match of text.matchAll(pattern)) {
+    const name = match[1].trim().replace(/\s+/g, ' ').toLowerCase()
+    const value = Number(match[2].replace(/%$/, ''))
+    if (name !== '' && Number.isFinite(value)) values[name] = value
+  }
+  return values
+}
+
 export function RunsView({
   projectId,
   projectTitle,
@@ -181,7 +200,9 @@ export function RunsView({
     summary: '',
     metrics: '',
     experimentId: '',
+    confirmedFinal: false,
   })
+  const [metricSchemaText, setMetricSchemaText] = useState('')
   const [serverId, setServerId] = useState('')
   const [experimentJob, setExperimentJob] = useState<{ id: string; state: string; note: string } | null>(null)
   const [jobBusy, setJobBusy] = useState(false)
@@ -212,9 +233,14 @@ export function RunsView({
     setPlan(selected.experimentPlan || {
       dataset: '', baselines: '', metrics: '', seeds: '', command: '', resources: '', stopCondition: '', successCriteria: '',
     })
-    setResultDraft(selected.result || {
-      outcome: 'inconclusive', summary: '', metrics: '', experimentId: selected.experimentId,
-    })
+    setMetricSchemaText((selected.experimentPlan?.metricSchema || [])
+      .map(spec => `${spec.name}:${spec.direction}:${spec.required ? 'required' : 'optional'}`)
+      .join(', '))
+    setResultDraft(selected.result
+      ? { ...selected.result, confirmedFinal: Boolean(selected.result.confirmedFinal) }
+      : {
+        outcome: 'inconclusive', summary: '', metrics: '', experimentId: selected.experimentId, confirmedFinal: false,
+      })
   }, [selected?.id, selected?.updatedAt])
 
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -440,7 +466,7 @@ export function RunsView({
     try {
       const body = await request<{ run: ResearchRun }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/experiment-plan`,
-        { method: 'POST', body: JSON.stringify(plan) },
+        { method: 'POST', body: JSON.stringify({ ...plan, metricSchema: metricSchemaText }) },
       )
       replaceRun(body.run)
       setNotice(t('runs.planSaved'))
@@ -514,14 +540,21 @@ export function RunsView({
   }
 
   async function recordResult() {
-    if (!selected || resultDraft.summary.trim() === '') return
+    if (!selected || resultDraft.summary.trim() === '' || !resultDraft.confirmedFinal) return
+    const values = parseMetricValuesClient(resultDraft.metrics)
+    const missing = (selected.experimentPlan?.metricSchema || [])
+      .filter(spec => spec.required && !(spec.name.toLowerCase() in values))
+    if (missing.length > 0) {
+      setError(t('runs.missingMetrics', { metrics: missing.map(spec => spec.name).join(', ') }))
+      return
+    }
     setLoading(true)
     setError('')
     setNotice('')
     try {
       const body = await request<{ run: ResearchRun }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/result`,
-        { method: 'POST', body: JSON.stringify(resultDraft) },
+        { method: 'POST', body: JSON.stringify({ ...resultDraft, metricValues: parseMetricValuesClient(resultDraft.metrics) }) },
       )
       replaceRun(body.run)
       setNotice(t('runs.resultSaved'))
@@ -943,6 +976,12 @@ export function RunsView({
                     <input className={css.runsInput} value={plan.resources} onChange={event => setPlan({ ...plan, resources: event.target.value })} placeholder={t('runs.resources')} />
                     <input className={css.runsInput} value={plan.successCriteria} onChange={event => setPlan({ ...plan, successCriteria: event.target.value })} placeholder={t('runs.successCriteria')} />
                   </div>
+                  <input
+                    className={css.runsInput}
+                    value={metricSchemaText}
+                    onChange={event => setMetricSchemaText(event.target.value)}
+                    placeholder={t('runs.metricSchemaPlaceholder')}
+                  />
                   <input className={css.runsInput} value={plan.command} onChange={event => setPlan({ ...plan, command: event.target.value })} placeholder={t('runs.command')} />
                   <input className={css.runsInput} value={plan.stopCondition} onChange={event => setPlan({ ...plan, stopCondition: event.target.value })} placeholder={t('runs.stopCondition')} />
                   <button type="button" className={css.btn} disabled={loading || plan.dataset.trim() === '' || plan.metrics.trim() === ''} onClick={() => void savePlanForm()}>
@@ -1034,7 +1073,20 @@ export function RunsView({
                       </select>
                       <textarea className={css.runsTextarea} value={resultDraft.summary} onChange={event => setResultDraft({ ...resultDraft, summary: event.target.value })} placeholder={t('runs.resultPlaceholder')} rows={3} />
                       <input className={css.runsInput} value={resultDraft.metrics} onChange={event => setResultDraft({ ...resultDraft, metrics: event.target.value })} placeholder={t('runs.resultMetrics')} />
-                      <button type="button" className={css.btnPrimary} disabled={loading || resultDraft.summary.trim() === ''} onClick={() => void recordResult()}>
+                      <label className={css.runsConfirm}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(resultDraft.confirmedFinal)}
+                          onChange={event => setResultDraft({ ...resultDraft, confirmedFinal: event.target.checked })}
+                        />
+                        {t('runs.confirmFinal')}
+                      </label>
+                      <button
+                        type="button"
+                        className={css.btnPrimary}
+                        disabled={loading || resultDraft.summary.trim() === '' || !resultDraft.confirmedFinal}
+                        onClick={() => void recordResult()}
+                      >
                         {t('runs.saveResult')}
                       </button>
                       {selected.result && (

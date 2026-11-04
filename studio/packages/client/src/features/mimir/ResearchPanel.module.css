@@ -10736,6 +10736,16 @@ button.paperNoteBlockMeta:hover {
   white-space: pre-wrap;
 }
 
+.runsConfirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 11px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
 .runsResultForm {
   display: flex;
   flex-direction: column;

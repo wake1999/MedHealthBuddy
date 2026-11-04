@@ -46,7 +46,13 @@ function failRun(ctx: any, error: unknown) {
   if (/not_found$/.test(message)) {
     return fail(ctx, 404, message, message)
   }
-  if (message === 'research_evidence_empty' || message === 'research_evidence_not_approved' || message === 'research_claims_empty') {
+  if (
+    message === 'research_evidence_empty'
+    || message === 'research_evidence_not_approved'
+    || message === 'research_claims_empty'
+    || message === 'research_result_confirmation_required'
+    || message.startsWith('research_result_missing_metrics')
+  ) {
     return fail(ctx, 422, message, message)
   }
   if (/required|incomplete|project_not_found/.test(message)) {

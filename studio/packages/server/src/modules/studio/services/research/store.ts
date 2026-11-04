@@ -405,10 +405,17 @@ export interface ResearchRunHypothesis {
   at: number
 }
 
+export interface ResearchMetricSpec {
+  name: string
+  direction: 'max' | 'min' | 'none'
+  required: boolean
+}
+
 export interface ResearchRunExperimentPlan {
   dataset: string
   baselines: string
   metrics: string
+  metricSchema: ResearchMetricSpec[]
   seeds: string
   command: string
   resources: string
@@ -422,6 +429,7 @@ export interface ResearchRunResult {
   summary: string
   metrics: string
   experimentId: string
+  confirmedFinal: boolean
   at: number
 }
 
@@ -602,7 +610,9 @@ function normalizeStore(input: unknown): ResearchStore {
     evidence: Array.isArray(run.evidence) ? run.evidence : [],
     claims: Array.isArray(run.claims) ? run.claims : [],
     hypothesis: run.hypothesis || null,
-    experimentPlan: run.experimentPlan || null,
+    experimentPlan: run.experimentPlan
+      ? { ...run.experimentPlan, metricSchema: Array.isArray(run.experimentPlan.metricSchema) ? run.experimentPlan.metricSchema : [] }
+      : null,
     experimentId: typeof run.experimentId === 'string' ? run.experimentId : '',
     experimentJobId: typeof run.experimentJobId === 'string' ? run.experimentJobId : '',
     jobInsight: run.jobInsight || null,

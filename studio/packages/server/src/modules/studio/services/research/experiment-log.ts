@@ -11,6 +11,8 @@ export interface ParsedMetric {
   raw: string
 }
 
+import type { ResearchMetricSpec } from './store'
+
 export interface ExperimentLogInsight {
   metrics: ParsedMetric[]
   failureClass: string
@@ -79,6 +81,40 @@ export function classifyExperimentFailure(logTail: string, state: string, exitCo
   if (/traceback|exception|error:|failed|assertionerror/i.test(logTail)) return 'runtime_error'
   if (exitCode !== null && exitCode !== 0) return 'nonzero_exit'
   return 'unknown'
+}
+
+/**
+ * Parse `F1:max:required, Loss:min:optional` into a metric contract.
+ * A bare `F1` means maximize and required, which is the safe default for a
+ * research result gate.
+ */
+export function parseMetricSchema(text: string): ResearchMetricSpec[] {
+  const out: ResearchMetricSpec[] = []
+  const seen = new Set<string>()
+  for (const token of String(text || '').split(/[,\n;]+/)) {
+    const parts = token.trim().split(':').map(value => value.trim())
+    const name = parts[0] || ''
+    if (name === '') continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    const direction = parts[1] === 'min' || parts[1] === 'none' ? parts[1] : 'max'
+    const required = parts[2] === 'optional' ? false : true
+    out.push({ name, direction, required })
+  }
+  return out.slice(0, 24)
+}
+
+/** Parse human-entered result metrics into a case-insensitive value map. */
+export function parseMetricValues(text: string): Record<string, number> {
+  const values: Record<string, number> = {}
+  const pattern = /(?:^|[\s,;])([A-Za-z][A-Za-z0-9 _./-]{0,40})\s*[:=]\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?%?)/g
+  for (const match of String(text || '').matchAll(pattern)) {
+    const name = match[1].trim().replace(/\s+/g, ' ').toLowerCase()
+    const value = Number(match[2].replace(/%$/, ''))
+    if (name !== '' && Number.isFinite(value)) values[name] = value
+  }
+  return values
 }
 
 /** Build the persisted preview shown in the Research Run experiment panel. */

@@ -1,4 +1,4 @@
-import { inspectExperimentLog } from './experiment-log'
+import { inspectExperimentLog, parseMetricSchema, parseMetricValues } from './experiment-log'
 import { jobState, submitJob } from './ssh'
 import {
   newId,
@@ -58,6 +58,7 @@ export interface ExperimentPlanInput {
   dataset?: string
   baselines?: string
   metrics?: string
+  metricSchema?: string
   seeds?: string
   command?: string
   resources?: string
@@ -69,6 +70,8 @@ export interface ResultInput {
   outcome?: ResearchRunResult['outcome']
   summary?: string
   metrics?: string
+  metricValues?: Record<string, number>
+  confirmedFinal?: boolean
   confidence?: number
 }
 
@@ -373,6 +376,7 @@ export async function saveExperimentPlan(profile: string, runId: string, input: 
       dataset: clean(input.dataset, 2000),
       baselines: clean(input.baselines, 2000),
       metrics: clean(input.metrics, 2000),
+      metricSchema: parseMetricSchema(clean(input.metricSchema, 2000)),
       seeds: clean(input.seeds, 1000),
       command: clean(input.command, 4000),
       resources: clean(input.resources, 2000),
@@ -531,8 +535,17 @@ export async function recordExperimentResult(profile: string, runId: string, inp
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
     if (!run.hypothesis || run.experimentId === '') throw new Error('research_experiment_required')
+    if (input.confirmedFinal !== true) throw new Error('research_result_confirmation_required')
     const summary = clean(input.summary, 4000)
     if (summary === '') throw new Error('research_result_summary_required')
+    const metricValues = input.metricValues && typeof input.metricValues === 'object'
+      ? input.metricValues
+      : parseMetricValues(clean(input.metrics, 4000))
+    const schema = run.experimentPlan?.metricSchema || []
+    const missing = schema
+      .filter(spec => spec.required && !(spec.name.toLowerCase() in metricValues))
+      .map(spec => spec.name)
+    if (missing.length > 0) throw new Error(`research_result_missing_metrics:${missing.join(',')}`)
     const outcome = ['supported', 'contradicted', 'inconclusive'].includes(input.outcome || '')
       ? (input.outcome as ResearchRunResult['outcome'])
       : 'inconclusive'
@@ -565,11 +578,15 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       createdAt: now,
       updatedAt: now,
     })
+    const metricText = Object.entries(metricValues)
+      .map(([name, value]) => `${name}=${value}`)
+      .join(', ')
     run.result = {
       outcome,
       summary,
-      metrics: clean(input.metrics, 3000),
+      metrics: metricText || clean(input.metrics, 3000),
       experimentId: run.experimentId,
+      confirmedFinal: true,
       at: now,
     }
     run.stage = 'analysis'

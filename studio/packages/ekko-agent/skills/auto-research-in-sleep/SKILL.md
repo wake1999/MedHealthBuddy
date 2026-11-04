@@ -73,12 +73,20 @@ POST /api/studio/research/runs/:id/result
 POST /api/studio/research/runs/:id/advance
 ```
 
-Hypothesis and plan are artifacts, not free-form chat. A result write-back must
-include the outcome (`supported|contradicted|inconclusive`), summary, and
-metrics; the server adds a linked evidence row and claim. `refresh-experiment`
-also returns `insight.metrics` and `insight.failureClass` parsed from the job
-log; treat them as a preview, not as a verdict. Never approve the evidence gate
-or invent a result yourself.
+Hypothesis and plan are artifacts, not free-form chat. Define a metric contract
+in `experiment-plan`, for example:
+
+```text
+metricSchema: "F1:max:required, Acc:max:required, Loss:min:optional"
+```
+
+A result write-back must include the outcome
+(`supported|contradicted|inconclusive`), summary, required metrics, and
+`confirmedFinal: true`; the server adds a linked evidence row and claim and
+rejects missing required metrics. `refresh-experiment` also returns
+`insight.metrics` and `insight.failureClass` parsed from the job log; treat them
+as a preview, not as a verdict. Never approve the evidence gate or invent a
+result yourself.
 
 ## Operating contract
 

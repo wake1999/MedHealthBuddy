@@ -406,6 +406,8 @@ export interface ResearchRunHypothesis {
   metric: string
   expected: string
   falsification: string
+  /** Approved claims this hypothesis is grounded in. */
+  claimIds: string[]
   at: number
 }
 
@@ -647,7 +649,9 @@ function normalizeStore(input: unknown): ResearchStore {
       reviewedAt: claim.reviewedAt || 0,
       contradictionIds: Array.isArray(claim.contradictionIds) ? claim.contradictionIds : [],
     })),
-    hypothesis: run.hypothesis || null,
+    hypothesis: run.hypothesis
+      ? { ...run.hypothesis, claimIds: Array.isArray(run.hypothesis.claimIds) ? run.hypothesis.claimIds : [] }
+      : null,
     experimentPlan: run.experimentPlan
       ? { ...run.experimentPlan, metricSchema: Array.isArray(run.experimentPlan.metricSchema) ? run.experimentPlan.metricSchema : [] }
       : null,

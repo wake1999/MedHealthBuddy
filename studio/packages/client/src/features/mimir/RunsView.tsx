@@ -61,6 +61,7 @@ interface RunHypothesis {
   metric: string
   expected: string
   falsification: string
+  claimIds?: string[]
 }
 
 interface RunMetricSpec {
@@ -355,6 +356,7 @@ export function RunsView({
   } | null>(null)
   const [claimsBusy, setClaimsBusy] = useState(false)
   const [reviewBusy, setReviewBusy] = useState('')
+  const [graphBusy, setGraphBusy] = useState(false)
   const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
   const [coverage, setCoverage] = useState<ClaimCoverage | null>(null)
@@ -428,6 +430,7 @@ export function RunsView({
   const resultStats = summarizeMetricSamplesClient(resultSchema, resultSamples, baselineSamples)
   const autoVerdict = assessMetricSamplesClient(resultSchema, resultSamples, baselineSamples)
   const outcomeOverridden = autoVerdict !== 'inconclusive' && resultDraft.outcome !== autoVerdict
+  const approvedClaims = (selected?.claims || []).filter(claim => claim.reviewStatus === 'approved')
   const visibleClaims = (selected?.claims || []).filter(claim => {
     if (claimFilter === 'all') return true
     if (claimFilter === 'contradictions') return claim.contradictionIds.length > 0
@@ -461,9 +464,11 @@ export function RunsView({
 
   useEffect(() => {
     if (!selected) return
-    setHypothesis(selected.hypothesis || {
-      text: '', independentVariable: '', dependentVariable: '', baselines: '', metric: '', expected: '', falsification: '',
-    })
+    setHypothesis(selected.hypothesis
+      ? { ...selected.hypothesis, claimIds: selected.hypothesis.claimIds || [] }
+      : {
+        text: '', independentVariable: '', dependentVariable: '', baselines: '', metric: '', expected: '', falsification: '', claimIds: [],
+      })
     setPlan(selected.experimentPlan || {
       dataset: '', baselines: '', metrics: '', seeds: '', command: '', resources: '', stopCondition: '', successCriteria: '',
     })
@@ -710,6 +715,30 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setClaimsBusy(false)
+    }
+  }
+
+  async function exportClaimGraph() {
+    if (!selected) return
+    setGraphBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ markdown: string; filename: string }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/claim-graph`,
+      )
+      const blob = new Blob([body.markdown], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = body.filename
+      link.click()
+      URL.revokeObjectURL(url)
+      setNotice(t('runs.graphDownloaded'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setGraphBusy(false)
     }
   }
 
@@ -1286,7 +1315,15 @@ export function RunsView({
                     >
                       {claimsBusy ? t('runs.claimsBusy') : t('runs.deriveClaims')}
                     </button>
-                  </div>
+                    <button
+                      type="button"
+                      className={css.btn}
+                      disabled={graphBusy}
+                      onClick={() => void exportClaimGraph()}
+                    >
+                      {graphBusy ? t('runs.graphBusy') : t('runs.exportGraph')}
+                    </button>
+                    </div>
                 </div>
                 {(selected.claims?.length || 0) === 0 && <p className={css.hint}>{t('runs.claimsEmpty')}</p>}
                 {visibleClaims.map(claim => (
@@ -1418,6 +1455,28 @@ export function RunsView({
               {stageIndex >= 3 && (
                 <div className={css.runsExperimentPanel}>
                   <h4>{t('runs.hypothesisTitle')}</h4>
+                  <div className={css.runsHypothesisClaims}>
+                    <span>{t('runs.hypothesisClaims')}</span>
+                    {approvedClaims.length === 0 && <p className={css.hint}>{t('runs.hypothesisClaimsEmpty')}</p>}
+                    {approvedClaims.map(claim => {
+                      const selectedClaim = (hypothesis.claimIds || []).includes(claim.id)
+                      return (
+                        <label key={claim.id} className={css.runsHypothesisClaim}>
+                          <input
+                            type="checkbox"
+                            checked={selectedClaim}
+                            onChange={event => setHypothesis(current => ({
+                              ...current,
+                              claimIds: event.target.checked
+                                ? [...(current.claimIds || []), claim.id]
+                                : (current.claimIds || []).filter(id => id !== claim.id),
+                            }))}
+                          />
+                          <span>{claim.text}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
                   <textarea
                     className={css.runsTextarea}
                     value={hypothesis.text}
@@ -1433,7 +1492,12 @@ export function RunsView({
                   </div>
                   <input className={css.runsInput} value={hypothesis.expected} onChange={event => setHypothesis({ ...hypothesis, expected: event.target.value })} placeholder={t('runs.expected')} />
                   <textarea className={css.runsTextarea} value={hypothesis.falsification} onChange={event => setHypothesis({ ...hypothesis, falsification: event.target.value })} placeholder={t('runs.falsification')} rows={2} />
-                  <button type="button" className={css.btn} disabled={loading || hypothesis.text.trim() === ''} onClick={() => void saveHypothesisForm()}>
+                  <button
+                    type="button"
+                    className={css.btn}
+                    disabled={loading || hypothesis.text.trim() === '' || (hypothesis.claimIds || []).length === 0}
+                    onClick={() => void saveHypothesisForm()}
+                  >
                     {t('runs.saveHypothesis')}
                   </button>
 

@@ -81,7 +81,21 @@ export async function generateRunReport(profile: string, runId: string): Promise
     lines.push('_Not recorded._', '')
   } else {
     const h = run.hypothesis
-    lines.push(h.text, '', `- Independent variable: ${list(h.independentVariable)}`, `- Dependent variable: ${list(h.dependentVariable)}`, `- Baselines: ${list(h.baselines)}`, `- Metric: ${list(h.metric)}`, `- Expected: ${list(h.expected)}`, `- Falsification: ${list(h.falsification)}`, '')
+    const linkedClaims = run.claims
+      .filter(claim => h.claimIds.includes(claim.id))
+      .map(claim => `${claim.id}: ${claim.text}`)
+    lines.push(
+      h.text,
+      '',
+      `- Independent variable: ${list(h.independentVariable)}`,
+      `- Dependent variable: ${list(h.dependentVariable)}`,
+      `- Baselines: ${list(h.baselines)}`,
+      `- Metric: ${list(h.metric)}`,
+      `- Expected: ${list(h.expected)}`,
+      `- Falsification: ${list(h.falsification)}`,
+      `- Approved claims: ${list(linkedClaims.join('\n'))}`,
+      '',
+    )
   }
 
   lines.push('## Experiment plan', '')

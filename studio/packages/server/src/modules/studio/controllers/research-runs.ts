@@ -21,6 +21,7 @@ import {
 } from '../services/research/runs'
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 import { generateRunReport } from '../services/research/run-report'
+import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { generateResultsDraft } from '../services/research/run-results-draft'
 import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
@@ -61,6 +62,7 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_claims_needs_evidence'
     || message === 'research_claims_missing_evidence'
     || message === 'research_claim_contradiction_note_required'
+    || message === 'research_hypothesis_claim_required'
     || message.startsWith('research_result_missing_metrics')
   ) {
     return fail(ctx, 422, message, message)
@@ -321,6 +323,17 @@ export async function insertResultsHandler(ctx: any) {
         String(ctx.params.id || ''),
         String(body.figureId || ''),
       )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function claimGraphHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await generateClaimGraph(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
     }
   } catch (error) {
     failRun(ctx, error)

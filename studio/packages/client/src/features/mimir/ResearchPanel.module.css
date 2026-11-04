@@ -10641,6 +10641,37 @@ button.paperNoteBlockMeta:hover {
   gap: 8px;
 }
 
+.runsHypothesisClaims {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 10%));
+  border-radius: 7px;
+  background: var(--mimir-sheet, #fffdf8);
+}
+
+.runsHypothesisClaims > span {
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 10.5px;
+}
+
+.runsHypothesisClaim {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--mimir-ink, #211e19);
+  font-size: 11px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.runsHypothesisClaim input {
+  margin-top: 2px;
+}
+
 .runsLinked {
   margin: 0;
   color: #3f7049;

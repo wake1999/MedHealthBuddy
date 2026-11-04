@@ -52,6 +52,7 @@ export interface HypothesisInput {
   metric?: string
   expected?: string
   falsification?: string
+  claimIds?: string[]
 }
 
 export interface ExperimentPlanInput {
@@ -355,6 +356,11 @@ export async function saveHypothesis(profile: string, runId: string, input: Hypo
     if (!run) throw new Error('research_run_not_found')
     const text = clean(input.text, 3000)
     if (text === '') throw new Error('research_hypothesis_required')
+    const approved = new Set(run.claims.filter(claim => claim.reviewStatus === 'approved').map(claim => claim.id))
+    const claimIds = (Array.isArray(input.claimIds) ? input.claimIds : [])
+      .map(String)
+      .filter(id => approved.has(id))
+    if (claimIds.length === 0) throw new Error('research_hypothesis_claim_required')
     const hypothesis: ResearchRunHypothesis = {
       text,
       independentVariable: clean(input.independentVariable, 1000),
@@ -363,6 +369,7 @@ export async function saveHypothesis(profile: string, runId: string, input: Hypo
       metric: clean(input.metric, 1000),
       expected: clean(input.expected, 2000),
       falsification: clean(input.falsification, 2000),
+      claimIds: Array.from(new Set(claimIds)).slice(0, 12),
       at: Date.now(),
     }
     run.hypothesis = hypothesis
@@ -403,12 +410,17 @@ export async function createExperimentRecord(profile: string, runId: string): Pr
     if (run.experimentId !== '') return run
     const plan = run.experimentPlan
     const hypothesis = run.hypothesis
+    const linkedClaims = run.claims
+      .filter(claim => hypothesis.claimIds.includes(claim.id))
+      .map(claim => `${claim.id}: ${claim.text}`)
+      .join('\n')
     const experiment = {
       id: newId('exp'),
       projectId: run.projectId,
       name: `${run.title} — ${hypothesis.text.slice(0, 80)}`,
       config: [
         `Hypothesis: ${hypothesis.text}`,
+        `Linked claims:\n${linkedClaims || '(none)'}`,
         `Independent variable: ${hypothesis.independentVariable}`,
         `Dependent variable: ${hypothesis.dependentVariable}`,
         `Expected: ${hypothesis.expected}`,

@@ -22282,6 +22282,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/claim-graph": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get claim-graph",
+        "description": "GET /api/studio/research/runs/:id/claim-graph",
+        "operationId": "claimGraphHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/claims/derive": {
       "post": {
         "tags": [

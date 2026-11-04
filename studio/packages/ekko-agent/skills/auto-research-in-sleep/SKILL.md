@@ -68,6 +68,7 @@ GET   /api/studio/research/runs/:id/claim-coverage
 PATCH /api/studio/research/runs/:id/claims/:claimId
 POST  /api/studio/research/runs/:id/hypothesis
 POST  /api/studio/research/runs/:id/experiment-plan
+GET   /api/studio/research/runs/:id/claim-graph
 POST  /api/studio/research/runs/:id/create-experiment
 POST  /api/studio/research/runs/:id/submit-experiment
 POST  /api/studio/research/runs/:id/refresh-experiment
@@ -80,7 +81,9 @@ POST  /api/studio/research/runs/:id/insert-results
 
 `approve-evidence` only locks the table. Hypothesis requires at least one
 approved claim, no `needs_evidence` claim, and a review note for an approved
-contradictory claim. Never approve evidence or claims yourself.
+contradictory claim. A hypothesis must send `claimIds` containing only approved
+claim ids. `claim-graph` exports a deterministic Mermaid Claim–Evidence graph
+and Markdown table. Never approve evidence or claims yourself.
 
 `report` is a deterministic Markdown export of persisted evidence, claims,
 hypothesis, plan, job insight, and statistics. `results-draft` returns a Results

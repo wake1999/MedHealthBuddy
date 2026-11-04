@@ -10793,6 +10793,16 @@ button.paperNoteBlockMeta:hover {
   white-space: pre-wrap;
 }
 
+.runsWarnings {
+  margin: 0;
+  padding: 7px 10px 7px 24px;
+  border-radius: 7px;
+  background: rgb(176 138 67 / 9%);
+  color: #7a5b23;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
 .runsMetricStats {
   display: flex;
   flex-wrap: wrap;

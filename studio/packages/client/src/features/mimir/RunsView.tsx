@@ -357,6 +357,8 @@ export function RunsView({
   const [jobBusy, setJobBusy] = useState(false)
   const [reportBusy, setReportBusy] = useState(false)
   const [report, setReport] = useState<{ markdown: string; filename: string } | null>(null)
+  const [resultsBusy, setResultsBusy] = useState(false)
+  const [resultsDraft, setResultsDraft] = useState<{ markdown: string; latex: string; warnings: string[] } | null>(null)
   const [evidence, setEvidence] = useState({
     paperId: '',
     claim: '',
@@ -785,6 +787,43 @@ export function RunsView({
     }
   }
 
+  async function generateResultsDraft() {
+    if (!selected) return
+    setResultsBusy(true)
+    setError('')
+    try {
+      const body = await request<{ markdown: string; latex: string; warnings: string[] }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/results-draft`,
+        { method: 'POST' },
+      )
+      setResultsDraft({ markdown: body.markdown, latex: body.latex, warnings: body.warnings || [] })
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setResultsBusy(false)
+    }
+  }
+
+  async function copyResults(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setNotice(t('runs.resultsCopied'))
+    } catch {
+      setError(t('runs.reportCopyFailed'))
+    }
+  }
+
+  function downloadResults() {
+    if (!resultsDraft) return
+    const blob = new Blob([resultsDraft.markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `RESULTS_${(selected?.title || 'run').replace(/[\\/:*?"<>|]+/g, '-')}.md`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function copyReport() {
     if (!report) return
     try {
@@ -997,6 +1036,14 @@ export function RunsView({
                   onClick={() => void generateReport()}
                 >
                   {reportBusy ? t('runs.reportBusy') : t('runs.generateReport')}
+                </button>
+                <button
+                  type="button"
+                  className={css.btn}
+                  disabled={resultsBusy}
+                  onClick={() => void generateResultsDraft()}
+                >
+                  {resultsBusy ? t('runs.resultsBusy') : t('runs.generateResults')}
                 </button>
                 <small>{t('runs.updated')}: {formatDate(selected.updatedAt)}</small>
               </div>
@@ -1355,6 +1402,30 @@ export function RunsView({
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {resultsDraft && (
+                <div className={css.runsReport}>
+                  <div className={css.runsReportHead}>
+                    <h4>{t('runs.resultsTitle')}</h4>
+                    <div>
+                      <button type="button" className={css.btn} onClick={() => void copyResults(resultsDraft.markdown)}>{t('runs.copyResults')}</button>
+                      <button type="button" className={css.btn} onClick={() => void copyResults(resultsDraft.latex)}>{t('runs.copyLatex')}</button>
+                      <button type="button" className={css.btn} onClick={downloadResults}>{t('runs.downloadReport')}</button>
+                      <button type="button" className={css.btn} onClick={() => setResultsDraft(null)}>{t('runs.close')}</button>
+                    </div>
+                  </div>
+                  {resultsDraft.warnings.length > 0 && (
+                    <ul className={css.runsWarnings}>
+                      {resultsDraft.warnings.map(warning => <li key={warning}>{warning}</li>)}
+                    </ul>
+                  )}
+                  <pre>{resultsDraft.markdown}</pre>
+                  <details>
+                    <summary>{t('runs.showLatex')}</summary>
+                    <pre>{resultsDraft.latex}</pre>
+                  </details>
                 </div>
               )}
 

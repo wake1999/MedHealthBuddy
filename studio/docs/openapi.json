@@ -22733,6 +22733,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/results-draft": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create results-draft",
+        "description": "POST /api/studio/research/runs/:id/results-draft",
+        "operationId": "runResultsDraftHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/submit-experiment": {
       "post": {
         "tags": [

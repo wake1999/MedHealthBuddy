@@ -3,7 +3,7 @@ import { agentMetadata } from '@/utils/agent-catalog'
 import PageLoading from '@/components/common/PageLoading.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { getAgentUpdatePolicies, setAgentAutoUpdate, type AgentUpdatePolicyState } from '@/api/coding-agents'
-import { computed, defineAsyncComponent, h, onMounted, onUnmounted, ref, watch } from 'vue'
+import { defineAsyncComponent, h, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NAlert, NButton, NDrawer, NDrawerContent, NPopconfirm, NSwitch, NTag, useDialog, useMessage } from 'naive-ui'
@@ -127,7 +127,6 @@ const loading = ref(true)
 const loadError = ref('')
 const runtimeManagerVisible = ref(false)
 const hermesCliDetailsVisible = ref(false)
-const hermesCliDetailsLoading = ref(false)
 const hermesRuntimeStatus = ref<RuntimeVersionStatus | null>(null)
 const aiHelpDrawerVisible = ref(false)
 const aiHelpPrompt = ref('')
@@ -153,15 +152,6 @@ const updateInfo = ref<Record<CodingAgentId, CodingAgentUpdateResult | null>>({
 
 })
 
-const hermesStatus = computed(() => agentStatusSnapshot.value?.agents.find(agent => agent.id === 'hermes'))
-const hermesDetected = computed(() => Boolean(hermesStatus.value?.installed))
-const hermesVersion = computed(() => formatHermesVersion(hermesStatus.value?.version))
-const hermesType = computed<'CLI' | 'Runtime' | ''>(() => {
-  if (hermesStatus.value?.source === 'user-cli') return 'CLI'
-  if (hermesStatus.value?.source === 'managed-runtime') return 'Runtime'
-  return ''
-})
-
 watch(runtimeManagerVisible, (visible, previous) => {
   if (!visible && previous) {
     void syncAgentStatus().catch((error) => {
@@ -178,10 +168,6 @@ function formatVersion(value?: string): string {
   const version = value?.trim()
   if (!version) return t('agentManager.unknownVersion')
   return /^v(?=\d)/i.test(version) ? version : `v${version}`
-}
-
-function formatHermesVersion(value?: string): string {
-  return formatVersion(value?.split('·')[0])
 }
 
 function installedVersion(id: CodingAgentId): string {
@@ -351,18 +337,6 @@ async function refreshAll() {
   if (errors.length) loadError.value = errors.join('\n')
   loading.value = false
   if (externalInstallationRefreshPending) void checkExternalCliInstallation()
-}
-
-async function openHermesCliDetails() {
-  hermesCliDetailsLoading.value = true
-  try {
-    hermesRuntimeStatus.value = await fetchRuntimeVersionStatus({ includeRemote: false })
-    hermesCliDetailsVisible.value = true
-  } catch (error) {
-    message.error(errorMessage(error))
-  } finally {
-    hermesCliDetailsLoading.value = false
-  }
 }
 
 async function submitLegacyDataMigrationDecision(action: 'migrate' | 'decline'): Promise<boolean> {
@@ -544,63 +518,6 @@ onUnmounted(() => {
                 </NButton>
               </div>
             </section>
-
-          <section class="agent-card coding-agent-card hermes-card" data-testid="agent-card-hermes">
-            <header class="agent-card-header compact">
-              <div class="agent-identity">
-                <img :src="'/coding-agents/hermes.png'" alt="" class="agent-logo" />
-                <div>
-                  <div class="agent-name-row">
-                    <h3>Hermes</h3>
-                    <NTag
-                      v-if="hermesDetected && hermesType"
-                      data-testid="hermes-source-type"
-                      type="info"
-                      size="small"
-                      :bordered="false"
-                    >
-                      {{ hermesType }}
-                    </NTag>
-                    <NTag :type="hermesDetected ? 'success' : 'warning'" size="small" :bordered="false">
-                      {{ hermesDetected ? t('codingAgents.installed') : t('codingAgents.notInstalled') }}
-                    </NTag>
-                  </div>
-                  <p v-if="hermesDetected" class="agent-version">{{ hermesVersion }}</p>
-                  <p v-else>{{ t('agentManager.hermesDescription') }}</p>
-                </div>
-              </div>
-            </header>
-
-            <div class="agent-actions">
-              <NButton
-                v-if="hermesDetected"
-                secondary
-                size="small"
-                @click="router.push({ name: 'hermes.configSettings' })"
-              >
-                {{ t('sidebar.settings') }}
-              </NButton>
-              <NButton
-                v-if="hermesDetected && hermesType === 'CLI'"
-                data-testid="view-hermes-cli-details"
-                secondary
-                size="small"
-                :loading="hermesCliDetailsLoading"
-                @click="openHermesCliDetails"
-              >
-                {{ t('runtimeVersions.viewCliDetails') }}
-              </NButton>
-              <NButton
-                v-if="!hermesDetected || hermesType === 'Runtime'"
-                type="primary"
-                secondary
-                size="small"
-                @click="runtimeManagerVisible = true"
-              >
-                {{ hermesDetected ? t('agentManager.manageRuntime') : t('codingAgents.installNow') }}
-              </NButton>
-            </div>
-          </section>
 
             <section
               v-for="agent in codingAgents"

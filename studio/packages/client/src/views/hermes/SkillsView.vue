@@ -36,7 +36,7 @@ const searchQuery = ref('')
 const showSidebar = ref(true)
 const sourceFilter = ref<SourceFilter | null>(null)
 const skillTarget = ref<SkillTarget>(props.target)
-const agentTargets = ref<SkillTarget[]>(['ekko', 'hermes'])
+const agentTargets = ref<SkillTarget[]>(['ekko'])
 const agentTargetOptions = computed(() => agentTargets.value.map(agent => ({
   label: t(`skillMarket.agents.${agent}`),
   value: agent,
@@ -75,7 +75,7 @@ onMounted(async () => {
   handleMobileChange(mobileQuery)
   mobileQuery.addEventListener('change', handleMobileChange)
   if (!props.embedded) {
-    const installed = await fetchInstalledSkillTargets()
+    const installed = (await fetchInstalledSkillTargets()).filter(target => target !== 'hermes') as SkillTarget[]
     agentTargets.value = installed.includes(skillTarget.value) ? installed : [skillTarget.value, ...installed]
   }
   loadSkills()

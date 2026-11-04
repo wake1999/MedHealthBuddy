@@ -31,7 +31,7 @@ export function loadNewChatFormPreferences(account: number | null): NewChatFormP
     const saved = JSON.parse(raw)
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null
     const agent = AGENT_OPTIONS.find(option => option.value === saved.agent)?.value || AGENT_OPTIONS[0].value
-    const nativeModels = Object.fromEntries(AGENT_OPTIONS.filter(option => option.value !== 'hermes' && option.value !== 'ekko-agent')
+    const nativeModels = Object.fromEntries(AGENT_OPTIONS.filter(option => option.value !== 'ekko-agent')
       .flatMap(option => {
         const selection = saved.nativeModels?.[option.value]
         return selection && typeof selection === 'object' ? [[option.value, {

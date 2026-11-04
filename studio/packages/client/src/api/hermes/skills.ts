@@ -144,9 +144,11 @@ export async function fetchInstalledSkillTargets(): Promise<SkillTarget[]> {
       const target = SKILL_TARGET_BY_AGENT_STATUS[record.id]
       if (target && !installed.includes(target)) installed.push(target)
     }
-    return ['ekko', ...installed.filter(target => target !== 'ekko')]
+    // Hermes has been removed from this MedHealthBuddy build. Do not surface
+    // its skill tree even if an older runtime is still detected on disk.
+    return ['ekko', ...installed.filter(target => target !== 'ekko' && target !== 'hermes')]
   } catch {
-    return ['ekko', 'hermes']
+    return ['ekko']
   }
 }
 

@@ -1,3 +1,4 @@
+import { inspectExperimentLog } from './experiment-log'
 import { jobState, submitJob } from './ssh'
 import {
   newId,
@@ -131,6 +132,7 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     experimentPlan: null,
     experimentId: '',
     experimentJobId: '',
+    jobInsight: null,
     result: null,
     approvals: [],
     createdAt: now,
@@ -472,6 +474,7 @@ export async function submitExperimentJob(
       exp.jobId = job.id
     }
     current.experimentJobId = job.id
+    current.jobInsight = null
     current.updatedAt = Date.now()
     return { run: current, job }
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.experiment.submitted' })
@@ -481,11 +484,16 @@ export async function submitExperimentJob(
 export async function refreshExperimentJob(
   profile: string,
   runId: string,
-): Promise<{ run: ResearchRun; job: ResearchJob | null; state: { state: string; detail: string; exitCode: number | null } | null }> {
+): Promise<{
+  run: ResearchRun
+  job: ResearchJob | null
+  state: { state: string; detail: string; exitCode: number | null } | null
+  insight: { metrics: Array<{ name: string; value: number; raw: string }>; failureClass: string; logTail: string; exitCode: number | null; at: number } | null
+}> {
   const store = await readStore(profile)
   const run = store.runs.find(row => row.id === runId)
   if (!run) throw new Error('research_run_not_found')
-  if (run.experimentJobId === '') return { run, job: null, state: null }
+  if (run.experimentJobId === '') return { run, job: null, state: null, insight: null }
   const job = store.jobs.find(row => row.id === run.experimentJobId)
   if (!job) throw new Error('research_job_not_found')
   const server = store.servers.find(row => row.id === job.serverId)
@@ -495,6 +503,8 @@ export async function refreshExperimentJob(
     job.pid || '',
     job.logPath,
   )
+  const parsed = inspectExperimentLog(state.logTail, state.state, state.exitCode)
+  const insight = { ...parsed, at: Date.now() }
   const result = await updateStore(profile, 'run.experiment.refreshed', draft => {
     const current = draft.runs.find(row => row.id === runId)
     if (!current) throw new Error('research_run_not_found')
@@ -509,8 +519,9 @@ export async function refreshExperimentJob(
     }
     const exp = draft.experiments.find(row => row.id === current.experimentId)
     if (exp && state.state !== 'running') exp.status = state.state === 'succeeded' ? 'done' : 'failed'
+    current.jobInsight = insight
     current.updatedAt = Date.now()
-    return { run: current, job: target || null, state }
+    return { run: current, job: target || null, state, insight }
   }, { actor: { kind: 'system', id: 'research-job' }, action: 'run.experiment.refreshed' })
   return result
 }

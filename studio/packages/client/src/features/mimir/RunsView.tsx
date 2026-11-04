@@ -60,6 +60,13 @@ interface RunResult {
   experimentId: string
 }
 
+interface RunJobInsight {
+  metrics: Array<{ name: string; value: number; raw: string }>
+  failureClass: string
+  logTail: string
+  exitCode: number | null
+}
+
 interface RunServer {
   id: string
   name: string
@@ -81,6 +88,7 @@ interface ResearchRun {
   experimentPlan: RunExperimentPlan | null
   experimentId: string
   experimentJobId: string
+  jobInsight: RunJobInsight | null
   result: RunResult | null
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
@@ -491,6 +499,7 @@ export function RunsView({
         run: ResearchRun
         job: { id: string; state: string; note: string } | null
         state: { state: string; detail: string; exitCode: number | null } | null
+        insight: RunJobInsight | null
       }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/refresh-experiment`, {
         method: 'POST',
       })
@@ -976,6 +985,40 @@ export function RunsView({
                           job <code>{selected.experimentJobId}</code>
                           {experimentJob ? ` · ${experimentJob.state}${experimentJob.note ? ` · ${experimentJob.note}` : ''}` : ''}
                         </p>
+                      )}
+                      {selected.jobInsight && (
+                        <div className={css.runsInsight}>
+                          {selected.jobInsight.metrics.length > 0 && (
+                            <div className={css.runsMetricChips}>
+                              {selected.jobInsight.metrics.slice(0, 8).map(metric => (
+                                <span key={`${metric.name}:${metric.raw}`}>{metric.name} {metric.value}</span>
+                              ))}
+                              <button
+                                type="button"
+                                className={css.btn}
+                                onClick={() => setResultDraft(current => ({
+                                  ...current,
+                                  metrics: selected.jobInsight!.metrics
+                                    .map(metric => `${metric.name}=${metric.value}`)
+                                    .join(', '),
+                                }))}
+                              >
+                                {t('runs.fillMetrics')}
+                              </button>
+                            </div>
+                          )}
+                          {selected.jobInsight.failureClass !== '' && (
+                            <p className={css.runsFailureClass} role="status">
+                              {t('runs.failureClass')}: {t(`runs.failure.${selected.jobInsight.failureClass}`)}
+                            </p>
+                          )}
+                          {selected.jobInsight.logTail && (
+                            <details className={css.runsLogDetails}>
+                              <summary>{t('runs.showLog')}</summary>
+                              <pre>{selected.jobInsight.logTail.slice(-4000)}</pre>
+                            </details>
+                          )}
+                        </div>
                       )}
                       {selected.experimentPlan?.command && <code className={css.runsCommand}>{selected.experimentPlan.command}</code>}
                     </div>

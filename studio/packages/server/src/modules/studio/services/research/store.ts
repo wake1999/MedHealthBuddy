@@ -425,6 +425,14 @@ export interface ResearchRunResult {
   at: number
 }
 
+export interface ResearchRunJobInsight {
+  metrics: Array<{ name: string; value: number; raw: string }>
+  failureClass: string
+  logTail: string
+  exitCode: number | null
+  at: number
+}
+
 export interface ResearchRunApproval {
   stage: ResearchRunStage
   at: number
@@ -448,6 +456,7 @@ export interface ResearchRun {
   experimentPlan: ResearchRunExperimentPlan | null
   experimentId: string
   experimentJobId: string
+  jobInsight: ResearchRunJobInsight | null
   result: ResearchRunResult | null
   approvals: ResearchRunApproval[]
   createdAt: number
@@ -596,6 +605,7 @@ function normalizeStore(input: unknown): ResearchStore {
     experimentPlan: run.experimentPlan || null,
     experimentId: typeof run.experimentId === 'string' ? run.experimentId : '',
     experimentJobId: typeof run.experimentJobId === 'string' ? run.experimentJobId : '',
+    jobInsight: run.jobInsight || null,
     result: run.result || null,
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
   }))

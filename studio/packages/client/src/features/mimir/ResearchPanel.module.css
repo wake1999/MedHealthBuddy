@@ -10682,6 +10682,60 @@ button.paperNoteBlockMeta:hover {
   white-space: pre-wrap;
 }
 
+.runsInsight {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 10%));
+  border-radius: 8px;
+  background: var(--mimir-paper, #fffaf0);
+}
+
+.runsMetricChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.runsMetricChips span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgb(80 130 90 / 10%);
+  color: #3f7049;
+  font-size: 10.5px;
+}
+
+.runsMetricChips button {
+  margin-left: auto;
+}
+
+.runsFailureClass {
+  margin: 0;
+  color: #9c3b32;
+  font-size: 11px;
+}
+
+.runsLogDetails summary {
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.runsLogDetails pre {
+  max-height: 180px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 7px;
+  border-radius: 6px;
+  background: rgb(33 30 25 / 6%);
+  color: var(--mimir-ink, #211e19);
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .runsResultForm {
   display: flex;
   flex-direction: column;

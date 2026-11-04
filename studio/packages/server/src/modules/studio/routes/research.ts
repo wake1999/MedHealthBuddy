@@ -2,11 +2,24 @@ import Router from '@koa/router'
 
 import * as ctrl from '../controllers/research'
 import * as paperCtrl from '../controllers/research-paper'
+import * as runCtrl from '../controllers/research-runs'
 
 export const researchRoutes = new Router()
 
 researchRoutes.get('/api/studio/research/state', ctrl.getState)
 researchRoutes.get('/api/studio/research/events', ctrl.events)
+
+// Research Run MVP: explicit, resumable literature → evidence → hypothesis stage.
+researchRoutes.get('/api/studio/research/runs', runCtrl.listRunsHandler)
+researchRoutes.post('/api/studio/research/runs', runCtrl.createRunHandler)
+researchRoutes.get('/api/studio/research/runs/:id', runCtrl.getRunHandler)
+researchRoutes.patch('/api/studio/research/runs/:id', runCtrl.updateRunHandler)
+researchRoutes.delete('/api/studio/research/runs/:id', runCtrl.deleteRunHandler)
+researchRoutes.post('/api/studio/research/runs/:id/advance', runCtrl.advanceRunHandler)
+researchRoutes.post('/api/studio/research/runs/:id/approve-evidence', runCtrl.approveEvidenceHandler)
+researchRoutes.post('/api/studio/research/runs/:id/evidence', runCtrl.addEvidenceHandler)
+researchRoutes.patch('/api/studio/research/runs/:id/evidence/:evidenceId', runCtrl.updateEvidenceHandler)
+researchRoutes.delete('/api/studio/research/runs/:id/evidence/:evidenceId', runCtrl.removeEvidenceHandler)
 
 researchRoutes.post('/api/studio/research/projects', ctrl.createProject)
 researchRoutes.post('/api/studio/research/projects/import', ctrl.importProjectHandler)

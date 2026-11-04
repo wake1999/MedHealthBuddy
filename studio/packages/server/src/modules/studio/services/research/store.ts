@@ -32,6 +32,7 @@ export const RESEARCH_COLLECTIONS = [
   'evidence',
   'knowledge',
   'folders',
+  'runs',
 ] as const
 
 export type ResearchCollection = typeof RESEARCH_COLLECTIONS[number]
@@ -357,6 +358,52 @@ export interface ResearchEvidenceEdge {
   retractReason?: string
 }
 
+/** Stages of the first Research Run MVP. */
+export type ResearchRunStage = 'scope' | 'literature' | 'evidence' | 'hypothesis'
+
+/**
+ * One row in a Research Run's evidence table. The quote and page are kept
+ * separate so the UI can send the reader back to the source instead of showing
+ * an unsourced model claim.
+ */
+export interface ResearchRunEvidence {
+  id: string
+  paperId: string
+  paperTitle: string
+  claim: string
+  quote: string
+  page: number | null
+  section: string
+  support: 'supports' | 'contradicts' | 'mixed' | 'context'
+  confidence: number
+  note: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ResearchRunApproval {
+  stage: ResearchRunStage
+  at: number
+  note: string
+}
+
+export type ResearchRunStatus = 'running' | 'waiting_approval' | 'completed' | 'cancelled'
+
+/** A resumable literature -> evidence -> hypothesis run for one project. */
+export interface ResearchRun {
+  id: string
+  projectId: string
+  title: string
+  question: string
+  stage: ResearchRunStage
+  status: ResearchRunStatus
+  paperIds: string[]
+  evidence: ResearchRunEvidence[]
+  approvals: ResearchRunApproval[]
+  createdAt: number
+  updatedAt: number
+}
+
 export interface ResearchCollections {
   papers: ResearchPaper[]
   folders: ResearchFolder[]
@@ -372,6 +419,7 @@ export interface ResearchCollections {
   journal: ResearchJournalEntry[]
   evidence: ResearchEvidenceEdge[]
   knowledge: ResearchKnowledge[]
+  runs: ResearchRun[]
 }
 
 export interface ResearchStore extends ResearchCollections {
@@ -458,6 +506,7 @@ export function emptyStore(): ResearchStore {
     journal: [],
     evidence: [],
     knowledge: [],
+    runs: [],
     updatedAt: 0,
   }
 }

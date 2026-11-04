@@ -10,7 +10,7 @@
 import { defineStore, type EngineStoreHandle } from './define-store.ts'
 
 /** The workbench's nine view tabs. */
-export type ResearchTab = 'overview' | 'paper' | 'papers' | 'experiments' | 'figures' | 'meetings' | 'servers' | 'ledger' | 'venues'
+export type ResearchTab = 'overview' | 'paper' | 'papers' | 'experiments' | 'figures' | 'meetings' | 'servers' | 'ledger' | 'venues' | 'runs'
 
 /** The paper-view pane holding fullscreen, or null. */
 export type PaperFullscreen = 'editor' | 'preview'
@@ -21,7 +21,7 @@ function readTabPreference(): ResearchTab {
     const saved = localStorage.getItem('mimir.activeTab')
     if (saved === 'papers' || saved === 'overview' || saved === 'experiments'
       || saved === 'figures' || saved === 'meetings' || saved === 'servers'
-      || saved === 'ledger' || saved === 'brief' || saved === 'paper') {
+      || saved === 'ledger' || saved === 'brief' || saved === 'paper' || saved === 'runs') {
       return saved as ResearchTab
     }
   } catch { /* 私有模式 */ }

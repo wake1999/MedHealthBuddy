@@ -34,6 +34,7 @@ question instead of guessing.
 | Venue | `GET /venue-templates`, `GET /venues/catalog` | `POST /projects/:id/venue-template`, `DELETE /projects/:id/venue-template` |
 | Seminar deck | `GET /projects/:id/decks` | `POST /projects/:id/decks`, `GET /projects/:id/decks/:deckId/preview` |
 | Wiki / knowledge | `GET /ledger/digest` | `POST /wiki/import` |
+| Research Run | `GET /api/studio/research/runs?projectId=...`, `GET /runs/:id` | `POST /runs` (`projectId`, `question`, `paperIds`), `POST /runs/:id/evidence`, `POST /runs/:id/approve-evidence`, `POST /runs/:id/advance` |
 
 ## Safety rules
 

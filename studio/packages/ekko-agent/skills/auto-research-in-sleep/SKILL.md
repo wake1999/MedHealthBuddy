@@ -28,6 +28,29 @@ GET /api/studio/research/state
 The user may start this Skill from **文献 → AI 工具 → 自主研究**, which passes the
 selected project and paper scope in the prompt.
 
+For multi-step work, prefer a persisted **Research Run** over a long chat:
+
+```text
+POST /api/studio/research/runs
+{ "projectId": "...", "question": "...", "paperIds": ["..."] }
+```
+
+Add each source-grounded row with:
+
+```text
+POST /api/studio/research/runs/:id/evidence
+{ "paperId": "...", "claim": "...", "quote": "...", "page": 3, "section": "...", "support": "supports", "confidence": 0.8 }
+```
+
+Then stop and let the human approve the evidence table:
+
+```text
+POST /api/studio/research/runs/:id/approve-evidence
+POST /api/studio/research/runs/:id/advance
+```
+
+Never approve the evidence gate yourself.
+
 ## Operating contract
 
 - One active research run per project unless the user explicitly asks for

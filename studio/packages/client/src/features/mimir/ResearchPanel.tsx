@@ -36,6 +36,7 @@ import { MeetingsView } from './MeetingsView.tsx'
 import { ServersView } from './ServersView.tsx'
 import { LedgerView } from './LedgerView.tsx'
 import { VenuesView } from './VenuesView.tsx'
+import { RunsView } from './RunsView.tsx'
 import { ToastHost } from './ToastHost.tsx'
 import { ImportProjectDialog } from './ImportProjectDialog.tsx'
 import css from './ResearchPanel.module.css'
@@ -51,6 +52,7 @@ const TAB_KEYS: Record<ResearchTab, ResearchKey> = {
   servers: 'tab.servers',
   ledger: 'tab.ledger',
   venues: 'tab.venues',
+  runs: 'tab.runs',
 }
 
 /** One 16×16 stroke icon per tab, painted in the nav item's currentColor. */
@@ -114,6 +116,12 @@ const TAB_ICONS: Record<ResearchTab, ReactNode> = {
       <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" />
       <path d="M1.5 6h13M5 1.5v2M11 1.5v2" />
       <path d="M4.5 9h3M4.5 11.5h5" />
+    </svg>
+  ),
+  runs: (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2.5 3.5h4v4h-4zM9.5 8.5h4v4h-4z" />
+      <path d="M6.5 5.5h3.5a2 2 0 0 1 2 2v1M9.5 10.5H6a2 2 0 0 1-2-2v-1" />
     </svg>
   ),
 }
@@ -736,6 +744,15 @@ export function ResearchPanel({
       <main className={css.content} role="tabpanel" aria-label={t(TAB_KEYS[activeTab])}>
         {activeTab === 'overview' && (
           <OverviewView project={selectedProject} stats={overviewStats} backup={backup} taskHealth={taskHealth} jobs={jobs} experiments={experiments} openLedger={() => { actions.setTab('ledger') }} exportWiki={exportWiki} importWiki={importWiki} t={t} />
+        )}
+        {activeTab === 'runs' && (
+          <RunsView
+            projectId={selectedProjectId}
+            projectTitle={selectedProject?.title}
+            papers={papers.list}
+            requestProjectSession={requestProjectSession}
+            t={t}
+          />
         )}
         {activeTab === 'paper' && (
           <PaperView

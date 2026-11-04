@@ -10652,6 +10652,36 @@ button.paperNoteBlockMeta:hover {
   font-size: 10.5px;
 }
 
+.runsJobForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgb(80 130 90 / 24%);
+}
+
+.runsJobRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.runsJobRow select {
+  flex: 1 1 220px;
+}
+
+.runsCommand {
+  display: block;
+  overflow: auto;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgb(33 30 25 / 6%);
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 10.5px;
+  white-space: pre-wrap;
+}
+
 .runsResultForm {
   display: flex;
   flex-direction: column;

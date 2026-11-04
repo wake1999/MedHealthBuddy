@@ -60,6 +60,13 @@ interface RunResult {
   experimentId: string
 }
 
+interface RunServer {
+  id: string
+  name: string
+  host: string
+  status?: string
+}
+
 interface ResearchRun {
   id: string
   projectId: string
@@ -73,6 +80,7 @@ interface ResearchRun {
   hypothesis: RunHypothesis | null
   experimentPlan: RunExperimentPlan | null
   experimentId: string
+  experimentJobId: string
   result: RunResult | null
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
@@ -111,6 +119,7 @@ export function RunsView({
   projectId,
   projectTitle,
   papers,
+  servers,
   requestProjectSession,
   openPaperPage,
   t,
@@ -118,6 +127,7 @@ export function RunsView({
   projectId: string | null
   projectTitle?: string
   papers: readonly RunPaper[]
+  servers: readonly RunServer[]
   requestProjectSession?: (prompt: string) => Promise<{ ok: boolean; error?: string }>
   openPaperPage?: (paperId: string, page: number) => void
   t: (key: string, params?: Record<string, unknown>) => string
@@ -164,6 +174,9 @@ export function RunsView({
     metrics: '',
     experimentId: '',
   })
+  const [serverId, setServerId] = useState('')
+  const [experimentJob, setExperimentJob] = useState<{ id: string; state: string; note: string } | null>(null)
+  const [jobBusy, setJobBusy] = useState(false)
   const [evidence, setEvidence] = useState({
     paperId: '',
     claim: '',
@@ -178,6 +191,10 @@ export function RunsView({
   const selected = runs.find(run => run.id === selectedId) || null
   const stageIndex = selected ? STAGES.indexOf(selected.stage) : 0
   const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
+
+  useEffect(() => {
+    if (serverId === '' && servers.length > 0) setServerId(servers[0].id)
+  }, [servers, serverId])
 
   useEffect(() => {
     if (!selected) return
@@ -442,6 +459,48 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function submitExperiment() {
+    if (!selected || serverId === '') return
+    setJobBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun; job: { id: string; state: string; note: string } }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/submit-experiment`,
+        { method: 'POST', body: JSON.stringify({ serverId }) },
+      )
+      replaceRun(body.run)
+      setExperimentJob({ id: body.job.id, state: body.job.state, note: body.job.note || '' })
+      setNotice(t('runs.jobSubmitted'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setJobBusy(false)
+    }
+  }
+
+  async function refreshExperiment() {
+    if (!selected) return
+    setJobBusy(true)
+    setError('')
+    try {
+      const body = await request<{
+        run: ResearchRun
+        job: { id: string; state: string; note: string } | null
+        state: { state: string; detail: string; exitCode: number | null } | null
+      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/refresh-experiment`, {
+        method: 'POST',
+      })
+      replaceRun(body.run)
+      if (body.job) setExperimentJob({ id: body.job.id, state: body.job.state, note: body.job.note || '' })
+      if (body.state) setNotice(t('runs.jobState', { state: body.state.state, detail: body.state.detail || '' }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setJobBusy(false)
     }
   }
 
@@ -887,6 +946,39 @@ export function RunsView({
                     <button type="button" className={css.btnPrimary} disabled={loading || !selected.hypothesis || !selected.experimentPlan} onClick={() => void createExperiment()}>
                       {t('runs.createExperiment')}
                     </button>
+                  )}
+
+                  {selected.experimentId !== '' && (
+                    <div className={css.runsJobForm}>
+                      <h4>{t('runs.jobTitle')}</h4>
+                      {servers.length === 0 && <p className={css.hint}>{t('runs.noServers')}</p>}
+                      <div className={css.runsJobRow}>
+                        <select className={css.runsInput} value={serverId} onChange={event => setServerId(event.target.value)}>
+                          <option value="">{t('runs.selectServer')}</option>
+                          {servers.map(server => <option key={server.id} value={server.id}>{server.name} · {server.host}</option>)}
+                        </select>
+                        <button
+                          type="button"
+                          className={css.btnPrimary}
+                          disabled={jobBusy || serverId === '' || selected.experimentJobId !== '' || !selected.experimentPlan?.command}
+                          onClick={() => void submitExperiment()}
+                        >
+                          {jobBusy ? t('runs.jobBusy') : t('runs.submitJob')}
+                        </button>
+                        {selected.experimentJobId !== '' && (
+                          <button type="button" className={css.btn} disabled={jobBusy} onClick={() => void refreshExperiment()}>
+                            {t('runs.refreshJob')}
+                          </button>
+                        )}
+                      </div>
+                      {selected.experimentJobId !== '' && (
+                        <p className={css.runsLinked}>
+                          job <code>{selected.experimentJobId}</code>
+                          {experimentJob ? ` · ${experimentJob.state}${experimentJob.note ? ` · ${experimentJob.note}` : ''}` : ''}
+                        </p>
+                      )}
+                      {selected.experimentPlan?.command && <code className={css.runsCommand}>{selected.experimentPlan.command}</code>}
+                    </div>
                   )}
 
                   {selected.experimentId !== '' && (

@@ -8,6 +8,8 @@ import {
   importWorkbenchEvidence,
   listRuns,
   recordExperimentResult,
+  refreshExperimentJob,
+  submitExperimentJob,
   removeEvidence,
   removeRun,
   saveExperimentPlan,
@@ -41,13 +43,13 @@ function readBody(ctx: any): Record<string, unknown> | null {
 
 function failRun(ctx: any, error: unknown) {
   const message = String((error as Error)?.message || error)
-  if (message === 'research_run_not_found' || message === 'research_evidence_not_found') {
+  if (/not_found$/.test(message)) {
     return fail(ctx, 404, message, message)
   }
-  if (message === 'research_evidence_empty' || message === 'research_evidence_not_approved') {
+  if (message === 'research_evidence_empty' || message === 'research_evidence_not_approved' || message === 'research_claims_empty') {
     return fail(ctx, 422, message, message)
   }
-  if (/required|project_not_found/.test(message)) {
+  if (/required|incomplete|project_not_found/.test(message)) {
     return fail(ctx, 400, message, message)
   }
   return fail(ctx, 500, message || 'research run operation failed')
@@ -233,6 +235,36 @@ export async function createExperimentHandler(ctx: any) {
     ctx.body = {
       ok: true,
       run: await createExperimentRecord(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function submitExperimentHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await submitExperimentJob(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(body.serverId || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function refreshExperimentHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await refreshExperimentJob(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+      )),
     }
   } catch (error) {
     failRun(ctx, error)

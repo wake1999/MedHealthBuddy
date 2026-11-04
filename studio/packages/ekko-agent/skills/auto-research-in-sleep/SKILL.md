@@ -67,6 +67,8 @@ POST /api/studio/research/runs/:id/approve-evidence
 POST /api/studio/research/runs/:id/hypothesis
 POST /api/studio/research/runs/:id/experiment-plan
 POST /api/studio/research/runs/:id/create-experiment
+POST /api/studio/research/runs/:id/submit-experiment
+POST /api/studio/research/runs/:id/refresh-experiment
 POST /api/studio/research/runs/:id/result
 POST /api/studio/research/runs/:id/advance
 ```

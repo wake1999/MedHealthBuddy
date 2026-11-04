@@ -22625,6 +22625,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/refresh-experiment": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create refresh-experiment",
+        "description": "POST /api/studio/research/runs/:id/refresh-experiment",
+        "operationId": "refreshExperimentHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/result": {
       "post": {
         "tags": [
@@ -22633,6 +22669,42 @@
         "summary": "Create result",
         "description": "POST /api/studio/research/runs/:id/result",
         "operationId": "recordResultHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/submit-experiment": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create submit-experiment",
+        "description": "POST /api/studio/research/runs/:id/submit-experiment",
+        "operationId": "submitExperimentHandler",
         "security": [
           {
             "BearerAuth": []

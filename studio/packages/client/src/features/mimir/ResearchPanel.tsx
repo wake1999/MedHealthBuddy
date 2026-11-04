@@ -751,6 +751,12 @@ export function ResearchPanel({
             projectTitle={selectedProject?.title}
             papers={papers.list}
             requestProjectSession={requestProjectSession}
+            openPaperPage={(paperId, page) => {
+              actions.setTab('papers')
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('mimir:open-paper', { detail: { paperId, page } }))
+              }, 180)
+            }}
             t={t}
           />
         )}

@@ -38,12 +38,15 @@ POST /api/studio/research/runs
 Ask the server to extract source-grounded rows directly:
 
 ```text
-POST /api/studio/research/runs/:id/extract-evidence
+POST /api/studio/research/runs/:id/extract-evidence?async=true
 { "maxPerPaper": 4 }
+GET  /api/studio/research/runs/:id/extract-status
 ```
 
 The server verifies each quote against the paper's page-delimited full text and
-drops paraphrases. Then derive a claim mapping:
+drops paraphrases. The async form returns a job; poll its status and show
+`phase`, `current`, `total`, and `message` instead of holding one silent request.
+Then derive a claim mapping:
 
 ```text
 POST /api/studio/research/runs/:id/claims/derive

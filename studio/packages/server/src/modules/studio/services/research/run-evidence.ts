@@ -96,7 +96,11 @@ export interface ExtractEvidenceResult {
 export async function extractEvidenceForRun(
   profile: string,
   runId: string,
-  input: { paperIds?: string[]; maxPerPaper?: number } = {},
+  input: {
+    paperIds?: string[]
+    maxPerPaper?: number
+    onProgress?: (progress: { phase: string; current: number; total: number; message: string }) => void
+  } = {},
 ): Promise<ExtractEvidenceResult> {
   const run = await getRun(profile, runId)
   const store = await readStore(profile)
@@ -111,10 +115,13 @@ export async function extractEvidenceForRun(
   let added = 0
   let skipped = 0
   const paperErrors: string[] = []
+  input.onProgress?.({ phase: 'reading', current: 0, total: selected.length, message: '' })
 
-  for (const paperId of selected) {
+  for (let index = 0; index < selected.length; index += 1) {
+    const paperId = selected[index]
     const paper = store.papers.find(row => row.id === paperId)
     if (!paper) continue
+    input.onProgress?.({ phase: 'reading', current: index, total: selected.length, message: paper.title })
     let fulltext = ''
     try {
       fulltext = (await readPaperFulltext(profile, paperId)).text
@@ -126,6 +133,7 @@ export async function extractEvidenceForRun(
       paperErrors.push(`${paper.title}: empty full text`)
       continue
     }
+    input.onProgress?.({ phase: 'extracting', current: index, total: selected.length, message: paper.title })
     let content = ''
     try {
       content = await completeText(target, promptForPaper(run.question, paper.title, fulltext), {
@@ -177,7 +185,9 @@ export async function extractEvidenceForRun(
       acceptedForPaper += 1
       added += 1
     }
+    input.onProgress?.({ phase: 'reading', current: index + 1, total: selected.length, message: paper.title })
   }
+  input.onProgress?.({ phase: 'done', current: selected.length, total: selected.length, message: '' })
   return { added, skipped, paperErrors }
 }
 

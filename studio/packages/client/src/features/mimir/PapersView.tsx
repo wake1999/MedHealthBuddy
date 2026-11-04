@@ -4420,6 +4420,24 @@ export function PapersView({
   // A citation click asks one card's reader to open on a page. A fresh object
   // each time, so asking for the same page twice still re-opens the overlay.
   const [readerJump, setReaderJump] = useState<{ key: string; page: number } | null>(null)
+
+  // Research Run evidence rows can ask the library to open a paper at the
+  // cited page. The event is used because the runs view and this reader are
+  // sibling tabs of the same workbench.
+  useEffect(() => {
+    const openAtPage = (event: Event): void => {
+      const detail = (event as CustomEvent<{ paperId?: string; page?: number }>).detail || {}
+      const paperId = String(detail.paperId || '')
+      if (paperId === '') return
+      const paper = papers.list.find(row => paperKey(row) === paperId)
+      if (!paper) return
+      const key = paperKey(paper)
+      setExpanded(prev => ({ ...prev, [key]: true }))
+      setReaderJump({ key, page: Math.max(1, Math.round(Number(detail.page) || 1)) })
+    }
+    window.addEventListener('mimir:open-paper', openAtPage)
+    return () => { window.removeEventListener('mimir:open-paper', openAtPage) }
+  }, [papers.list])
   // Bumped when a highlight is saved so the notes panel re-reads the blocks.
   const [notesRefresh, setNotesRefresh] = useState(0)
   const [review, setReview] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; text: string; error: string; saved?: boolean }>({

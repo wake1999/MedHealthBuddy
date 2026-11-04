@@ -11,6 +11,13 @@ import {
   updateRun,
 } from '../services/research/runs'
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
+import {
+  beginRunExtraction,
+  finishRunExtraction,
+  getRunExtraction,
+  runExtractionKey,
+  updateRunExtraction,
+} from '../services/research/run-extraction-progress'
 
 function profileOf(ctx: any): string | undefined {
   return ctx.state?.profile?.name
@@ -144,23 +151,50 @@ export async function removeEvidenceHandler(ctx: any) {
 
 export async function extractEvidenceHandler(ctx: any) {
   const body = readBody(ctx) || {}
-  try {
-    const result = await extractEvidenceForRun(
-      profileOf(ctx) || 'default',
-      String(ctx.params.id || ''),
-      {
-        paperIds: Array.isArray(body.paperIds) ? body.paperIds.map(String) : undefined,
-        maxPerPaper: typeof body.maxPerPaper === 'number' ? body.maxPerPaper : undefined,
+  const profile = profileOf(ctx) || 'default'
+  const runId = String(ctx.params.id || '')
+  const asyncMode = String(ctx.query?.async || body.async || '') === 'true'
+  const options = {
+    paperIds: Array.isArray(body.paperIds) ? body.paperIds.map(String) : undefined,
+    maxPerPaper: typeof body.maxPerPaper === 'number' ? body.maxPerPaper : undefined,
+  }
+  if (asyncMode) {
+    const key = runExtractionKey(profile, runId)
+    const job = beginRunExtraction(key)
+    if (job === null) return fail(ctx, 409, 'evidence extraction already running', 'extraction_in_progress')
+    ctx.status = 202
+    ctx.body = { ok: true, job }
+    void extractEvidenceForRun(profile, runId, {
+      ...options,
+      onProgress: progress => {
+        updateRunExtraction(key, {
+          phase: progress.phase,
+          current: progress.current,
+          total: progress.total,
+          message: progress.message,
+        })
       },
-    )
+    })
+      .then(result => finishRunExtraction(key, result))
+      .catch(error => finishRunExtraction(key, { error: String((error as Error)?.message || error) }))
+    return
+  }
+  try {
+    const result = await extractEvidenceForRun(profile, runId, options)
     ctx.body = {
       ok: true,
       ...result,
-      run: await getRun(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+      run: await getRun(profile, runId),
     }
   } catch (error) {
     failRun(ctx, error)
   }
+}
+
+export async function extractEvidenceStatusHandler(ctx: any) {
+  const key = runExtractionKey(profileOf(ctx) || 'default', String(ctx.params.id || ''))
+  ctx.set('Cache-Control', 'no-store')
+  ctx.body = { ok: true, job: getRunExtraction(key) }
 }
 
 export async function deriveClaimsHandler(ctx: any) {

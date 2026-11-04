@@ -80,18 +80,26 @@ export function RunsView({
   projectTitle,
   papers,
   requestProjectSession,
+  openPaperPage,
   t,
 }: {
   projectId: string | null
   projectTitle?: string
   papers: readonly RunPaper[]
   requestProjectSession?: (prompt: string) => Promise<{ ok: boolean; error?: string }>
+  openPaperPage?: (paperId: string, page: number) => void
   t: (key: string, params?: Record<string, unknown>) => string
 }) {
   const [runs, setRuns] = useState<ResearchRun[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [loading, setLoading] = useState(false)
   const [extracting, setExtracting] = useState(false)
+  const [extractionProgress, setExtractionProgress] = useState<{
+    phase: string
+    current: number
+    total: number
+    message: string
+  } | null>(null)
   const [claimsBusy, setClaimsBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -217,27 +225,57 @@ export function RunsView({
 
   async function extractEvidence() {
     if (!selected) return
+    const runId = selected.id
     setExtracting(true)
     setError('')
     setNotice('')
+    setExtractionProgress({ phase: 'reading', current: 0, total: selected.paperIds.length, message: '' })
     try {
-      const body = await request<{
-        run: ResearchRun
+      const started = await request<{ job: {
+        state: 'running' | 'done' | 'error'
+        phase: string
+        current: number
+        total: number
+        message: string
         added: number
         skipped: number
         paperErrors: string[]
-      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/extract-evidence`, {
+        error: string
+      } }>(`/api/studio/research/runs/${encodeURIComponent(runId)}/extract-evidence?async=true`, {
         method: 'POST',
         body: JSON.stringify({ maxPerPaper: 4 }),
       })
-      replaceRun(body.run)
-      const skipped = body.skipped > 0 ? `，跳过 ${body.skipped} 条无法在原文中定位的引用` : ''
-      const failures = body.paperErrors.length > 0 ? `；${body.paperErrors.length} 篇文献读取失败` : ''
-      setNotice(t('runs.extractDone', { added: body.added, skipped, failures }))
+      let job = started.job
+      while (job.state === 'running') {
+        setExtractionProgress({
+          phase: job.phase,
+          current: job.current,
+          total: job.total,
+          message: job.message,
+        })
+        await new Promise(resolve => window.setTimeout(resolve, 900))
+        const status = await request<{ job: typeof job | null }>(
+          `/api/studio/research/runs/${encodeURIComponent(runId)}/extract-status`,
+        )
+        if (!status.job) throw new Error(t('runs.extractionLost'))
+        job = status.job
+      }
+      setExtractionProgress({
+        phase: job.phase,
+        current: job.current,
+        total: job.total,
+        message: job.message,
+      })
+      if (job.state === 'error') throw new Error(job.error || t('runs.extractionFailed'))
+      await loadRuns(runId)
+      const skipped = job.skipped > 0 ? `，跳过 ${job.skipped} 条无法在原文中定位的引用` : ''
+      const failures = job.paperErrors.length > 0 ? `；${job.paperErrors.length} 篇文献读取失败` : ''
+      setNotice(t('runs.extractDone', { added: job.added, skipped, failures }))
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setExtracting(false)
+      setExtractionProgress(null)
     }
   }
 
@@ -399,6 +437,30 @@ export function RunsView({
                 <span className={css.runsStatus}>{t(`runs.status.${selected.status}`)}</span>
               </div>
 
+              {extracting && extractionProgress && (
+                <div className={css.runsExtractionProgress} role="status">
+                  <div className={css.runsExtractionHead}>
+                    <span>
+                      {extractionProgress.phase === 'extracting'
+                        ? t('runs.extracting')
+                        : t('runs.readingPaper')}
+                      {' '}
+                      {extractionProgress.current}/{extractionProgress.total || '?'}
+                    </span>
+                    {extractionProgress.message && <small>{extractionProgress.message}</small>}
+                  </div>
+                  <div className={css.translationProgressTrack} aria-hidden="true">
+                    <span
+                      className={css.translationProgressBar}
+                      data-determinate={extractionProgress.total > 0 || undefined}
+                      style={extractionProgress.total > 0
+                        ? { width: `${Math.round((extractionProgress.current / extractionProgress.total) * 100)}%` }
+                        : undefined}
+                    />
+                  </div>
+                </div>
+              )}
+
               <ol className={css.runsStages}>
                 {STAGES.map((stage, index) => (
                   <li key={stage} data-state={index < stageIndex ? 'done' : index === stageIndex ? 'active' : 'todo'}>
@@ -464,7 +526,21 @@ export function RunsView({
                         <tr key={row.id}>
                           <td>{row.claim}</td>
                           <td>{row.quote || '—'}</td>
-                          <td>{row.paperTitle || '—'}{row.page ? ` · p.${row.page}` : ''}{row.section ? ` · ${row.section}` : ''}</td>
+                          <td>
+                            {row.paperId && openPaperPage ? (
+                              <button
+                                type="button"
+                                className={css.runsSourceLink}
+                                onClick={() => openPaperPage(row.paperId, row.page || 1)}
+                                title={t('runs.openSource')}
+                              >
+                                {row.paperTitle || '—'}{row.page ? ` · p.${row.page}` : ''}
+                              </button>
+                            ) : (
+                              <span>{row.paperTitle || '—'}{row.page ? ` · p.${row.page}` : ''}</span>
+                            )}
+                            {row.section ? <small> · {row.section}</small> : null}
+                          </td>
                           <td>{t(`runs.supportValue.${row.support}`)}</td>
                           <td>{Math.round(row.confidence * 100)}%</td>
                           <td>
@@ -499,6 +575,27 @@ export function RunsView({
                       <span>{t(`runs.claimStatus.${claim.status}`)}</span>
                       <span>{Math.round(claim.confidence * 100)}%</span>
                       <span>{claim.evidenceIds.length} {t('runs.evidenceUnit')}</span>
+                    </div>
+                    <div className={css.runsClaimEvidence}>
+                      {claim.evidenceIds.map((evidenceId) => {
+                        const evidenceRow = selected.evidence.find(row => row.id === evidenceId)
+                        if (!evidenceRow) return null
+                        return (
+                          <button
+                            key={evidenceId}
+                            type="button"
+                            onClick={() => {
+                              if (evidenceRow.paperId && openPaperPage) {
+                                openPaperPage(evidenceRow.paperId, evidenceRow.page || 1)
+                              }
+                            }}
+                            title={evidenceRow.quote}
+                          >
+                            {evidenceRow.paperTitle || t('runs.source')}
+                            {evidenceRow.page ? ` · p.${evidenceRow.page}` : ''}
+                          </button>
+                        )
+                      })}
                     </div>
                     {claim.note && <p>{claim.note}</p>}
                   </article>

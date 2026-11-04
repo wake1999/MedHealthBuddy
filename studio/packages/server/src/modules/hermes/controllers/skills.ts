@@ -50,6 +50,10 @@ function requestSkillsDir(ctx: any): string {
 type SkillTarget = 'ekko' | 'hermes' | 'claude' | 'codex' | 'pi' | 'grok' | 'opencode' | 'dsh' | 'cursor' | 'antigravity'
 
 const SKILL_TARGETS: SkillTarget[] = ['ekko', 'hermes', 'claude', 'codex', 'pi', 'grok', 'opencode', 'dsh', 'cursor', 'antigravity']
+const IMPORTED_RESEARCH_SKILLS = new Set([
+  'auto-research-in-sleep',
+  'academic-research-suite',
+])
 
 /** Query/body values arrive as free text; unknown targets keep the historical default. */
 export function normalizeSkillTarget(value: unknown, fallback: SkillTarget = 'hermes'): SkillTarget {
@@ -659,6 +663,17 @@ export async function list(ctx: any) {
       const bundledManifest = target === 'ekko' ? await readEkkoBuiltinManifest(skillsDir) : new Map<string, string>()
       const disabledSkills = target === 'ekko' ? ekkoDisabledSkills(requestedProfile(ctx)) : []
       let categories = await scanSkillsDirIfExists(skillsDir, bundledManifest, new Set(), disabledSkills, new Map())
+      if (target === 'ekko') {
+        // The research suites are shipped with the product but presented as
+        // local installs, separate from the generic built-in toolbox.
+        categories = categories.map(category => ({
+          ...category,
+          skills: category.skills.map((skill: { name: string; source?: string; managedByEkko?: boolean }) =>
+            IMPORTED_RESEARCH_SKILLS.has(skill.name)
+              ? { ...skill, source: 'local', managedByEkko: false }
+              : skill),
+        }))
+      }
       const extraDirs: string[] = []
       if (target === 'codex') {
         const systemDir = codexSystemSkillsDir()

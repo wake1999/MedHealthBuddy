@@ -2363,7 +2363,7 @@ export default {
     source: {
       builtin: '内置',
       hub: '技能仓库',
-      local: '全局',
+      local: '本地安装',
       external: '外部目录',
     },
   },

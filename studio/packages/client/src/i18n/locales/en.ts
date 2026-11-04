@@ -2317,7 +2317,7 @@ export default {
     source: {
       builtin: 'Builtin',
       hub: 'Hub',
-      local: 'Global',
+      local: 'Local install',
       external: 'External',
     },
   },

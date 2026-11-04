@@ -35,6 +35,22 @@ export interface EkkoExternalDirectoryEntry {
   isDir: boolean
 }
 
+const IMPORTED_RESEARCH_SKILLS = new Set([
+  'auto-research-in-sleep',
+  'academic-research-suite',
+])
+
+function classifySkillSource<T extends { name: string; source: 'builtin' | 'local' | 'external'; builtIn: boolean }>(
+  skill: T,
+): T {
+  // These two suites ship with MedHealthBuddy, but conceptually they are
+  // imported research skills, not part of the generic built-in toolbox. Keep
+  // their files managed by the built-in synchronizer while presenting them as
+  // local installs in the UI.
+  if (!IMPORTED_RESEARCH_SKILLS.has(skill.name)) return skill
+  return { ...skill, source: 'local', builtIn: false }
+}
+
 function normalizeProfile(profile: string): string {
   return String(profile || '').trim() || 'default'
 }
@@ -68,7 +84,7 @@ export async function listEkkoSkills(
   const result = await resolved.skill.discover(query, { profile })
   assertToolResult(result)
   const data = result.data as { skills?: EkkoSkillSummary[] } | undefined
-  return Array.isArray(data?.skills) ? data.skills : []
+  return Array.isArray(data?.skills) ? data.skills.map(classifySkillSource) : []
 }
 
 export async function getEkkoSkill(
@@ -81,7 +97,7 @@ export async function getEkkoSkill(
   assertToolResult(result)
   const data = result.data as Omit<EkkoSkillDetail, 'content'> | undefined
   if (!data?.name) throw new Error('Skill not found.')
-  return {
+  return classifySkillSource({
     name: data.name,
     description: data.description || '',
     category: data.category || 'misc',
@@ -91,7 +107,7 @@ export async function getEkkoSkill(
     managedByEkko: Boolean(data.managedByEkko),
     builtIn: Boolean(data.builtIn),
     content: skillContent(result),
-  }
+  })
 }
 
 export async function createEkkoSkill(

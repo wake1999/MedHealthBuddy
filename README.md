@@ -75,6 +75,60 @@ MedHealthBuddy 是一个本地优先的科研工作台，面向文献驱动的�
 - 自动判定与人工选择不一致时必须填写理由
 - 论文编译失败不会静默通过
 
+## 安装与发布产物
+
+这个 Git 仓库只保存源码。安装包、`.tgz` 和 `release-*` 目录都是构建产物，不提交到 Git，所以在 README 里不会直接看到可下载的二进制文件。
+
+### Windows 安装包
+
+在源码目录构建：
+
+```bash
+cd studio
+npm install
+npm run build:desktop:win
+```
+
+默认输出类似：
+
+```text
+studio/packages/desktop/release-*/MedHealthBuddy-0.8.11-x64.exe
+```
+
+安装包体积约 1.1 GB，不放进 Git 仓库。
+
+### npm 包
+
+生成 npm tarball：
+
+```bash
+cd studio
+npm run pack:npm -- release/npm
+```
+
+产物：
+
+```text
+studio/release/npm/medhealthbuddy-webui-0.7.35.tgz
+```
+
+本地安装：
+
+```bash
+npm install -g ./release/npm/medhealthbuddy-webui-0.7.35.tgz
+medhealthbuddy
+```
+
+要求 Node.js >= 23。
+
+当前包名为 `medhealthbuddy-webui`，**尚未发布到 npm registry**，所以不能直接使用：
+
+```bash
+npm install -g medhealthbuddy-webui
+```
+
+要对外发布安装包，应在 GitHub Releases 中上传 `.exe` 和 `.tgz`，不要提交进 Git 历史。
+
 ## 快速开始
 
 要求：

@@ -1,6 +1,17 @@
-import { newId, readStore, updateStore, type ResearchRun, type ResearchRunClaim, type ResearchRunEvidence, type ResearchRunStage } from './store'
+import {
+  newId,
+  readStore,
+  updateStore,
+  type ResearchRun,
+  type ResearchRunClaim,
+  type ResearchRunEvidence,
+  type ResearchRunExperimentPlan,
+  type ResearchRunHypothesis,
+  type ResearchRunResult,
+  type ResearchRunStage,
+} from './store'
 
-const RUN_STAGES: ResearchRunStage[] = ['scope', 'literature', 'evidence', 'hypothesis']
+const RUN_STAGES: ResearchRunStage[] = ['scope', 'literature', 'evidence', 'hypothesis', 'experiment', 'analysis']
 const SUPPORT_VALUES = new Set<ResearchRunEvidence['support']>(['supports', 'contradicts', 'mixed', 'context'])
 
 export interface CreateRunInput {
@@ -28,6 +39,34 @@ export interface ClaimInput {
   evidenceIds?: string[]
   confidence?: number
   note?: string
+}
+
+export interface HypothesisInput {
+  text?: string
+  independentVariable?: string
+  dependentVariable?: string
+  baselines?: string
+  metric?: string
+  expected?: string
+  falsification?: string
+}
+
+export interface ExperimentPlanInput {
+  dataset?: string
+  baselines?: string
+  metrics?: string
+  seeds?: string
+  command?: string
+  resources?: string
+  stopCondition?: string
+  successCriteria?: string
+}
+
+export interface ResultInput {
+  outcome?: ResearchRunResult['outcome']
+  summary?: string
+  metrics?: string
+  confidence?: number
 }
 
 function clean(value: unknown, max = 4000): string {
@@ -86,6 +125,10 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     paperIds,
     evidence: [],
     claims: [],
+    hypothesis: null,
+    experimentPlan: null,
+    experimentId: '',
+    result: null,
     approvals: [],
     createdAt: now,
     updatedAt: now,
@@ -295,6 +338,149 @@ export async function importWorkbenchEvidence(
   return { imported, skipped, run: await getRun(profile, runId) }
 }
 
+export async function saveHypothesis(profile: string, runId: string, input: HypothesisInput): Promise<ResearchRun> {
+  return updateStore(profile, 'run.hypothesis.saved', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const text = clean(input.text, 3000)
+    if (text === '') throw new Error('research_hypothesis_required')
+    const hypothesis: ResearchRunHypothesis = {
+      text,
+      independentVariable: clean(input.independentVariable, 1000),
+      dependentVariable: clean(input.dependentVariable, 1000),
+      baselines: clean(input.baselines, 2000),
+      metric: clean(input.metric, 1000),
+      expected: clean(input.expected, 2000),
+      falsification: clean(input.falsification, 2000),
+      at: Date.now(),
+    }
+    run.hypothesis = hypothesis
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.hypothesis.saved' })
+}
+
+export async function saveExperimentPlan(profile: string, runId: string, input: ExperimentPlanInput): Promise<ResearchRun> {
+  return updateStore(profile, 'run.experiment-plan.saved', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const plan: ResearchRunExperimentPlan = {
+      dataset: clean(input.dataset, 2000),
+      baselines: clean(input.baselines, 2000),
+      metrics: clean(input.metrics, 2000),
+      seeds: clean(input.seeds, 1000),
+      command: clean(input.command, 4000),
+      resources: clean(input.resources, 2000),
+      stopCondition: clean(input.stopCondition, 2000),
+      successCriteria: clean(input.successCriteria, 2000),
+      at: Date.now(),
+    }
+    if (plan.dataset === '' || plan.metrics === '') throw new Error('research_experiment_plan_incomplete')
+    run.experimentPlan = plan
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.experiment-plan.saved' })
+}
+
+export async function createExperimentRecord(profile: string, runId: string): Promise<ResearchRun> {
+  return updateStore(profile, 'run.experiment.created', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    if (!run.hypothesis) throw new Error('research_hypothesis_required')
+    if (!run.experimentPlan) throw new Error('research_experiment_plan_required')
+    if (run.experimentId !== '') return run
+    const plan = run.experimentPlan
+    const hypothesis = run.hypothesis
+    const experiment = {
+      id: newId('exp'),
+      projectId: run.projectId,
+      name: `${run.title} — ${hypothesis.text.slice(0, 80)}`,
+      config: [
+        `Hypothesis: ${hypothesis.text}`,
+        `Independent variable: ${hypothesis.independentVariable}`,
+        `Dependent variable: ${hypothesis.dependentVariable}`,
+        `Expected: ${hypothesis.expected}`,
+        `Falsification: ${hypothesis.falsification}`,
+        `Dataset: ${plan.dataset}`,
+        `Baselines: ${plan.baselines}`,
+        `Metrics: ${plan.metrics}`,
+        `Seeds: ${plan.seeds}`,
+        `Command: ${plan.command}`,
+        `Resources: ${plan.resources}`,
+        `Stop condition: ${plan.stopCondition}`,
+        `Success criteria: ${plan.successCriteria}`,
+        `Research Run: ${run.id}`,
+      ].join('\n'),
+      metrics: [],
+      conclusion: '',
+      status: 'planned' as const,
+      at: Date.now(),
+    }
+    draft.experiments.push(experiment)
+    run.experimentId = experiment.id
+    run.stage = 'experiment'
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.experiment.created' })
+}
+
+export async function recordExperimentResult(profile: string, runId: string, input: ResultInput): Promise<ResearchRun> {
+  return updateStore(profile, 'run.experiment.result', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    if (!run.hypothesis || run.experimentId === '') throw new Error('research_experiment_required')
+    const summary = clean(input.summary, 4000)
+    if (summary === '') throw new Error('research_result_summary_required')
+    const outcome = ['supported', 'contradicted', 'inconclusive'].includes(input.outcome || '')
+      ? (input.outcome as ResearchRunResult['outcome'])
+      : 'inconclusive'
+    const now = Date.now()
+    const evidenceId = newId('ev')
+    const support = outcome === 'supported' ? 'supports' : outcome === 'contradicted' ? 'contradicts' : 'mixed'
+    run.evidence.push({
+      id: evidenceId,
+      paperId: '',
+      paperTitle: `Experiment ${run.experimentId}`,
+      claim: run.hypothesis.text,
+      quote: summary,
+      page: null,
+      section: 'experiment result',
+      support,
+      confidence: typeof input.confidence === 'number' && Number.isFinite(input.confidence)
+        ? Math.max(0, Math.min(1, input.confidence))
+        : outcome === 'inconclusive' ? 0.4 : 0.8,
+      note: clean(input.metrics, 3000),
+      createdAt: now,
+      updatedAt: now,
+    })
+    run.claims.push({
+      id: newId('claim'),
+      text: run.hypothesis.text,
+      status: outcome === 'supported' ? 'supported' : outcome === 'contradicted' ? 'contradicted' : 'mixed',
+      evidenceIds: [evidenceId],
+      confidence: outcome === 'inconclusive' ? 0.4 : 0.75,
+      note: summary,
+      createdAt: now,
+      updatedAt: now,
+    })
+    run.result = {
+      outcome,
+      summary,
+      metrics: clean(input.metrics, 3000),
+      experimentId: run.experimentId,
+      at: now,
+    }
+    run.stage = 'analysis'
+    run.updatedAt = now
+    const experiment = draft.experiments.find(row => row.id === run.experimentId)
+    if (experiment) {
+      experiment.status = outcome === 'inconclusive' ? 'failed' : 'done'
+      experiment.conclusion = summary
+    }
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.experiment.result' })
+}
+
 export async function replaceClaims(profile: string, runId: string, inputs: ClaimInput[]): Promise<ResearchRun> {
   const now = Date.now()
   return updateStore(profile, 'run.claims.replaced', draft => {
@@ -349,6 +535,15 @@ export async function advanceRun(profile: string, runId: string): Promise<Resear
     if (run.stage === 'evidence') {
       if (!run.approvals.some(item => item.stage === 'evidence')) throw new Error('research_evidence_not_approved')
       run.stage = 'hypothesis'
+      run.status = 'running'
+    } else if (run.stage === 'hypothesis') {
+      if (!run.hypothesis) throw new Error('research_hypothesis_required')
+      if (run.experimentId === '') throw new Error('research_experiment_required')
+      run.stage = 'experiment'
+      run.status = 'running'
+    } else if (run.stage === 'experiment') {
+      if (!run.result) throw new Error('research_result_required')
+      run.stage = 'analysis'
       run.status = 'running'
     } else {
       const next = nextStage(run.stage)

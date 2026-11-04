@@ -64,10 +64,17 @@ Then stop and let the human approve the evidence table:
 
 ```text
 POST /api/studio/research/runs/:id/approve-evidence
+POST /api/studio/research/runs/:id/hypothesis
+POST /api/studio/research/runs/:id/experiment-plan
+POST /api/studio/research/runs/:id/create-experiment
+POST /api/studio/research/runs/:id/result
 POST /api/studio/research/runs/:id/advance
 ```
 
-Never approve the evidence gate yourself.
+Hypothesis and plan are artifacts, not free-form chat. A result write-back must
+include the outcome (`supported|contradicted|inconclusive`), summary, and
+metrics; the server adds a linked evidence row and claim. Never approve the
+evidence gate or invent a result yourself.
 
 ## Operating contract
 

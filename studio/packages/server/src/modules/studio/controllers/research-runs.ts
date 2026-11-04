@@ -2,12 +2,16 @@ import {
   addEvidence,
   advanceRun,
   approveEvidence,
+  createExperimentRecord,
   createRun,
   getRun,
   importWorkbenchEvidence,
   listRuns,
+  recordExperimentResult,
   removeEvidence,
   removeRun,
+  saveExperimentPlan,
+  saveHypothesis,
   updateEvidence,
   updateRun,
 } from '../services/research/runs'
@@ -196,6 +200,56 @@ export async function extractEvidenceStatusHandler(ctx: any) {
   const key = runExtractionKey(profileOf(ctx) || 'default', String(ctx.params.id || ''))
   ctx.set('Cache-Control', 'no-store')
   ctx.body = { ok: true, job: getRunExtraction(key) }
+}
+
+export async function saveHypothesisHandler(ctx: any) {
+  const body = readBody(ctx)
+  if (!body) return fail(ctx, 400, 'Invalid body')
+  try {
+    ctx.body = {
+      ok: true,
+      run: await saveHypothesis(profileOf(ctx) || 'default', String(ctx.params.id || ''), body as never),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function saveExperimentPlanHandler(ctx: any) {
+  const body = readBody(ctx)
+  if (!body) return fail(ctx, 400, 'Invalid body')
+  try {
+    ctx.body = {
+      ok: true,
+      run: await saveExperimentPlan(profileOf(ctx) || 'default', String(ctx.params.id || ''), body as never),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function createExperimentHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      run: await createExperimentRecord(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function recordResultHandler(ctx: any) {
+  const body = readBody(ctx)
+  if (!body) return fail(ctx, 400, 'Invalid body')
+  try {
+    ctx.body = {
+      ok: true,
+      run: await recordExperimentResult(profileOf(ctx) || 'default', String(ctx.params.id || ''), body as never),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
 }
 
 export async function importWorkbenchEvidenceHandler(ctx: any) {

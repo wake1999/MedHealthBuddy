@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react'
 import css from './ResearchPanel.module.css'
 
 type Support = 'supports' | 'contradicts' | 'mixed' | 'context'
-type Stage = 'scope' | 'literature' | 'evidence' | 'hypothesis'
+type Stage = 'scope' | 'literature' | 'evidence' | 'hypothesis' | 'experiment' | 'analysis'
 
 interface RunEvidence {
   id: string
@@ -32,6 +32,34 @@ interface RunClaim {
   note: string
 }
 
+interface RunHypothesis {
+  text: string
+  independentVariable: string
+  dependentVariable: string
+  baselines: string
+  metric: string
+  expected: string
+  falsification: string
+}
+
+interface RunExperimentPlan {
+  dataset: string
+  baselines: string
+  metrics: string
+  seeds: string
+  command: string
+  resources: string
+  stopCondition: string
+  successCriteria: string
+}
+
+interface RunResult {
+  outcome: 'supported' | 'contradicted' | 'inconclusive'
+  summary: string
+  metrics: string
+  experimentId: string
+}
+
 interface ResearchRun {
   id: string
   projectId: string
@@ -42,6 +70,10 @@ interface ResearchRun {
   paperIds: string[]
   evidence: RunEvidence[]
   claims: RunClaim[]
+  hypothesis: RunHypothesis | null
+  experimentPlan: RunExperimentPlan | null
+  experimentId: string
+  result: RunResult | null
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
   updatedAt: number
@@ -53,7 +85,7 @@ interface RunPaper {
   title: string
 }
 
-const STAGES: Stage[] = ['scope', 'literature', 'evidence', 'hypothesis']
+const STAGES: Stage[] = ['scope', 'literature', 'evidence', 'hypothesis', 'experiment', 'analysis']
 const SUPPORTS: Support[] = ['supports', 'contradicts', 'mixed', 'context']
 
 function apiHeaders(): Record<string, string> {
@@ -107,6 +139,31 @@ export function RunsView({
   const [question, setQuestion] = useState('')
   const [title, setTitle] = useState('')
   const [paperIds, setPaperIds] = useState<string[]>([])
+  const [hypothesis, setHypothesis] = useState<RunHypothesis>({
+    text: '',
+    independentVariable: '',
+    dependentVariable: '',
+    baselines: '',
+    metric: '',
+    expected: '',
+    falsification: '',
+  })
+  const [plan, setPlan] = useState<RunExperimentPlan>({
+    dataset: '',
+    baselines: '',
+    metrics: '',
+    seeds: '',
+    command: '',
+    resources: '',
+    stopCondition: '',
+    successCriteria: '',
+  })
+  const [resultDraft, setResultDraft] = useState<RunResult>({
+    outcome: 'inconclusive',
+    summary: '',
+    metrics: '',
+    experimentId: '',
+  })
   const [evidence, setEvidence] = useState({
     paperId: '',
     claim: '',
@@ -121,6 +178,19 @@ export function RunsView({
   const selected = runs.find(run => run.id === selectedId) || null
   const stageIndex = selected ? STAGES.indexOf(selected.stage) : 0
   const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
+
+  useEffect(() => {
+    if (!selected) return
+    setHypothesis(selected.hypothesis || {
+      text: '', independentVariable: '', dependentVariable: '', baselines: '', metric: '', expected: '', falsification: '',
+    })
+    setPlan(selected.experimentPlan || {
+      dataset: '', baselines: '', metrics: '', seeds: '', command: '', resources: '', stopCondition: '', successCriteria: '',
+    })
+    setResultDraft(selected.result || {
+      outcome: 'inconclusive', summary: '', metrics: '', experimentId: selected.experimentId,
+    })
+  }, [selected?.id, selected?.updatedAt])
 
   async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, { ...options, headers: { ...apiHeaders(), ...(options.headers || {}) } })
@@ -315,6 +385,82 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setClaimsBusy(false)
+    }
+  }
+
+  async function saveHypothesisForm() {
+    if (!selected) return
+    setLoading(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/hypothesis`,
+        { method: 'POST', body: JSON.stringify(hypothesis) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.hypothesisSaved'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function savePlanForm() {
+    if (!selected) return
+    setLoading(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/experiment-plan`,
+        { method: 'POST', body: JSON.stringify(plan) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.planSaved'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function createExperiment() {
+    if (!selected) return
+    setLoading(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/create-experiment`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.experimentCreated'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function recordResult() {
+    if (!selected || resultDraft.summary.trim() === '') return
+    setLoading(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/result`,
+        { method: 'POST', body: JSON.stringify(resultDraft) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.resultSaved'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -697,6 +843,74 @@ export function RunsView({
                   {t('runs.addEvidence')}
                 </button>
               </div>
+
+              {stageIndex >= 3 && (
+                <div className={css.runsExperimentPanel}>
+                  <h4>{t('runs.hypothesisTitle')}</h4>
+                  <textarea
+                    className={css.runsTextarea}
+                    value={hypothesis.text}
+                    onChange={event => setHypothesis({ ...hypothesis, text: event.target.value })}
+                    placeholder={t('runs.hypothesisPlaceholder')}
+                    rows={2}
+                  />
+                  <div className={css.runsFormGrid}>
+                    <input className={css.runsInput} value={hypothesis.independentVariable} onChange={event => setHypothesis({ ...hypothesis, independentVariable: event.target.value })} placeholder={t('runs.independentVariable')} />
+                    <input className={css.runsInput} value={hypothesis.dependentVariable} onChange={event => setHypothesis({ ...hypothesis, dependentVariable: event.target.value })} placeholder={t('runs.dependentVariable')} />
+                    <input className={css.runsInput} value={hypothesis.baselines} onChange={event => setHypothesis({ ...hypothesis, baselines: event.target.value })} placeholder={t('runs.baselines')} />
+                    <input className={css.runsInput} value={hypothesis.metric} onChange={event => setHypothesis({ ...hypothesis, metric: event.target.value })} placeholder={t('runs.metric')} />
+                  </div>
+                  <input className={css.runsInput} value={hypothesis.expected} onChange={event => setHypothesis({ ...hypothesis, expected: event.target.value })} placeholder={t('runs.expected')} />
+                  <textarea className={css.runsTextarea} value={hypothesis.falsification} onChange={event => setHypothesis({ ...hypothesis, falsification: event.target.value })} placeholder={t('runs.falsification')} rows={2} />
+                  <button type="button" className={css.btn} disabled={loading || hypothesis.text.trim() === ''} onClick={() => void saveHypothesisForm()}>
+                    {t('runs.saveHypothesis')}
+                  </button>
+
+                  <h4>{t('runs.planTitle')}</h4>
+                  <div className={css.runsFormGrid}>
+                    <input className={css.runsInput} value={plan.dataset} onChange={event => setPlan({ ...plan, dataset: event.target.value })} placeholder={t('runs.dataset')} />
+                    <input className={css.runsInput} value={plan.metrics} onChange={event => setPlan({ ...plan, metrics: event.target.value })} placeholder={t('runs.metrics')} />
+                    <input className={css.runsInput} value={plan.baselines} onChange={event => setPlan({ ...plan, baselines: event.target.value })} placeholder={t('runs.baselines')} />
+                    <input className={css.runsInput} value={plan.seeds} onChange={event => setPlan({ ...plan, seeds: event.target.value })} placeholder={t('runs.seeds')} />
+                    <input className={css.runsInput} value={plan.resources} onChange={event => setPlan({ ...plan, resources: event.target.value })} placeholder={t('runs.resources')} />
+                    <input className={css.runsInput} value={plan.successCriteria} onChange={event => setPlan({ ...plan, successCriteria: event.target.value })} placeholder={t('runs.successCriteria')} />
+                  </div>
+                  <input className={css.runsInput} value={plan.command} onChange={event => setPlan({ ...plan, command: event.target.value })} placeholder={t('runs.command')} />
+                  <input className={css.runsInput} value={plan.stopCondition} onChange={event => setPlan({ ...plan, stopCondition: event.target.value })} placeholder={t('runs.stopCondition')} />
+                  <button type="button" className={css.btn} disabled={loading || plan.dataset.trim() === '' || plan.metrics.trim() === ''} onClick={() => void savePlanForm()}>
+                    {t('runs.savePlan')}
+                  </button>
+
+                  {selected.experimentId !== '' ? (
+                    <p className={css.runsLinked}>✓ {t('runs.experimentLinked')}: <code>{selected.experimentId}</code></p>
+                  ) : (
+                    <button type="button" className={css.btnPrimary} disabled={loading || !selected.hypothesis || !selected.experimentPlan} onClick={() => void createExperiment()}>
+                      {t('runs.createExperiment')}
+                    </button>
+                  )}
+
+                  {selected.experimentId !== '' && (
+                    <div className={css.runsResultForm}>
+                      <h4>{t('runs.resultTitle')}</h4>
+                      <select className={css.runsInput} value={resultDraft.outcome} onChange={event => setResultDraft({ ...resultDraft, outcome: event.target.value as RunResult['outcome'] })}>
+                        <option value="supported">{t('runs.outcome.supported')}</option>
+                        <option value="contradicted">{t('runs.outcome.contradicted')}</option>
+                        <option value="inconclusive">{t('runs.outcome.inconclusive')}</option>
+                      </select>
+                      <textarea className={css.runsTextarea} value={resultDraft.summary} onChange={event => setResultDraft({ ...resultDraft, summary: event.target.value })} placeholder={t('runs.resultPlaceholder')} rows={3} />
+                      <input className={css.runsInput} value={resultDraft.metrics} onChange={event => setResultDraft({ ...resultDraft, metrics: event.target.value })} placeholder={t('runs.resultMetrics')} />
+                      <button type="button" className={css.btnPrimary} disabled={loading || resultDraft.summary.trim() === ''} onClick={() => void recordResult()}>
+                        {t('runs.saveResult')}
+                      </button>
+                      {selected.result && (
+                        <p className={css.runsLinked}>
+                          {t(`runs.outcome.${selected.result.outcome}`)} · {selected.result.summary.slice(0, 180)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

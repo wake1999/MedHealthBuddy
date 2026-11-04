@@ -10618,6 +10618,48 @@ button.paperNoteBlockMeta:hover {
   white-space: nowrap;
 }
 
+.runsExperimentPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid rgb(80 130 90 / 20%);
+  border-radius: 12px;
+  background: rgb(80 130 90 / 4%);
+}
+
+.runsExperimentPanel h4 {
+  margin: 4px 0 0;
+  color: var(--mimir-ink, #211e19);
+  font-size: 12px;
+}
+
+.runsFormGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.runsLinked {
+  margin: 0;
+  color: #3f7049;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.runsLinked code {
+  font-size: 10.5px;
+}
+
+.runsResultForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgb(80 130 90 / 24%);
+}
+
 .runsClaims {
   display: flex;
   flex-direction: column;

@@ -359,7 +359,7 @@ export interface ResearchEvidenceEdge {
 }
 
 /** Stages of the first Research Run MVP. */
-export type ResearchRunStage = 'scope' | 'literature' | 'evidence' | 'hypothesis'
+export type ResearchRunStage = 'scope' | 'literature' | 'evidence' | 'hypothesis' | 'experiment' | 'analysis'
 
 /**
  * One row in a Research Run's evidence table. The quote and page are kept
@@ -392,6 +392,37 @@ export interface ResearchRunClaim {
   updatedAt: number
 }
 
+export interface ResearchRunHypothesis {
+  text: string
+  independentVariable: string
+  dependentVariable: string
+  baselines: string
+  metric: string
+  expected: string
+  falsification: string
+  at: number
+}
+
+export interface ResearchRunExperimentPlan {
+  dataset: string
+  baselines: string
+  metrics: string
+  seeds: string
+  command: string
+  resources: string
+  stopCondition: string
+  successCriteria: string
+  at: number
+}
+
+export interface ResearchRunResult {
+  outcome: 'supported' | 'contradicted' | 'inconclusive'
+  summary: string
+  metrics: string
+  experimentId: string
+  at: number
+}
+
 export interface ResearchRunApproval {
   stage: ResearchRunStage
   at: number
@@ -411,6 +442,10 @@ export interface ResearchRun {
   paperIds: string[]
   evidence: ResearchRunEvidence[]
   claims: ResearchRunClaim[]
+  hypothesis: ResearchRunHypothesis | null
+  experimentPlan: ResearchRunExperimentPlan | null
+  experimentId: string
+  result: ResearchRunResult | null
   approvals: ResearchRunApproval[]
   createdAt: number
   updatedAt: number
@@ -554,6 +589,10 @@ function normalizeStore(input: unknown): ResearchStore {
     ...run,
     evidence: Array.isArray(run.evidence) ? run.evidence : [],
     claims: Array.isArray(run.claims) ? run.claims : [],
+    hypothesis: run.hypothesis || null,
+    experimentPlan: run.experimentPlan || null,
+    experimentId: typeof run.experimentId === 'string' ? run.experimentId : '',
+    result: run.result || null,
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
   }))
   const asRef = (value: unknown): ResearchMainlineRef | null => {

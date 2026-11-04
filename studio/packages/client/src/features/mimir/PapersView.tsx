@@ -4593,6 +4593,46 @@ export function PapersView({
     }))
   }
 
+  /**
+   * 把内置科研 Skill 直接投到当前项目会话。Skill 自己通过
+   * ekko_studio_api_request 读写文献、实验、服务器和论文模块。
+   */
+  const launchResearchSkill = (skill: 'auto-research-in-sleep' | 'academic-research-suite'): void => {
+    if (selectedProject === null) {
+      setActionError(t('bib.noProject'))
+      return
+    }
+    setAiMenuOpen(false)
+    setActionError(null)
+    const scope = aiScope.slice(0, 20)
+    const papers = scope.length === 0
+      ? '(当前没有选中的文献)'
+      : scope.map(paper => `- ${paperKey(paper)} | ${paper.title}`).join('\n')
+    const prompt = [
+      `Use the built-in Skill "${skill}" for this research task.`,
+      `Call skill_view for "${skill}" first, then read its references/workbench-api.md.`,
+      '',
+      `Research Workbench project: ${selectedProject.title} (${selectedProject.id})`,
+      `Project directory: ${selectedProject.absDir ?? selectedProject.paperDir ?? ''}`,
+      'Papers in scope:',
+      papers,
+      '',
+      'Start by calling ekko_studio_api_request GET /api/studio/research/state.',
+      'Use only real workbench records and verified full text; never invent citations, metrics, or claims.',
+      'Record plans/results in the matching workbench module and ask before destructive writes.',
+      'For this turn, complete the next unfinished stage and leave a short resumable journal entry.',
+    ].join('\n')
+    void requestProjectSession(prompt).then((result) => {
+      if (!result.ok) {
+        setActionError(result.error ?? t('papers.relatedWorkFailed'))
+        return
+      }
+      // 启动 Skill 后直接进入聊天页。`openSession` 指向模型设置页，
+      // 这里不能复用它；当前会话已经由 requestProjectSession 选中。
+      window.location.hash = '#/hermes/chat'
+    })
+  }
+
   /** Local PDF files become papers one by one; folder input simply supplies more File objects. */
   const importPdfFiles = (files: readonly File[]): void => {
     const pdfs = files.filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
@@ -5281,6 +5321,24 @@ export function PapersView({
                     onClick={() => { startAiPicker('review') }}
                   >
                     {review.status === 'loading' ? t('papers.skillRunning') : t('papers.review')}
+                  </button>
+                  <button
+                    type="button"
+                    className={css.papersMenuItem}
+                    disabled={selectedProject === null || visible.length === 0}
+                    title={selectedProject === null ? t('bib.noProject') : t('papers.autoResearchHint')}
+                    onClick={() => { launchResearchSkill('auto-research-in-sleep') }}
+                  >
+                    {t('papers.autoResearch')}
+                  </button>
+                  <button
+                    type="button"
+                    className={css.papersMenuItem}
+                    disabled={selectedProject === null || visible.length === 0}
+                    title={selectedProject === null ? t('bib.noProject') : t('papers.academicSuiteHint')}
+                    onClick={() => { launchResearchSkill('academic-research-suite') }}
+                  >
+                    {t('papers.academicSuite')}
                   </button>
                   <button
                     type="button"

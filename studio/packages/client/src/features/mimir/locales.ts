@@ -446,6 +446,10 @@ export const zh = {
   'papers.knowledgeNoProject': '这篇论文还没有归属项目，无法存入知识',
   // Cross-paper review
   'papers.review': '生成文献综述',
+  'papers.autoResearch': '自主研究',
+  'papers.autoResearchHint': '启动自主研究 Skill：文献 → 想法 → 实验 → 证据 → 论文',
+  'papers.academicSuite': '学术研究套件',
+  'papers.academicSuiteHint': '启动学术研究 Skill：综述、写作、审稿、引用检查',
   'papers.reviewHint': '对勾选（或当前筛选）的文献生成主题化综述',
   'papers.closeReview': '关闭综述',
   'papers.selectAllCount': '全选 {count} 篇',
@@ -1578,6 +1582,10 @@ export const en = {
   'papers.knowledgeNoProject': 'This paper has no project yet; cannot save to knowledge',
   // Cross-paper review
   'papers.review': 'Literature review',
+  'papers.autoResearch': 'Autonomous research',
+  'papers.autoResearchHint': 'Start the autonomous research Skill: literature → ideas → experiments → evidence → paper',
+  'papers.academicSuite': 'Academic research suite',
+  'papers.academicSuiteHint': 'Start the academic research Skill: review, writing, peer review, citations',
   'papers.reviewHint': 'Write a thematic review of the checked (or currently listed) papers',
   'papers.closeReview': 'Close review',
   'papers.selectAllCount': 'Select all {count}',

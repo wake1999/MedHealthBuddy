@@ -46,6 +46,7 @@ interface RunMetricSpec {
   name: string
   direction: 'max' | 'min' | 'none'
   required: boolean
+  target?: number
 }
 
 interface RunExperimentPlan {
@@ -61,11 +62,13 @@ interface RunExperimentPlan {
 }
 
 interface RunResult {
-  outcome: 'supported' | 'contradicted' | 'inconclusive'
+  outcome: 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
   summary: string
   metrics: string
   experimentId: string
   confirmedFinal?: boolean
+  autoOutcome?: RunResult['outcome']
+  overrideReason?: string
 }
 
 interface RunJobInsight {
@@ -142,6 +145,24 @@ function parseMetricValuesClient(text: string): Record<string, number> {
   return values
 }
 
+function assessMetricOutcomeClient(
+  schema: RunMetricSpec[],
+  values: Record<string, number>,
+): RunResult['outcome'] {
+  const decisive = schema.filter(spec => spec.required && spec.target !== undefined && spec.direction !== 'none')
+  if (decisive.length === 0) return 'inconclusive'
+  let pass = 0
+  let fail = 0
+  for (const spec of decisive) {
+    const value = values[spec.name.toLowerCase()]
+    if (value === undefined || !Number.isFinite(value)) return 'inconclusive'
+    const ok = spec.direction === 'max' ? value >= Number(spec.target) : value <= Number(spec.target)
+    if (ok) pass += 1
+    else fail += 1
+  }
+  return fail === 0 ? 'supported' : pass === 0 ? 'contradicted' : 'mixed'
+}
+
 export function RunsView({
   projectId,
   projectTitle,
@@ -201,6 +222,8 @@ export function RunsView({
     metrics: '',
     experimentId: '',
     confirmedFinal: false,
+    autoOutcome: 'inconclusive',
+    overrideReason: '',
   })
   const [metricSchemaText, setMetricSchemaText] = useState('')
   const [serverId, setServerId] = useState('')
@@ -220,6 +243,11 @@ export function RunsView({
   const selected = runs.find(run => run.id === selectedId) || null
   const stageIndex = selected ? STAGES.indexOf(selected.stage) : 0
   const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
+  const autoVerdict = assessMetricOutcomeClient(
+    selected?.experimentPlan?.metricSchema || [],
+    parseMetricValuesClient(resultDraft.metrics),
+  )
+  const outcomeOverridden = autoVerdict !== 'inconclusive' && resultDraft.outcome !== autoVerdict
 
   useEffect(() => {
     if (serverId === '' && servers.length > 0) setServerId(servers[0].id)
@@ -234,12 +262,18 @@ export function RunsView({
       dataset: '', baselines: '', metrics: '', seeds: '', command: '', resources: '', stopCondition: '', successCriteria: '',
     })
     setMetricSchemaText((selected.experimentPlan?.metricSchema || [])
-      .map(spec => `${spec.name}:${spec.direction}:${spec.required ? 'required' : 'optional'}`)
+      .map(spec => `${spec.name}:${spec.direction}:${spec.required ? 'required' : 'optional'}${spec.target === undefined ? '' : `:${spec.target}`}`)
       .join(', '))
     setResultDraft(selected.result
-      ? { ...selected.result, confirmedFinal: Boolean(selected.result.confirmedFinal) }
+      ? {
+        ...selected.result,
+        confirmedFinal: Boolean(selected.result.confirmedFinal),
+        autoOutcome: selected.result.autoOutcome || 'inconclusive',
+        overrideReason: selected.result.overrideReason || '',
+      }
       : {
-        outcome: 'inconclusive', summary: '', metrics: '', experimentId: selected.experimentId, confirmedFinal: false,
+        outcome: 'inconclusive', summary: '', metrics: '', experimentId: selected.experimentId,
+        confirmedFinal: false, autoOutcome: 'inconclusive', overrideReason: '',
       })
   }, [selected?.id, selected?.updatedAt])
 
@@ -546,6 +580,10 @@ export function RunsView({
       .filter(spec => spec.required && !(spec.name.toLowerCase() in values))
     if (missing.length > 0) {
       setError(t('runs.missingMetrics', { metrics: missing.map(spec => spec.name).join(', ') }))
+      return
+    }
+    if (outcomeOverridden && (resultDraft.overrideReason || '').trim() === '') {
+      setError(t('runs.overrideReasonRequired'))
       return
     }
     setLoading(true)
@@ -1066,11 +1104,23 @@ export function RunsView({
                   {selected.experimentId !== '' && (
                     <div className={css.runsResultForm}>
                       <h4>{t('runs.resultTitle')}</h4>
+                      <p className={css.runsAutoVerdict}>
+                        {t('runs.autoVerdict')}: {t(`runs.outcome.${autoVerdict}`)}
+                      </p>
                       <select className={css.runsInput} value={resultDraft.outcome} onChange={event => setResultDraft({ ...resultDraft, outcome: event.target.value as RunResult['outcome'] })}>
                         <option value="supported">{t('runs.outcome.supported')}</option>
                         <option value="contradicted">{t('runs.outcome.contradicted')}</option>
+                        <option value="mixed">{t('runs.outcome.mixed')}</option>
                         <option value="inconclusive">{t('runs.outcome.inconclusive')}</option>
                       </select>
+                      {outcomeOverridden && (
+                        <input
+                          className={css.runsInput}
+                          value={resultDraft.overrideReason || ''}
+                          onChange={event => setResultDraft({ ...resultDraft, overrideReason: event.target.value })}
+                          placeholder={t('runs.overrideReason')}
+                        />
+                      )}
                       <textarea className={css.runsTextarea} value={resultDraft.summary} onChange={event => setResultDraft({ ...resultDraft, summary: event.target.value })} placeholder={t('runs.resultPlaceholder')} rows={3} />
                       <input className={css.runsInput} value={resultDraft.metrics} onChange={event => setResultDraft({ ...resultDraft, metrics: event.target.value })} placeholder={t('runs.resultMetrics')} />
                       <label className={css.runsConfirm}>
@@ -1084,7 +1134,7 @@ export function RunsView({
                       <button
                         type="button"
                         className={css.btnPrimary}
-                        disabled={loading || resultDraft.summary.trim() === '' || !resultDraft.confirmedFinal}
+                        disabled={loading || resultDraft.summary.trim() === '' || !resultDraft.confirmedFinal || (outcomeOverridden && (resultDraft.overrideReason || '').trim() === '')}
                         onClick={() => void recordResult()}
                       >
                         {t('runs.saveResult')}

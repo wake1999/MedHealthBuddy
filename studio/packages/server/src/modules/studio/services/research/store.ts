@@ -409,6 +409,8 @@ export interface ResearchMetricSpec {
   name: string
   direction: 'max' | 'min' | 'none'
   required: boolean
+  /** Optional target; when present the server can suggest an outcome. */
+  target?: number
 }
 
 export interface ResearchRunExperimentPlan {
@@ -425,11 +427,13 @@ export interface ResearchRunExperimentPlan {
 }
 
 export interface ResearchRunResult {
-  outcome: 'supported' | 'contradicted' | 'inconclusive'
+  outcome: 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
   summary: string
   metrics: string
   experimentId: string
   confirmedFinal: boolean
+  autoOutcome: 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
+  overrideReason: string
   at: number
 }
 

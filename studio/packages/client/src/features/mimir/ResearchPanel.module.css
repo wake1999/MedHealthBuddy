@@ -10746,6 +10746,12 @@ button.paperNoteBlockMeta:hover {
   cursor: pointer;
 }
 
+.runsAutoVerdict {
+  margin: 0;
+  color: #3f7049;
+  font-size: 11px;
+}
+
 .runsResultForm {
   display: flex;
   flex-direction: column;

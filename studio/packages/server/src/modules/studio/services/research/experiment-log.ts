@@ -100,9 +100,36 @@ export function parseMetricSchema(text: string): ResearchMetricSpec[] {
     seen.add(key)
     const direction = parts[1] === 'min' || parts[1] === 'none' ? parts[1] : 'max'
     const required = parts[2] === 'optional' ? false : true
-    out.push({ name, direction, required })
+    const target = parts[3] !== undefined && Number.isFinite(Number(parts[3])) ? Number(parts[3]) : undefined
+    out.push({ name, direction, required, ...(target === undefined ? {} : { target }) })
   }
   return out.slice(0, 24)
+}
+
+export type MetricVerdict = 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
+
+/**
+ * Compare required metric values against their targets.
+ * No targets means the system must not pretend to know the answer.
+ */
+export function assessMetricOutcome(
+  schema: ResearchMetricSpec[],
+  values: Record<string, number>,
+): MetricVerdict {
+  const decisive = schema.filter(spec => spec.required && spec.target !== undefined && spec.direction !== 'none')
+  if (decisive.length === 0) return 'inconclusive'
+  let pass = 0
+  let fail = 0
+  for (const spec of decisive) {
+    const value = values[spec.name.toLowerCase()]
+    if (value === undefined || !Number.isFinite(value)) return 'inconclusive'
+    const ok = spec.direction === 'max' ? value >= Number(spec.target) : value <= Number(spec.target)
+    if (ok) pass += 1
+    else fail += 1
+  }
+  if (fail === 0) return 'supported'
+  if (pass === 0) return 'contradicted'
+  return 'mixed'
 }
 
 /** Parse human-entered result metrics into a case-insensitive value map. */

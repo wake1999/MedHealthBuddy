@@ -51,6 +51,7 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_evidence_not_approved'
     || message === 'research_claims_empty'
     || message === 'research_result_confirmation_required'
+    || message === 'research_result_override_reason_required'
     || message.startsWith('research_result_missing_metrics')
   ) {
     return fail(ctx, 422, message, message)

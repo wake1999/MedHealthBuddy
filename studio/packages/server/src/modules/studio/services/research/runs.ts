@@ -1,4 +1,4 @@
-import { inspectExperimentLog, parseMetricSchema, parseMetricValues } from './experiment-log'
+import { assessMetricOutcome, inspectExperimentLog, parseMetricSchema, parseMetricValues } from './experiment-log'
 import { jobState, submitJob } from './ssh'
 import {
   newId,
@@ -72,6 +72,7 @@ export interface ResultInput {
   metrics?: string
   metricValues?: Record<string, number>
   confirmedFinal?: boolean
+  overrideReason?: string
   confidence?: number
 }
 
@@ -546,9 +547,14 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       .filter(spec => spec.required && !(spec.name.toLowerCase() in metricValues))
       .map(spec => spec.name)
     if (missing.length > 0) throw new Error(`research_result_missing_metrics:${missing.join(',')}`)
-    const outcome = ['supported', 'contradicted', 'inconclusive'].includes(input.outcome || '')
+    const autoOutcome = assessMetricOutcome(schema, metricValues)
+    const outcome = ['supported', 'contradicted', 'mixed', 'inconclusive'].includes(input.outcome || '')
       ? (input.outcome as ResearchRunResult['outcome'])
-      : 'inconclusive'
+      : autoOutcome
+    const overrideReason = clean(input.overrideReason, 2000)
+    if (autoOutcome !== 'inconclusive' && outcome !== autoOutcome && overrideReason === '') {
+      throw new Error('research_result_override_reason_required')
+    }
     const now = Date.now()
     const evidenceId = newId('ev')
     const support = outcome === 'supported' ? 'supports' : outcome === 'contradicted' ? 'contradicts' : 'mixed'
@@ -587,6 +593,8 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       metrics: metricText || clean(input.metrics, 3000),
       experimentId: run.experimentId,
       confirmedFinal: true,
+      autoOutcome,
+      overrideReason,
       at: now,
     }
     run.stage = 'analysis'

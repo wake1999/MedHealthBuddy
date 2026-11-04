@@ -87,10 +87,11 @@ and `confirmedFinal: true`. The server computes mean/std/95% CI/delta, rejects
 missing required metrics, and suggests an outcome from targets and baselines;
 overriding that outcome requires `overrideReason`. Send `baselineSamples` with
 one value per seed for a paired t approximation; the result also carries a
-Wilcoxon approximation (`wilcoxonP`) and Holm-adjusted p-values
-(`pAdjusted`). A single sample cannot prove significance; provide multiple
-seeds when making a significance claim. These are approximations, not a
-replacement for a full statistical analysis. `refresh-experiment` also returns
+Wilcoxon p-value (`wilcoxonP`, exact for up to 16 non-zero pairs), Holm-adjusted
+p-values (`pAdjusted`), and a paired Cohen's dz (`effectSize`/`effectSizeType`).
+A single sample cannot prove significance; provide multiple seeds when making a
+significance claim. These are approximations, not a replacement for a full
+statistical analysis. `refresh-experiment` also returns
 `insight.metrics` and `insight.failureClass` parsed from the job log; treat them
 as a preview, not as a verdict. Never approve the evidence gate or invent a
 result yourself.

@@ -431,6 +431,9 @@ export interface ResearchMetricStats {
   pValue: number | null
   pAdjusted: number | null
   wilcoxonP?: number | null
+  wilcoxonExact?: boolean
+  effectSize?: number | null
+  effectSizeType?: string
 }
 
 export interface ResearchRunExperimentPlan {

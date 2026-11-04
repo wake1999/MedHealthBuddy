@@ -65,6 +65,9 @@ interface RunMetricStats {
   pValue?: number | null
   pAdjusted?: number | null
   wilcoxonP?: number | null
+  wilcoxonExact?: boolean
+  effectSize?: number | null
+  effectSizeType?: string
 }
 
 interface RunExperimentPlan {
@@ -235,6 +238,8 @@ function summarizeMetricSamplesClient(
         test: paired ? 'paired_t_approx' : differences.length > 0 ? 'one_sample_t_approx' : 'descriptive',
         pValue,
         pAdjusted: null,
+        effectSize: differences.length > 1 && diffStd > 0 ? diffMean / diffStd : null,
+        effectSizeType: paired ? 'cohen_dz' : 'cohen_d',
       }
     })
   const tested = stats.filter(stat => stat.pValue !== null).sort((left, right) => (left.pValue || 1) - (right.pValue || 1))
@@ -1267,6 +1272,7 @@ export function RunsView({
                               {stat.delta !== null ? ` Δ=${stat.delta.toFixed(4)}` : ''}
                               {stat.pAdjusted !== null && stat.pAdjusted !== undefined ? ` p.adj=${stat.pAdjusted.toFixed(4)}` : ''}
                               {stat.wilcoxonP !== null && stat.wilcoxonP !== undefined ? ` w=${stat.wilcoxonP.toFixed(4)}` : ''}
+                              {stat.effectSize !== null && stat.effectSize !== undefined ? ` ${stat.effectSizeType || 'd'}=${stat.effectSize.toFixed(2)}` : ''}
                               {stat.significant === null ? '' : ` ${stat.significant ? '显著' : '不显著'}`}
                             </span>
                           ))}

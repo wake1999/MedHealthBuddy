@@ -140,9 +140,41 @@ function sampleStd(values: number[], mean = meanOf(values)): number {
   return Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1))
 }
 
-function wilcoxonP(differences: number[]): number | null {
+function exactWilcoxonP(differences: number[]): number | null {
   const nonzero = differences.filter(value => value !== 0)
-  if (nonzero.length < 2) return null
+  const n = nonzero.length
+  if (n < 2 || n > 16) return null
+  const ranked = nonzero
+    .map((value, index) => ({ abs: Math.abs(value), sign: Math.sign(value), index }))
+    .sort((left, right) => left.abs - right.abs)
+  const ranks = Array(n).fill(0)
+  for (let index = 0; index < n; index += 1) {
+    let end = index
+    while (end + 1 < n && ranked[end + 1].abs === ranked[index].abs) end += 1
+    const rank = (index + end + 2) / 2
+    for (let cursor = index; cursor <= end; cursor += 1) ranks[ranked[cursor].index] = rank
+    index = end
+  }
+  const observed = ranks.reduce((sum, rank, index) => sum + (nonzero[index] > 0 ? rank : 0), 0)
+  const expected = ranks.reduce((sum, rank) => sum + rank, 0) / 2
+  const distance = Math.abs(observed - expected)
+  const total = 2 ** n
+  let extreme = 0
+  for (let mask = 0; mask < total; mask += 1) {
+    let positive = 0
+    for (let index = 0; index < n; index += 1) {
+      if ((mask & (1 << index)) !== 0) positive += ranks[index]
+    }
+    if (Math.abs(positive - expected) >= distance) extreme += 1
+  }
+  return extreme / total
+}
+
+function wilcoxonP(differences: number[]): { p: number | null; exact: boolean } {
+  const nonzero = differences.filter(value => value !== 0)
+  if (nonzero.length < 2) return { p: null, exact: false }
+  const exact = exactWilcoxonP(differences)
+  if (exact !== null) return { p: exact, exact: true }
   const ranked = nonzero
     .map(value => ({ abs: Math.abs(value), sign: Math.sign(value) }))
     .sort((left, right) => left.abs - right.abs)
@@ -153,8 +185,8 @@ function wilcoxonP(differences: number[]): number | null {
   const n = ranked.length
   const expected = n * (n + 1) / 4
   const sd = Math.sqrt(n * (n + 1) * (2 * n + 1) / 24)
-  if (sd === 0) return null
-  return twoSidedP((positiveRank - expected) / sd)
+  if (sd === 0) return { p: null, exact: false }
+  return { p: twoSidedP((positiveRank - expected) / sd), exact: false }
 }
 
 function statsForSamples(
@@ -175,6 +207,9 @@ function statsForSamples(
   pValue: number | null
   pAdjusted: number | null
   wilcoxonP: number | null
+  wilcoxonExact: boolean
+  effectSize: number | null
+  effectSizeType: string
 } {
   const n = samples.length
   const mean = meanOf(samples)
@@ -197,6 +232,7 @@ function statsForSamples(
       : diffMean === 0 ? 0 : Number.POSITIVE_INFINITY
     : null
   const pValue = t === null ? null : t === Number.POSITIVE_INFINITY ? 0 : twoSidedP(t)
+  const wilcoxon = wilcoxonP(differences)
   return {
     name: spec.name,
     n,
@@ -210,7 +246,10 @@ function statsForSamples(
     test: paired ? 'paired_t_approx' : differences.length > 0 ? 'one_sample_t_approx' : 'descriptive',
     pValue,
     pAdjusted: null,
-    wilcoxonP: wilcoxonP(differences),
+    wilcoxonP: wilcoxon.p,
+    wilcoxonExact: wilcoxon.exact,
+    effectSize: differences.length > 1 && diffStd > 0 ? diffMean / diffStd : null,
+    effectSizeType: paired ? 'cohen_dz' : 'cohen_d',
   }
 }
 

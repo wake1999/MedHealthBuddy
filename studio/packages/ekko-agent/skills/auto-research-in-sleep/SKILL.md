@@ -60,21 +60,27 @@ POST /api/studio/research/runs/:id/evidence
 { "paperId": "...", "claim": "...", "quote": "...", "page": 3, "section": "...", "support": "supports", "confidence": 0.8 }
 ```
 
-Then stop and let the human approve the evidence table:
+Then stop and let the human approve the evidence table and review claims:
 
 ```text
-POST /api/studio/research/runs/:id/approve-evidence
-POST /api/studio/research/runs/:id/hypothesis
-POST /api/studio/research/runs/:id/experiment-plan
-POST /api/studio/research/runs/:id/create-experiment
-POST /api/studio/research/runs/:id/submit-experiment
-POST /api/studio/research/runs/:id/refresh-experiment
-POST /api/studio/research/runs/:id/result
-POST /api/studio/research/runs/:id/advance
-GET  /api/studio/research/runs/:id/report
-POST /api/studio/research/runs/:id/results-draft
-POST /api/studio/research/runs/:id/insert-results
+POST  /api/studio/research/runs/:id/approve-evidence
+GET   /api/studio/research/runs/:id/claim-coverage
+PATCH /api/studio/research/runs/:id/claims/:claimId
+POST  /api/studio/research/runs/:id/hypothesis
+POST  /api/studio/research/runs/:id/experiment-plan
+POST  /api/studio/research/runs/:id/create-experiment
+POST  /api/studio/research/runs/:id/submit-experiment
+POST  /api/studio/research/runs/:id/refresh-experiment
+POST  /api/studio/research/runs/:id/result
+POST  /api/studio/research/runs/:id/advance
+GET   /api/studio/research/runs/:id/report
+POST  /api/studio/research/runs/:id/results-draft
+POST  /api/studio/research/runs/:id/insert-results
 ```
+
+`approve-evidence` only locks the table. Hypothesis requires at least one
+approved claim, no `needs_evidence` claim, and a review note for an approved
+contradictory claim. Never approve evidence or claims yourself.
 
 `report` is a deterministic Markdown export of persisted evidence, claims,
 hypothesis, plan, job insight, and statistics. `results-draft` returns a Results

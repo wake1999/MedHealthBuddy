@@ -390,6 +390,10 @@ export interface ResearchRunClaim {
   evidenceIds: string[]
   confidence: number
   note: string
+  reviewStatus: 'pending' | 'approved' | 'rejected' | 'needs_evidence'
+  reviewNote: string
+  reviewedAt: number
+  contradictionIds: string[]
   createdAt: number
   updatedAt: number
 }
@@ -636,7 +640,13 @@ function normalizeStore(input: unknown): ResearchStore {
   store.runs = store.runs.map(run => ({
     ...run,
     evidence: Array.isArray(run.evidence) ? run.evidence : [],
-    claims: Array.isArray(run.claims) ? run.claims : [],
+    claims: (Array.isArray(run.claims) ? run.claims : []).map(claim => ({
+      ...claim,
+      reviewStatus: claim.reviewStatus || 'pending',
+      reviewNote: claim.reviewNote || '',
+      reviewedAt: claim.reviewedAt || 0,
+      contradictionIds: Array.isArray(claim.contradictionIds) ? claim.contradictionIds : [],
+    })),
     hypothesis: run.hypothesis || null,
     experimentPlan: run.experimentPlan
       ? { ...run.experimentPlan, metricSchema: Array.isArray(run.experimentPlan.metricSchema) ? run.experimentPlan.metricSchema : [] }

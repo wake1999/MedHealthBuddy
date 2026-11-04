@@ -601,6 +601,10 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       evidenceIds: [evidenceId],
       confidence: outcome === 'inconclusive' ? 0.4 : 0.75,
       note: summary,
+      reviewStatus: 'pending',
+      reviewNote: '',
+      reviewedAt: 0,
+      contradictionIds: [],
       createdAt: now,
       updatedAt: now,
     })
@@ -652,6 +656,13 @@ export async function replaceClaims(profile: string, runId: string, inputs: Clai
           ? Math.max(0, Math.min(1, input.confidence))
           : 0.5,
         note: clean(input.note, 2000),
+        reviewStatus: 'pending',
+        reviewNote: '',
+        reviewedAt: 0,
+        contradictionIds: evidenceIds.filter((evidenceId) => {
+          const row = run.evidence.find(evidence => evidence.id === evidenceId)
+          return row?.support === 'contradicts'
+        }),
         createdAt: now,
         updatedAt: now,
       })
@@ -662,15 +673,109 @@ export async function replaceClaims(profile: string, runId: string, inputs: Clai
   }, { actor: { kind: 'agent', id: 'research-run' }, action: 'run.claims.replaced' })
 }
 
+export interface ClaimReviewInput {
+  reviewStatus?: ResearchRunClaim['reviewStatus']
+  reviewNote?: string
+}
+
+export interface ClaimCoverage {
+  paperCount: number
+  coveredPaperCount: number
+  papersWithoutEvidence: string[]
+  claimCount: number
+  pendingCount: number
+  approvedCount: number
+  rejectedCount: number
+  needsEvidenceCount: number
+  claimsWithNoEvidence: number
+  contradictoryClaimCount: number
+  ready: boolean
+  blockers: string[]
+}
+
+function claimGateBlockers(run: ResearchRun): string[] {
+  const blockers: string[] = []
+  const approved = run.claims.filter(claim => claim.reviewStatus === 'approved')
+  if (approved.length === 0) blockers.push('research_claims_not_approved')
+  if (run.claims.some(claim => claim.reviewStatus === 'needs_evidence')) {
+    blockers.push('research_claims_needs_evidence')
+  }
+  if (approved.some(claim => claim.evidenceIds.length === 0)) {
+    blockers.push('research_claims_missing_evidence')
+  }
+  if (approved.some(claim => claim.contradictionIds.length > 0 && claim.reviewNote.trim() === '')) {
+    blockers.push('research_claim_contradiction_note_required')
+  }
+  return blockers
+}
+
+export function describeClaimCoverage(run: ResearchRun): ClaimCoverage {
+  const evidencePaperIds = new Set(run.evidence.map(row => row.paperId).filter(Boolean))
+  const papersWithoutEvidence = run.paperIds.filter(paperId => !evidencePaperIds.has(paperId))
+  const blockers = claimGateBlockers(run)
+  return {
+    paperCount: run.paperIds.length,
+    coveredPaperCount: run.paperIds.length - papersWithoutEvidence.length,
+    papersWithoutEvidence,
+    claimCount: run.claims.length,
+    pendingCount: run.claims.filter(claim => claim.reviewStatus === 'pending').length,
+    approvedCount: run.claims.filter(claim => claim.reviewStatus === 'approved').length,
+    rejectedCount: run.claims.filter(claim => claim.reviewStatus === 'rejected').length,
+    needsEvidenceCount: run.claims.filter(claim => claim.reviewStatus === 'needs_evidence').length,
+    claimsWithNoEvidence: run.claims.filter(claim => claim.evidenceIds.length === 0).length,
+    contradictoryClaimCount: run.claims.filter(claim => claim.contradictionIds.length > 0).length,
+    ready: blockers.length === 0,
+    blockers,
+  }
+}
+
+export async function reviewClaim(
+  profile: string,
+  runId: string,
+  claimId: string,
+  input: ClaimReviewInput,
+): Promise<{ run: ResearchRun; coverage: ClaimCoverage }> {
+  return updateStore(profile, 'run.claim.reviewed', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const claim = run.claims.find(row => row.id === claimId)
+    if (!claim) throw new Error('research_claim_not_found')
+    const reviewStatus = ['pending', 'approved', 'rejected', 'needs_evidence'].includes(input.reviewStatus || '')
+      ? (input.reviewStatus as ResearchRunClaim['reviewStatus'])
+      : 'pending'
+    const reviewNote = clean(input.reviewNote, 2000)
+    if (reviewStatus === 'approved' && claim.contradictionIds.length > 0 && reviewNote === '') {
+      throw new Error('research_claim_contradiction_note_required')
+    }
+    claim.reviewStatus = reviewStatus
+    claim.reviewNote = reviewNote
+    claim.reviewedAt = Date.now()
+    claim.updatedAt = claim.reviewedAt
+    run.updatedAt = claim.reviewedAt
+    return { run, coverage: describeClaimCoverage(run) }
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.claim.reviewed' })
+}
+
+export async function getClaimCoverage(profile: string, runId: string): Promise<ClaimCoverage> {
+  const store = await readStore(profile)
+  const run = store.runs.find(row => row.id === runId)
+  if (!run) throw new Error('research_run_not_found')
+  return describeClaimCoverage(run)
+}
+
 export async function approveEvidence(profile: string, runId: string, note = ''): Promise<ResearchRun> {
   return updateStore(profile, 'run.evidence.approved', draft => {
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
     if (run.evidence.length === 0) throw new Error('research_evidence_empty')
     const now = Date.now()
-    run.approvals.push({ stage: 'evidence', at: now, note: clean(note, 1000) })
-    run.stage = 'hypothesis'
-    run.status = 'running'
+    if (!run.approvals.some(item => item.stage === 'evidence')) {
+      run.approvals.push({ stage: 'evidence', at: now, note: clean(note, 1000) })
+    }
+    // The evidence gate locks the table; claim review is a separate gate
+    // before hypothesis. Do not skip it by advancing here.
+    run.stage = 'evidence'
+    run.status = 'waiting_approval'
     run.updatedAt = now
     return run
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.evidence.approved' })
@@ -682,6 +787,8 @@ export async function advanceRun(profile: string, runId: string): Promise<Resear
     if (!run) throw new Error('research_run_not_found')
     if (run.stage === 'evidence') {
       if (!run.approvals.some(item => item.stage === 'evidence')) throw new Error('research_evidence_not_approved')
+      const blockers = claimGateBlockers(run)
+      if (blockers.length > 0) throw new Error(blockers[0])
       run.stage = 'hypothesis'
       run.status = 'running'
     } else if (run.stage === 'hypothesis') {

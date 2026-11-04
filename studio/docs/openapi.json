@@ -22246,6 +22246,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/claim-coverage": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get claim-coverage",
+        "description": "GET /api/studio/research/runs/:id/claim-coverage",
+        "operationId": "claimCoverageHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/claims/derive": {
       "post": {
         "tags": [
@@ -22273,6 +22309,50 @@
         "parameters": [
           {
             "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/claims/{claimId}": {
+      "patch": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update :claimId",
+        "description": "PATCH /api/studio/research/runs/:id/claims/:claimId",
+        "operationId": "reviewClaimHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "claimId",
             "in": "path",
             "required": true,
             "schema": {

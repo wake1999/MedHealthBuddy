@@ -24,6 +24,8 @@ researchRoutes.post('/api/studio/research/runs/:id/evidence', runCtrl.addEvidenc
 researchRoutes.post('/api/studio/research/runs/:id/extract-evidence', runCtrl.extractEvidenceHandler)
 researchRoutes.get('/api/studio/research/runs/:id/extract-status', runCtrl.extractEvidenceStatusHandler)
 researchRoutes.post('/api/studio/research/runs/:id/claims/derive', runCtrl.deriveClaimsHandler)
+researchRoutes.patch('/api/studio/research/runs/:id/claims/:claimId', runCtrl.reviewClaimHandler)
+researchRoutes.get('/api/studio/research/runs/:id/claim-coverage', runCtrl.claimCoverageHandler)
 researchRoutes.post('/api/studio/research/runs/:id/hypothesis', runCtrl.saveHypothesisHandler)
 researchRoutes.post('/api/studio/research/runs/:id/experiment-plan', runCtrl.saveExperimentPlanHandler)
 researchRoutes.post('/api/studio/research/runs/:id/create-experiment', runCtrl.createExperimentHandler)

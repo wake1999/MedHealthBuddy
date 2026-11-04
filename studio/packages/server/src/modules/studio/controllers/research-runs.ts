@@ -4,9 +4,11 @@ import {
   approveEvidence,
   createExperimentRecord,
   createRun,
+  getClaimCoverage,
   getRun,
   importWorkbenchEvidence,
   listRuns,
+  reviewClaim,
   recordExperimentResult,
   refreshExperimentJob,
   submitExperimentJob,
@@ -55,6 +57,10 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_claims_empty'
     || message === 'research_result_confirmation_required'
     || message === 'research_result_override_reason_required'
+    || message === 'research_claims_not_approved'
+    || message === 'research_claims_needs_evidence'
+    || message === 'research_claims_missing_evidence'
+    || message === 'research_claim_contradiction_note_required'
     || message.startsWith('research_result_missing_metrics')
   ) {
     return fail(ctx, 422, message, message)
@@ -356,6 +362,40 @@ export async function deriveClaimsHandler(ctx: any) {
       ok: true,
       count,
       run: await getRun(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function reviewClaimHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await reviewClaim(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.claimId || ''),
+        {
+          reviewStatus: String(body.reviewStatus || '') as never,
+          reviewNote: String(body.reviewNote || ''),
+        },
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function claimCoverageHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      coverage: await getClaimCoverage(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+      ),
     }
   } catch (error) {
     failRun(ctx, error)

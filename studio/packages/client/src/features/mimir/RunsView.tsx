@@ -23,6 +23,8 @@ interface RunEvidence {
   note: string
 }
 
+type ClaimReviewStatus = 'pending' | 'approved' | 'rejected' | 'needs_evidence'
+
 interface RunClaim {
   id: string
   text: string
@@ -30,6 +32,25 @@ interface RunClaim {
   evidenceIds: string[]
   confidence: number
   note: string
+  reviewStatus: ClaimReviewStatus
+  reviewNote: string
+  reviewedAt: number
+  contradictionIds: string[]
+}
+
+interface ClaimCoverage {
+  paperCount: number
+  coveredPaperCount: number
+  papersWithoutEvidence: string[]
+  claimCount: number
+  pendingCount: number
+  approvedCount: number
+  rejectedCount: number
+  needsEvidenceCount: number
+  claimsWithNoEvidence: number
+  contradictoryClaimCount: number
+  ready: boolean
+  blockers: string[]
 }
 
 interface RunHypothesis {
@@ -333,6 +354,10 @@ export function RunsView({
     message: string
   } | null>(null)
   const [claimsBusy, setClaimsBusy] = useState(false)
+  const [reviewBusy, setReviewBusy] = useState('')
+  const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
+  const [coverage, setCoverage] = useState<ClaimCoverage | null>(null)
   const [importBusy, setImportBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -403,10 +428,32 @@ export function RunsView({
   const resultStats = summarizeMetricSamplesClient(resultSchema, resultSamples, baselineSamples)
   const autoVerdict = assessMetricSamplesClient(resultSchema, resultSamples, baselineSamples)
   const outcomeOverridden = autoVerdict !== 'inconclusive' && resultDraft.outcome !== autoVerdict
+  const visibleClaims = (selected?.claims || []).filter(claim => {
+    if (claimFilter === 'all') return true
+    if (claimFilter === 'contradictions') return claim.contradictionIds.length > 0
+    return claim.reviewStatus === claimFilter
+  })
+  const claimGateReady = coverage?.ready !== false
+  const gateBlocked = selected?.stage === 'evidence'
+    && selected.approvals.some(item => item.stage === 'evidence')
+    && !claimGateReady
 
   useEffect(() => {
     if (serverId === '' && servers.length > 0) setServerId(servers[0].id)
   }, [servers, serverId])
+
+  useEffect(() => {
+    if (!selected) {
+      setCoverage(null)
+      return
+    }
+    setReviewNotes(Object.fromEntries((selected.claims || []).map(claim => [claim.id, claim.reviewNote || ''])))
+    void request<{ coverage: ClaimCoverage }>(
+      `/api/studio/research/runs/${encodeURIComponent(selected.id)}/claim-coverage`,
+    )
+      .then(body => setCoverage(body.coverage))
+      .catch(() => setCoverage(null))
+  }, [selected?.id, selected?.updatedAt])
 
   useEffect(() => {
     if (figureId === '' && figures.length > 0) setFigureId(figures[0].id)
@@ -621,6 +668,32 @@ export function RunsView({
     }
   }
 
+  async function reviewClaim(claimId: string, reviewStatus: ClaimReviewStatus) {
+    if (!selected) return
+    setReviewBusy(claimId)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun; coverage: ClaimCoverage }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/claims/${encodeURIComponent(claimId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            reviewStatus,
+            reviewNote: reviewNotes[claimId] || '',
+          }),
+        },
+      )
+      replaceRun(body.run)
+      setCoverage(body.coverage)
+      setNotice(t('runs.claimReviewed'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setReviewBusy('')
+    }
+  }
+
   async function deriveClaims() {
     if (!selected) return
     setClaimsBusy(true)
@@ -780,6 +853,7 @@ export function RunsView({
         body: JSON.stringify({ note: 'Evidence table approved from the workbench.' }),
       })
       await loadRuns(selected.id)
+      setNotice(t('runs.evidenceApprovedClaimGate'))
     } catch (err) {
       setError((err as Error).message)
       setLoading(false)
@@ -1069,7 +1143,7 @@ export function RunsView({
                 <button
                   type="button"
                   className={css.btnPrimary}
-                  disabled={loading || selected.evidence.length === 0 || selected.stage !== 'evidence'}
+                  disabled={loading || selected.evidence.length === 0 || selected.stage !== 'evidence' || selected.approvals.some(item => item.stage === 'evidence')}
                   onClick={() => void approve()}
                 >
                   {t('runs.approveEvidence')}
@@ -1077,7 +1151,7 @@ export function RunsView({
                 <button
                   type="button"
                   className={css.btn}
-                  disabled={loading || (selected.stage === 'evidence' && !selected.approvals.some(item => item.stage === 'evidence'))}
+                  disabled={loading || gateBlocked || (selected.stage === 'evidence' && !selected.approvals.some(item => item.stage === 'evidence'))}
                   onClick={() => void advance()}
                 >
                   {t('runs.advance')}
@@ -1162,23 +1236,66 @@ export function RunsView({
                 </div>
               )}
 
+              {coverage && (
+                <div className={css.runsCoverage}>
+                  <div className={css.runsCoverageStats}>
+                    <span>{t('runs.coverage.papers', { covered: coverage.coveredPaperCount, total: coverage.paperCount })}</span>
+                    <span>{t('runs.coverage.claims', { approved: coverage.approvedCount, total: coverage.claimCount })}</span>
+                    <span>{t('runs.coverage.pending', { count: coverage.pendingCount })}</span>
+                    <span data-warn={coverage.needsEvidenceCount > 0 || coverage.contradictoryClaimCount > 0 || undefined}>
+                      {t('runs.coverage.attention', {
+                        needs: coverage.needsEvidenceCount,
+                        contradictions: coverage.contradictoryClaimCount,
+                      })}
+                    </span>
+                  </div>
+                  {coverage.papersWithoutEvidence.length > 0 && (
+                    <p className={css.runsCoverageWarning}>
+                      {t('runs.coverage.uncovered')}: {coverage.papersWithoutEvidence.join(', ')}
+                    </p>
+                  )}
+                  {coverage.blockers.length > 0 && (
+                    <p className={css.runsCoverageWarning}>
+                      {t('runs.coverage.blocked')}: {coverage.blockers.map(code => t(`runs.gate.${code}`)).join(' · ')}
+                    </p>
+                  )}
+                  {coverage.ready && <p className={css.runsCoverageReady}>{t('runs.coverage.ready')}</p>}
+                </div>
+              )}
+
               <div className={css.runsClaims}>
                 <div className={css.runsClaimsHead}>
                   <h4>{t('runs.claimsTitle')} ({selected.claims?.length || 0})</h4>
-                  <button
-                    type="button"
-                    className={css.btn}
-                    disabled={claimsBusy || selected.evidence.length === 0}
-                    onClick={() => void deriveClaims()}
-                  >
-                    {claimsBusy ? t('runs.claimsBusy') : t('runs.deriveClaims')}
-                  </button>
+                  <div className={css.runsClaimsTools}>
+                    <select
+                      className={css.runsInput}
+                      value={claimFilter}
+                      onChange={event => setClaimFilter(event.target.value as typeof claimFilter)}
+                    >
+                      <option value="all">{t('runs.filter.all')}</option>
+                      <option value="pending">{t('runs.reviewStatus.pending')}</option>
+                      <option value="approved">{t('runs.reviewStatus.approved')}</option>
+                      <option value="needs_evidence">{t('runs.reviewStatus.needs_evidence')}</option>
+                      <option value="contradictions">{t('runs.filter.contradictions')}</option>
+                    </select>
+                    <button
+                      type="button"
+                      className={css.btn}
+                      disabled={claimsBusy || selected.evidence.length === 0}
+                      onClick={() => void deriveClaims()}
+                    >
+                      {claimsBusy ? t('runs.claimsBusy') : t('runs.deriveClaims')}
+                    </button>
+                  </div>
                 </div>
                 {(selected.claims?.length || 0) === 0 && <p className={css.hint}>{t('runs.claimsEmpty')}</p>}
-                {(selected.claims || []).map(claim => (
-                  <article key={claim.id} className={css.runsClaimCard} data-status={claim.status}>
+                {visibleClaims.map(claim => (
+                  <article key={claim.id} className={css.runsClaimCard} data-status={claim.status} data-review={claim.reviewStatus}>
                     <div className={css.runsClaimText}>{claim.text}</div>
                     <div className={css.runsClaimMeta}>
+                      <span data-warn={claim.reviewStatus === 'needs_evidence' || claim.contradictionIds.length > 0 || undefined}>
+                        {t(`runs.reviewStatus.${claim.reviewStatus}`)}
+                      </span>
                       <span>{t(`runs.claimStatus.${claim.status}`)}</span>
                       <span>{Math.round(claim.confidence * 100)}%</span>
                       <span>{claim.evidenceIds.length} {t('runs.evidenceUnit')}</span>
@@ -1187,10 +1304,12 @@ export function RunsView({
                       {claim.evidenceIds.map((evidenceId) => {
                         const evidenceRow = selected.evidence.find(row => row.id === evidenceId)
                         if (!evidenceRow) return null
+                        const contradiction = claim.contradictionIds.includes(evidenceId)
                         return (
                           <button
                             key={evidenceId}
                             type="button"
+                            data-contradiction={contradiction || undefined}
                             onClick={() => {
                               if (evidenceRow.paperId && openPaperPage) {
                                 openPaperPage(evidenceRow.paperId, evidenceRow.page || 1)
@@ -1198,13 +1317,32 @@ export function RunsView({
                             }}
                             title={evidenceRow.quote}
                           >
-                            {evidenceRow.paperTitle || t('runs.source')}
+                            {contradiction ? '⚠ ' : ''}{evidenceRow.paperTitle || t('runs.source')}
                             {evidenceRow.page ? ` · p.${evidenceRow.page}` : ''}
                           </button>
                         )
                       })}
                     </div>
                     {claim.note && <p>{claim.note}</p>}
+                    {(claim.contradictionIds.length > 0 || claim.reviewStatus === 'needs_evidence') && (
+                      <input
+                        className={css.runsInput}
+                        value={reviewNotes[claim.id] || ''}
+                        onChange={event => setReviewNotes(current => ({ ...current, [claim.id]: event.target.value }))}
+                        placeholder={t('runs.claimReviewNote')}
+                      />
+                    )}
+                    <div className={css.runsClaimActions}>
+                      <button type="button" className={css.btn} disabled={reviewBusy === claim.id} onClick={() => void reviewClaim(claim.id, 'approved')}>
+                        {t('runs.claimReview.approve')}
+                      </button>
+                      <button type="button" className={css.btn} disabled={reviewBusy === claim.id} onClick={() => void reviewClaim(claim.id, 'needs_evidence')}>
+                        {t('runs.claimReview.needsEvidence')}
+                      </button>
+                      <button type="button" className={css.btn} disabled={reviewBusy === claim.id} onClick={() => void reviewClaim(claim.id, 'rejected')}>
+                        {t('runs.claimReview.reject')}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>

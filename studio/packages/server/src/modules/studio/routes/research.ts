@@ -21,6 +21,7 @@ researchRoutes.post('/api/studio/research/runs/:id/evidence', runCtrl.addEvidenc
 researchRoutes.post('/api/studio/research/runs/:id/extract-evidence', runCtrl.extractEvidenceHandler)
 researchRoutes.get('/api/studio/research/runs/:id/extract-status', runCtrl.extractEvidenceStatusHandler)
 researchRoutes.post('/api/studio/research/runs/:id/claims/derive', runCtrl.deriveClaimsHandler)
+researchRoutes.post('/api/studio/research/runs/:id/import-workbench-evidence', runCtrl.importWorkbenchEvidenceHandler)
 researchRoutes.patch('/api/studio/research/runs/:id/evidence/:evidenceId', runCtrl.updateEvidenceHandler)
 researchRoutes.delete('/api/studio/research/runs/:id/evidence/:evidenceId', runCtrl.removeEvidenceHandler)
 

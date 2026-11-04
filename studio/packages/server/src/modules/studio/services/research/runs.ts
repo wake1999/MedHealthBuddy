@@ -213,6 +213,88 @@ export async function removeEvidence(profile: string, runId: string, evidenceId:
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.evidence.removed' })
 }
 
+interface WorkbenchEvidenceRow {
+  id: string
+  projectId?: string
+  src?: string
+  dstLabel?: string
+  rel?: string
+  note?: string
+  retractedAt?: number
+}
+
+function noteField(note: string, name: string): string {
+  const quoted = note.match(new RegExp(`${name}:\\s*"([\\s\\S]*?)"\\s*(?:\\||$)`))
+  if (quoted) return quoted[1].trim()
+  const plain = note.match(new RegExp(`${name}:\\s*([^|]+)`))
+  return plain ? plain[1].trim() : ''
+}
+
+/**
+ * Older workbench builds exposed only the generic evidence collection. Agents
+ * that could not discover the Research API wrote rows there with a serialized
+ * note. This converts those rows into first-class Run evidence without
+ * inventing any new source text.
+ */
+export async function importWorkbenchEvidence(
+  profile: string,
+  runId: string,
+  evidenceIds: string[] = [],
+): Promise<{ imported: number; skipped: number; run: ResearchRun }> {
+  const store = await readStore(profile)
+  const run = store.runs.find(row => row.id === runId)
+  if (!run) throw new Error('research_run_not_found')
+  const wanted = new Set(evidenceIds.filter(Boolean))
+  const rows = (store.evidence as WorkbenchEvidenceRow[]).filter(row => {
+    if (wanted.size > 0) return wanted.has(row.id)
+    return row.projectId === run.projectId
+      && row.retractedAt === undefined
+      && (!row.src || run.paperIds.length === 0 || run.paperIds.includes(String(row.src)))
+  })
+  const existing = new Set(run.evidence.map(row => `${row.paperId}|${row.quote}`))
+  let imported = 0
+  let skipped = 0
+  for (const row of rows) {
+    const note = String(row.note || '')
+    const quote = noteField(note, 'quote')
+    const pageText = noteField(note, 'page')
+    const section = noteField(note, 'section')
+    const supportText = noteField(note, 'support') || row.rel || 'supports'
+    const confidenceText = noteField(note, 'confidence')
+    const paperId = String(row.src || run.paperIds[0] || '')
+    const paper = store.papers.find(item => item.id === paperId)
+    const claim = String(row.dstLabel || '').trim()
+    if (quote === '' || claim === '') {
+      skipped += 1
+      continue
+    }
+    const key = `${paperId}|${quote}`
+    if (existing.has(key)) {
+      skipped += 1
+      continue
+    }
+    const support = ['supports', 'contradicts', 'mixed', 'context'].includes(supportText)
+      ? supportText as ResearchRunEvidence['support']
+      : 'supports'
+    const confidence = Number(confidenceText)
+    const page = Number(pageText)
+    await addEvidence(profile, runId, {
+      paperId,
+      paperTitle: paper?.title || '',
+      claim,
+      quote,
+      page: Number.isFinite(page) && page > 0 ? page : null,
+      section,
+      support,
+      confidence: Number.isFinite(confidence) ? confidence : 0.5,
+      note: `Imported from workbench evidence ${row.id}: ${note}`.slice(0, 2000),
+    })
+    existing.add(key)
+    imported += 1
+  }
+  return { imported, skipped, run: await getRun(profile, runId) }
+}
+
 export async function replaceClaims(profile: string, runId: string, inputs: ClaimInput[]): Promise<ResearchRun> {
   const now = Date.now()
   return updateStore(profile, 'run.claims.replaced', draft => {

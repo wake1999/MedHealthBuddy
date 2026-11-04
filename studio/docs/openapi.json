@@ -185,6 +185,10 @@
       "description": "Health check"
     },
     {
+      "name": "Research",
+      "description": "Research workbench: papers, full text, evidence, Research Runs, claims, experiments, and compile"
+    },
+    {
       "name": "Update",
       "description": "Studio self-update management"
     },
@@ -19122,6 +19126,3901 @@
         }
       }
     },
+    "/api/studio/research/arxiv/search": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get search",
+        "description": "GET /api/studio/research/arxiv/search",
+        "operationId": "arxivSearch",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/eureka": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create eureka",
+        "description": "POST /api/studio/research/eureka",
+        "operationId": "setEurekaHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get eureka",
+        "description": "GET /api/studio/research/eureka",
+        "operationId": "eurekaView",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/events": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get events",
+        "description": "GET /api/studio/research/events",
+        "operationId": "events",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/evidence/edges": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create edges",
+        "description": "POST /api/studio/research/evidence/edges",
+        "operationId": "addEvidenceEdgeHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/evidence/edges/retract": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create retract",
+        "description": "POST /api/studio/research/evidence/edges/retract",
+        "operationId": "retractEvidenceEdgeHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/items/jobs/{id}/refresh": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create refresh",
+        "description": "POST /api/studio/research/items/jobs/:id/refresh",
+        "operationId": "refreshJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/items/servers/{id}/check": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create check",
+        "description": "POST /api/studio/research/items/servers/:id/check",
+        "operationId": "checkServer",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/items/servers/{id}/jobs": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create jobs",
+        "description": "POST /api/studio/research/items/servers/:id/jobs",
+        "operationId": "submitServerJob",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/items/subscriptions/{id}/check": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create check",
+        "description": "POST /api/studio/research/items/subscriptions/:id/check",
+        "operationId": "checkSubscription",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/items/{collection}": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create :collection",
+        "description": "POST /api/studio/research/items/:collection",
+        "operationId": "createItem",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/items/{collection}/batch": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create batch",
+        "description": "POST /api/studio/research/items/:collection/batch",
+        "operationId": "batchUpdateItemsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/items/{collection}/{id}": {
+      "patch": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update :id",
+        "description": "PATCH /api/studio/research/items/:collection/:id",
+        "operationId": "updateItem",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Delete :id",
+        "description": "DELETE /api/studio/research/items/:collection/:id",
+        "operationId": "deleteItem",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "collection",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/journal": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create journal",
+        "description": "POST /api/studio/research/journal",
+        "operationId": "addJournalEntryHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/ledger/digest": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get digest",
+        "description": "GET /api/studio/research/ledger/digest",
+        "operationId": "ledgerDigest",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tier",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/ledger/events": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get events",
+        "description": "GET /api/studio/research/ledger/events",
+        "operationId": "ledgerEvents",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/ledger/evidence": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get evidence",
+        "description": "GET /api/studio/research/ledger/evidence",
+        "operationId": "ledgerEvidence",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/ledger/foraging": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get foraging",
+        "description": "GET /api/studio/research/ledger/foraging",
+        "operationId": "ledgerForaging",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/ledger/moments": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get moments",
+        "description": "GET /api/studio/research/ledger/moments",
+        "operationId": "ledgerMoments",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/ledger/worktree": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get worktree",
+        "description": "GET /api/studio/research/ledger/worktree",
+        "operationId": "ledgerWorktree",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/library/search": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get search",
+        "description": "GET /api/studio/research/library/search",
+        "operationId": "searchLibraryHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/moments/pin": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create pin",
+        "description": "POST /api/studio/research/moments/pin",
+        "operationId": "pinMomentHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/paper-pdf": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get paper-pdf",
+        "description": "GET /api/studio/research/paper-pdf",
+        "operationId": "getPaperFilePdf",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "arxivId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/import-pdf": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import-pdf",
+        "description": "POST /api/studio/research/papers/import-pdf",
+        "operationId": "importPaperPdfHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/resolve": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create resolve",
+        "description": "POST /api/studio/research/papers/resolve",
+        "operationId": "resolvePaperMetadataHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/papers/{id}/ask": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create ask",
+        "description": "POST /api/studio/research/papers/:id/ask",
+        "operationId": "askPaperHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/papers/{id}/figures": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get figures",
+        "description": "GET /api/studio/research/papers/:id/figures",
+        "operationId": "listPaperFiguresHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/{id}/fulltext": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create fulltext",
+        "description": "POST /api/studio/research/papers/:id/fulltext",
+        "operationId": "extractPaperFulltextHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get fulltext",
+        "description": "GET /api/studio/research/papers/:id/fulltext",
+        "operationId": "readPaperFulltextHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/{id}/notes": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get notes",
+        "description": "GET /api/studio/research/papers/:id/notes",
+        "operationId": "readPaperNotesHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update notes",
+        "description": "PUT /api/studio/research/papers/:id/notes",
+        "operationId": "savePaperNotesHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/papers/{id}/notes/template": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create template",
+        "description": "POST /api/studio/research/papers/:id/notes/template",
+        "operationId": "applyReadingTemplateHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/{id}/pdf": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create pdf",
+        "description": "POST /api/studio/research/papers/:id/pdf",
+        "operationId": "uploadPaperPdf",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/{id}/skill": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create skill",
+        "description": "POST /api/studio/research/papers/:id/skill",
+        "operationId": "runPaperSkillHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/papers/{id}/suggest": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create suggest",
+        "description": "POST /api/studio/research/papers/:id/suggest",
+        "operationId": "suggestPaperTagsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/papers/{id}/summary": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create summary",
+        "description": "POST /api/studio/research/papers/:id/summary",
+        "operationId": "summarizePaperHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/{id}/translate": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create translate",
+        "description": "POST /api/studio/research/papers/:id/translate",
+        "operationId": "translatePaperHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/papers/{id}/translate-pdf": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create translate-pdf",
+        "description": "POST /api/studio/research/papers/:id/translate-pdf",
+        "operationId": "translatePaperPdfHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/{id}/translate-status": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get translate-status",
+        "description": "GET /api/studio/research/papers/:id/translate-status",
+        "operationId": "translatePaperStatusHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/papers/{id}/vision": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create vision",
+        "description": "POST /api/studio/research/papers/:id/vision",
+        "operationId": "askPaperFigureHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/projects": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create projects",
+        "description": "POST /api/studio/research/projects",
+        "operationId": "createProject",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/projects/import": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import",
+        "description": "POST /api/studio/research/projects/import",
+        "operationId": "importProjectHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/projects/{id}": {
+      "patch": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update :id",
+        "description": "PATCH /api/studio/research/projects/:id",
+        "operationId": "updateProject",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Delete :id",
+        "description": "DELETE /api/studio/research/projects/:id",
+        "operationId": "deleteProject",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/artifact": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get artifact",
+        "description": "GET /api/studio/research/projects/:id/artifact",
+        "operationId": "readArtifactHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "string"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/bibliography": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get bibliography",
+        "description": "GET /api/studio/research/projects/:id/bibliography",
+        "operationId": "getBibliography",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update bibliography",
+        "description": "PUT /api/studio/research/projects/:id/bibliography",
+        "operationId": "saveBibliography",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/projects/{id}/bibliography/import-zotero": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import-zotero",
+        "description": "POST /api/studio/research/projects/:id/bibliography/import-zotero",
+        "operationId": "importZoteroCollectionBib",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/compile": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create compile",
+        "description": "POST /api/studio/research/projects/:id/compile",
+        "operationId": "compileProject",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/compile/status": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get status",
+        "description": "GET /api/studio/research/projects/:id/compile/status",
+        "operationId": "compileStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/decks": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create decks",
+        "description": "POST /api/studio/research/projects/:id/decks",
+        "operationId": "createDeck",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get decks",
+        "description": "GET /api/studio/research/projects/:id/decks",
+        "operationId": "listDecksHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/decks/{deckId}": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get :deckId",
+        "description": "GET /api/studio/research/projects/:id/decks/:deckId",
+        "operationId": "getDeck",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deckId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/decks/{deckId}/file": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get file",
+        "description": "GET /api/studio/research/projects/:id/decks/:deckId/file",
+        "operationId": "downloadDeck",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deckId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/decks/{deckId}/preview": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get preview",
+        "description": "GET /api/studio/research/projects/:id/decks/:deckId/preview",
+        "operationId": "previewDeck",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deckId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/figure": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get figure",
+        "description": "GET /api/studio/research/projects/:id/figure",
+        "operationId": "getProjectFigure",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Delete figure",
+        "description": "DELETE /api/studio/research/projects/:id/figure",
+        "operationId": "deleteFigureHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/figures/convert": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create convert",
+        "description": "POST /api/studio/research/projects/:id/figures/convert",
+        "operationId": "convertFigureHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/figures/rename": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create rename",
+        "description": "POST /api/studio/research/projects/:id/figures/rename",
+        "operationId": "renameFigureHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/figures/upload": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create upload",
+        "description": "POST /api/studio/research/projects/:id/figures/upload",
+        "operationId": "uploadFigureHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/paper": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get paper",
+        "description": "GET /api/studio/research/projects/:id/paper",
+        "operationId": "getPaper",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update paper",
+        "description": "PUT /api/studio/research/projects/:id/paper",
+        "operationId": "savePaper",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/projects/{id}/papers/fetch-pdf": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create fetch-pdf",
+        "description": "POST /api/studio/research/projects/:id/papers/fetch-pdf",
+        "operationId": "fetchPaperPdfHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/papers/import-arxiv": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import-arxiv",
+        "description": "POST /api/studio/research/projects/:id/papers/import-arxiv",
+        "operationId": "importArxivPaper",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/papers/import-bib": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import-bib",
+        "description": "POST /api/studio/research/projects/:id/papers/import-bib",
+        "operationId": "importPapersToBib",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/papers/import-zotero": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import-zotero",
+        "description": "POST /api/studio/research/projects/:id/papers/import-zotero",
+        "operationId": "importZoteroPaper",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/pdf": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get pdf",
+        "description": "GET /api/studio/research/projects/:id/pdf",
+        "operationId": "getPaperPdf",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/snapshots": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get snapshots",
+        "description": "GET /api/studio/research/projects/:id/snapshots",
+        "operationId": "listSnapshots",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create snapshots",
+        "description": "POST /api/studio/research/projects/:id/snapshots",
+        "operationId": "createSnapshot",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/snapshots/{snapshotId}": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get :snapshotId",
+        "description": "GET /api/studio/research/projects/:id/snapshots/:snapshotId",
+        "operationId": "getSnapshotContent",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/snapshots/{snapshotId}/restore": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create restore",
+        "description": "POST /api/studio/research/projects/:id/snapshots/:snapshotId/restore",
+        "operationId": "restoreSnapshot",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/venue-template": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create venue-template",
+        "description": "POST /api/studio/research/projects/:id/venue-template",
+        "operationId": "applyVenueTemplateHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Delete venue-template",
+        "description": "DELETE /api/studio/research/projects/:id/venue-template",
+        "operationId": "clearVenueTemplateHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/pubmed/search": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get search",
+        "description": "GET /api/studio/research/pubmed/search",
+        "operationId": "searchPubmedHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/review": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create review",
+        "description": "POST /api/studio/research/review",
+        "operationId": "runLiteratureReviewHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/research/runs": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get runs",
+        "description": "GET /api/studio/research/runs",
+        "operationId": "listRunsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create runs",
+        "description": "POST /api/studio/research/runs",
+        "operationId": "createRunHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/runs/{id}": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get :id",
+        "description": "GET /api/studio/research/runs/:id",
+        "operationId": "getRunHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update :id",
+        "description": "PATCH /api/studio/research/runs/:id",
+        "operationId": "updateRunHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Delete :id",
+        "description": "DELETE /api/studio/research/runs/:id",
+        "operationId": "deleteRunHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/advance": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create advance",
+        "description": "POST /api/studio/research/runs/:id/advance",
+        "operationId": "advanceRunHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/approve-evidence": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create approve-evidence",
+        "description": "POST /api/studio/research/runs/:id/approve-evidence",
+        "operationId": "approveEvidenceHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/claims/derive": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create derive",
+        "description": "POST /api/studio/research/runs/:id/claims/derive",
+        "operationId": "deriveClaimsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/evidence": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create evidence",
+        "description": "POST /api/studio/research/runs/:id/evidence",
+        "operationId": "addEvidenceHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/evidence/{evidenceId}": {
+      "patch": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Update :evidenceId",
+        "description": "PATCH /api/studio/research/runs/:id/evidence/:evidenceId",
+        "operationId": "updateEvidenceHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Delete :evidenceId",
+        "description": "DELETE /api/studio/research/runs/:id/evidence/:evidenceId",
+        "operationId": "removeEvidenceHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "evidenceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/extract-evidence": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create extract-evidence",
+        "description": "POST /api/studio/research/runs/:id/extract-evidence",
+        "operationId": "extractEvidenceHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "async",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/extract-status": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get extract-status",
+        "description": "GET /api/studio/research/runs/:id/extract-status",
+        "operationId": "extractEvidenceStatusHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/import-workbench-evidence": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import-workbench-evidence",
+        "description": "POST /api/studio/research/runs/:id/import-workbench-evidence",
+        "operationId": "importWorkbenchEvidenceHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/settings/image-gen": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get image-gen",
+        "description": "GET /api/studio/research/settings/image-gen",
+        "operationId": "imageGenConfigGet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create image-gen",
+        "description": "POST /api/studio/research/settings/image-gen",
+        "operationId": "imageGenConfigSet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/settings/sxng": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get sxng",
+        "description": "GET /api/studio/research/settings/sxng",
+        "operationId": "sxngConfigGet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create sxng",
+        "description": "POST /api/studio/research/settings/sxng",
+        "operationId": "sxngConfigSet",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/state": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get state",
+        "description": "GET /api/studio/research/state",
+        "operationId": "getState",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/venue-templates": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get venue-templates",
+        "description": "GET /api/studio/research/venue-templates",
+        "operationId": "venueTemplatesHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/venues/catalog": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get catalog",
+        "description": "GET /api/studio/research/venues/catalog",
+        "operationId": "venueCatalog",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "ccf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/web/search": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get search",
+        "description": "GET /api/studio/research/web/search",
+        "operationId": "webSearchHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "string"
+              ]
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "string"
+              ]
+            }
+          },
+          {
+            "name": "max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/wiki/import": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import",
+        "description": "POST /api/studio/research/wiki/import",
+        "operationId": "importWikiHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/worktree/adopt": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create adopt",
+        "description": "POST /api/studio/research/worktree/adopt",
+        "operationId": "adoptIdeaHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/worktree/close": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create close",
+        "description": "POST /api/studio/research/worktree/close",
+        "operationId": "closeIdeaHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/worktree/idea-parent": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create idea-parent",
+        "description": "POST /api/studio/research/worktree/idea-parent",
+        "operationId": "setIdeaParentHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/worktree/mainline": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create mainline",
+        "description": "POST /api/studio/research/worktree/mainline",
+        "operationId": "setMainlineHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/research/zotero/collections": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get collections",
+        "description": "GET /api/studio/research/zotero/collections",
+        "operationId": "zoteroCollections",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/studio/research/zotero/items": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get items",
+        "description": "GET /api/studio/research/zotero/items",
+        "operationId": "zoteroItems",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/zotero/status": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get status",
+        "description": "GET /api/studio/research/zotero/status",
+        "operationId": "zoteroStatus",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
     "/api/studio/search/sessions": {
       "get": {
         "tags": [
@@ -22938,6 +26837,32 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/studio/translation/health": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get health",
+        "description": "GET /api/studio/translation/health",
+        "operationId": "translationRuntimeHealthHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
           }
         }
       }

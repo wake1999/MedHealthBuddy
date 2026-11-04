@@ -6,6 +6,21 @@ URL and never invent a project, paper, experiment, job, or collection id.
 
 ## Discover current state first
 
+The workbench routes are documented under the OpenAPI `Research` tag. If an MCP
+catalog shows a Studio build without that tag, refresh the MCP/OpenAPI catalog;
+do not substitute the generic `/items/evidence` collection for Research Run
+evidence.
+
+Never read a paper via an absolute path such as
+`C:\Users\...\.hermes\...`. Agent shells may not mount the host filesystem.
+Use the API instead:
+
+```text
+GET /api/studio/research/papers/:id/fulltext
+```
+
+Then:
+
 ```text
 GET /api/studio/research/state
 ```
@@ -34,7 +49,7 @@ question instead of guessing.
 | Venue | `GET /venue-templates`, `GET /venues/catalog` | `POST /projects/:id/venue-template`, `DELETE /projects/:id/venue-template` |
 | Seminar deck | `GET /projects/:id/decks` | `POST /projects/:id/decks`, `GET /projects/:id/decks/:deckId/preview` |
 | Wiki / knowledge | `GET /ledger/digest` | `POST /wiki/import` |
-| Research Run | `GET /api/studio/research/runs?projectId=...`, `GET /runs/:id`, `GET /runs/:id/extract-status` | `POST /runs` (`projectId`, `question`, `paperIds`), `POST /runs/:id/extract-evidence?async=true`, `POST /runs/:id/evidence`, `POST /runs/:id/claims/derive`, `POST /runs/:id/approve-evidence`, `POST /runs/:id/advance` |
+| Research Run | `GET /api/studio/research/runs?projectId=...`, `GET /runs/:id`, `GET /runs/:id/extract-status` | `POST /runs` (`projectId`, `question`, `paperIds`), `POST /runs/:id/extract-evidence?async=true`, `POST /runs/:id/evidence`, `POST /runs/:id/claims/derive`, `POST /runs/:id/import-workbench-evidence`, `POST /runs/:id/approve-evidence`, `POST /runs/:id/advance` |
 
 ## Safety rules
 

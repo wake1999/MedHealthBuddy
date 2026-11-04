@@ -4,6 +4,7 @@ import {
   approveEvidence,
   createRun,
   getRun,
+  importWorkbenchEvidence,
   listRuns,
   removeEvidence,
   removeRun,
@@ -195,6 +196,20 @@ export async function extractEvidenceStatusHandler(ctx: any) {
   const key = runExtractionKey(profileOf(ctx) || 'default', String(ctx.params.id || ''))
   ctx.set('Cache-Control', 'no-store')
   ctx.body = { ok: true, job: getRunExtraction(key) }
+}
+
+export async function importWorkbenchEvidenceHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    const result = await importWorkbenchEvidence(
+      profileOf(ctx) || 'default',
+      String(ctx.params.id || ''),
+      Array.isArray(body.evidenceIds) ? body.evidenceIds.map(String) : [],
+    )
+    ctx.body = { ok: true, ...result }
+  } catch (error) {
+    failRun(ctx, error)
+  }
 }
 
 export async function deriveClaimsHandler(ctx: any) {

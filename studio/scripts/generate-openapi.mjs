@@ -89,6 +89,10 @@ const tagMappings = {
   'modules/studio/routes/petdex.ts': { name: 'Petdex', description: 'Desktop pet catalog and assets' },
   'modules/studio/routes/pets.ts': { name: 'Pets', description: 'Per-profile desktop pet settings' },
   'modules/studio/routes/health.ts': { name: 'Health', description: 'Health check' },
+  'modules/studio/routes/research.ts': {
+    name: 'Research',
+    description: 'Research workbench: papers, full text, evidence, Research Runs, claims, experiments, and compile',
+  },
   'modules/studio/routes/update.ts': { name: 'Update', description: 'Studio self-update management' },
   'modules/studio/routes/upload.ts': { name: 'Studio Files', description: 'Studio runtime file upload' },
   'modules/studio/routes/auth.ts': { name: 'Auth', description: 'Authentication management' },

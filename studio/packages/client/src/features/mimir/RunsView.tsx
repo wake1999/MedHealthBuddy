@@ -101,6 +101,7 @@ export function RunsView({
     message: string
   } | null>(null)
   const [claimsBusy, setClaimsBusy] = useState(false)
+  const [importBusy, setImportBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [question, setQuestion] = useState('')
@@ -276,6 +277,25 @@ export function RunsView({
     } finally {
       setExtracting(false)
       setExtractionProgress(null)
+    }
+  }
+
+  async function importWorkbenchEvidence() {
+    if (!selected) return
+    setImportBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun; imported: number; skipped: number }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/import-workbench-evidence`,
+        { method: 'POST', body: JSON.stringify({}) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.importDone', { imported: body.imported, skipped: body.skipped }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setImportBusy(false)
     }
   }
 
@@ -486,6 +506,14 @@ export function RunsView({
                   onClick={() => void askAgentForEvidence()}
                 >
                   {t('runs.agentExtract')}
+                </button>
+                <button
+                  type="button"
+                  className={css.btn}
+                  disabled={importBusy || loading || extracting}
+                  onClick={() => void importWorkbenchEvidence()}
+                >
+                  {importBusy ? t('runs.importBusy') : t('runs.importWorkbench')}
                 </button>
                 <button
                   type="button"

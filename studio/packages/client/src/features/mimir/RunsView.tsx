@@ -61,6 +61,10 @@ interface RunMetricStats {
   baseline: number | null
   delta: number | null
   significant: boolean | null
+  test?: string
+  pValue?: number | null
+  pAdjusted?: number | null
+  wilcoxonP?: number | null
 }
 
 interface RunExperimentPlan {
@@ -172,11 +176,25 @@ function parseMetricSamplesClient(text: string): Record<string, number[]> {
   return samples
 }
 
+function normalCdfClient(value: number): number {
+  const sign = value < 0 ? -1 : 1
+  const x = Math.abs(value) / Math.SQRT2
+  const t = 1 / (1 + 0.3275911 * x)
+  const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))))
+  const erf = sign * (1 - poly * Math.exp(-x * x))
+  return 0.5 * (1 + erf)
+}
+
+function twoSidedPClient(value: number): number {
+  return Math.max(0, Math.min(1, 2 * (1 - normalCdfClient(Math.abs(value)))))
+}
+
 function summarizeMetricSamplesClient(
   schema: RunMetricSpec[],
   samples: Record<string, number[]>,
+  baselineSamples: Record<string, number[]> = {},
 ): RunMetricStats[] {
-  return schema
+  const stats = schema
     .filter(spec => Array.isArray(samples[spec.name.toLowerCase()]) && samples[spec.name.toLowerCase()].length > 0)
     .map((spec) => {
       const values = samples[spec.name.toLowerCase()]
@@ -187,9 +205,23 @@ function summarizeMetricSamplesClient(
       const half = n > 1 ? 1.96 * std / Math.sqrt(n) : null
       const baseline = spec.baseline === undefined ? null : spec.baseline
       const delta = baseline === null ? null : spec.direction === 'min' ? baseline - mean : mean - baseline
-      const significant = baseline === null || n < 2 || half === null
-        ? null
-        : spec.direction === 'min' ? mean + half < baseline : mean - half > baseline
+      const paired = (baselineSamples[spec.name.toLowerCase()] || []).length === n && n > 1
+      const reference = paired
+        ? baselineSamples[spec.name.toLowerCase()]
+        : baseline === null ? [] : Array(n).fill(baseline)
+      const differences = reference.length === n
+        ? values.map((value, index) => spec.direction === 'min' ? reference[index] - value : value - reference[index])
+        : []
+      const diffMean = differences.length > 0 ? differences.reduce((sum, value) => sum + value, 0) / differences.length : 0
+      const diffStd = differences.length > 1
+        ? Math.sqrt(differences.reduce((sum, value) => sum + (value - diffMean) ** 2, 0) / (differences.length - 1))
+        : 0
+      const t = differences.length > 1
+        ? diffStd > 0
+          ? diffMean / (diffStd / Math.sqrt(differences.length))
+          : diffMean === 0 ? 0 : Number.POSITIVE_INFINITY
+        : null
+      const pValue = t === null ? null : t === Number.POSITIVE_INFINITY ? 0 : twoSidedPClient(t)
       return {
         name: spec.name,
         n,
@@ -199,14 +231,28 @@ function summarizeMetricSamplesClient(
         ciHigh: half === null ? null : mean + half,
         baseline,
         delta,
-        significant,
+        significant: null as boolean | null,
+        test: paired ? 'paired_t_approx' : differences.length > 0 ? 'one_sample_t_approx' : 'descriptive',
+        pValue,
+        pAdjusted: null,
       }
     })
+  const tested = stats.filter(stat => stat.pValue !== null).sort((left, right) => (left.pValue || 1) - (right.pValue || 1))
+  let previous = 0
+  for (let index = 0; index < tested.length; index += 1) {
+    const stat = tested[index]
+    const adjusted = Math.min(1, Math.max(previous, (stat.pValue || 0) * (tested.length - index)))
+    stat.pAdjusted = adjusted
+    stat.significant = adjusted <= 0.05
+    previous = adjusted
+  }
+  return stats
 }
 
 function assessMetricSamplesClient(
   schema: RunMetricSpec[],
   samples: Record<string, number[]>,
+  baselineSamples: Record<string, number[]> = {},
 ): RunResult['outcome'] {
   const decisive = schema.filter(spec =>
     spec.required
@@ -214,12 +260,15 @@ function assessMetricSamplesClient(
     && (spec.target !== undefined || (spec.baseline !== undefined && spec.minDelta !== undefined)),
   )
   if (decisive.length === 0) return 'inconclusive'
+  const stats = summarizeMetricSamplesClient(schema, samples, baselineSamples)
+  const byName = new Map(stats.map(stat => [stat.name.toLowerCase(), stat]))
   let pass = 0
   let fail = 0
   for (const spec of decisive) {
     const values = samples[spec.name.toLowerCase()]
     if (!Array.isArray(values) || values.length === 0) return 'inconclusive'
-    const stat = summarizeMetricSamplesClient([spec], samples)[0]
+    const stat = byName.get(spec.name.toLowerCase())
+    if (!stat) return 'inconclusive'
     let ok = true
     if (spec.target !== undefined) {
       ok = spec.direction === 'max' ? stat.mean >= spec.target : stat.mean <= spec.target
@@ -297,6 +346,7 @@ export function RunsView({
     overrideReason: '',
   })
   const [metricSchemaText, setMetricSchemaText] = useState('')
+  const [baselineSamplesText, setBaselineSamplesText] = useState('')
   const [serverId, setServerId] = useState('')
   const [experimentJob, setExperimentJob] = useState<{ id: string; state: string; note: string } | null>(null)
   const [jobBusy, setJobBusy] = useState(false)
@@ -316,8 +366,9 @@ export function RunsView({
   const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
   const resultSchema = selected?.experimentPlan?.metricSchema || []
   const resultSamples = parseMetricSamplesClient(resultDraft.metrics)
-  const resultStats = summarizeMetricSamplesClient(resultSchema, resultSamples)
-  const autoVerdict = assessMetricSamplesClient(resultSchema, resultSamples)
+  const baselineSamples = parseMetricSamplesClient(baselineSamplesText)
+  const resultStats = summarizeMetricSamplesClient(resultSchema, resultSamples, baselineSamples)
+  const autoVerdict = assessMetricSamplesClient(resultSchema, resultSamples, baselineSamples)
   const outcomeOverridden = autoVerdict !== 'inconclusive' && resultDraft.outcome !== autoVerdict
 
   useEffect(() => {
@@ -342,6 +393,7 @@ export function RunsView({
         spec.minDelta ?? '',
       ].join(':'))
       .join(', '))
+    setBaselineSamplesText('')
     setResultDraft(selected.result
       ? {
         ...selected.result,
@@ -670,7 +722,7 @@ export function RunsView({
     try {
       const body = await request<{ run: ResearchRun }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/result`,
-        { method: 'POST', body: JSON.stringify({ ...resultDraft, metricSamples: resultSamples }) },
+        { method: 'POST', body: JSON.stringify({ ...resultDraft, metricSamples: resultSamples, baselineSamples }) },
       )
       replaceRun(body.run)
       setNotice(t('runs.resultSaved'))
@@ -1213,11 +1265,20 @@ export function RunsView({
                             <span key={stat.name}>
                               {stat.name} μ={stat.mean.toFixed(4)} σ={stat.std.toFixed(4)} n={stat.n}
                               {stat.delta !== null ? ` Δ=${stat.delta.toFixed(4)}` : ''}
-                              {stat.significant === null ? '' : ` ${stat.significant ? 'CI+' : 'CI-'}`}
+                              {stat.pAdjusted !== null && stat.pAdjusted !== undefined ? ` p.adj=${stat.pAdjusted.toFixed(4)}` : ''}
+                              {stat.wilcoxonP !== null && stat.wilcoxonP !== undefined ? ` w=${stat.wilcoxonP.toFixed(4)}` : ''}
+                              {stat.significant === null ? '' : ` ${stat.significant ? '显著' : '不显著'}`}
                             </span>
                           ))}
                         </div>
                       )}
+                      <textarea
+                        className={css.runsTextarea}
+                        value={baselineSamplesText}
+                        onChange={event => setBaselineSamplesText(event.target.value)}
+                        placeholder={t('runs.baselineSamples')}
+                        rows={2}
+                      />
                       <label className={css.runsConfirm}>
                         <input
                           type="checkbox"

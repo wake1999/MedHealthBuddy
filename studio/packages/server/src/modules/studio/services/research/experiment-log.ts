@@ -117,9 +117,50 @@ export function parseMetricSchema(text: string): ResearchMetricSpec[] {
 
 export type MetricVerdict = 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
 
+function normalCdf(value: number): number {
+  // Abramowitz-Stegun erf approximation; enough for an approximate p-value.
+  const sign = value < 0 ? -1 : 1
+  const x = Math.abs(value) / Math.SQRT2
+  const t = 1 / (1 + 0.3275911 * x)
+  const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))))
+  const erf = sign * (1 - poly * Math.exp(-x * x))
+  return 0.5 * (1 + erf)
+}
+
+function twoSidedP(z: number): number {
+  return Math.max(0, Math.min(1, 2 * (1 - normalCdf(Math.abs(z)))))
+}
+
+function meanOf(values: number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length
+}
+
+function sampleStd(values: number[], mean = meanOf(values)): number {
+  if (values.length < 2) return 0
+  return Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1))
+}
+
+function wilcoxonP(differences: number[]): number | null {
+  const nonzero = differences.filter(value => value !== 0)
+  if (nonzero.length < 2) return null
+  const ranked = nonzero
+    .map(value => ({ abs: Math.abs(value), sign: Math.sign(value) }))
+    .sort((left, right) => left.abs - right.abs)
+  let positiveRank = 0
+  for (let index = 0; index < ranked.length; index += 1) {
+    if (ranked[index].sign > 0) positiveRank += index + 1
+  }
+  const n = ranked.length
+  const expected = n * (n + 1) / 4
+  const sd = Math.sqrt(n * (n + 1) * (2 * n + 1) / 24)
+  if (sd === 0) return null
+  return twoSidedP((positiveRank - expected) / sd)
+}
+
 function statsForSamples(
   spec: ResearchMetricSpec,
   samples: number[],
+  baselineSamples: number[] = [],
 ): {
   name: string
   n: number
@@ -130,21 +171,32 @@ function statsForSamples(
   baseline: number | null
   delta: number | null
   significant: boolean | null
+  test: string
+  pValue: number | null
+  pAdjusted: number | null
+  wilcoxonP: number | null
 } {
   const n = samples.length
-  const mean = samples.reduce((sum, value) => sum + value, 0) / n
-  const variance = n > 1
-    ? samples.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (n - 1)
-    : 0
-  const std = Math.sqrt(Math.max(0, variance))
+  const mean = meanOf(samples)
+  const std = sampleStd(samples, mean)
   const half = n > 1 ? 1.96 * std / Math.sqrt(n) : null
   const baseline = spec.baseline === undefined ? null : spec.baseline
   const delta = baseline === null ? null : spec.direction === 'min' ? baseline - mean : mean - baseline
-  const significant = baseline === null || n < 2 || half === null
-    ? null
-    : spec.direction === 'min'
-      ? mean + half < baseline
-      : mean - half > baseline
+  const paired = baselineSamples.length === n && n > 1
+  const reference = paired
+    ? baselineSamples
+    : baseline === null ? [] : Array(n).fill(baseline)
+  const differences = reference.length === n
+    ? samples.map((value, index) => spec.direction === 'min' ? reference[index] - value : value - reference[index])
+    : []
+  const diffMean = differences.length > 0 ? meanOf(differences) : 0
+  const diffStd = differences.length > 1 ? sampleStd(differences, diffMean) : 0
+  const t = differences.length > 1
+    ? diffStd > 0
+      ? diffMean / (diffStd / Math.sqrt(differences.length))
+      : diffMean === 0 ? 0 : Number.POSITIVE_INFINITY
+    : null
+  const pValue = t === null ? null : t === Number.POSITIVE_INFINITY ? 0 : twoSidedP(t)
   return {
     name: spec.name,
     n,
@@ -154,29 +206,53 @@ function statsForSamples(
     ciHigh: half === null ? null : mean + half,
     baseline,
     delta,
-    significant,
+    significant: null,
+    test: paired ? 'paired_t_approx' : differences.length > 0 ? 'one_sample_t_approx' : 'descriptive',
+    pValue,
+    pAdjusted: null,
+    wilcoxonP: wilcoxonP(differences),
   }
 }
 
-/** Compute mean/std/CI/delta for every metric with samples. */
+/** Compute mean/std/CI/delta, paired tests, and Holm-adjusted p-values. */
 export function summarizeMetricSamples(
   schema: ResearchMetricSpec[],
   samples: Record<string, number[]>,
+  baselineSamples: Record<string, number[]> = {},
 ): ReturnType<typeof statsForSamples>[] {
-  return schema
+  const stats = schema
     .filter(spec => Array.isArray(samples[spec.name.toLowerCase()]) && samples[spec.name.toLowerCase()].length > 0)
-    .map(spec => statsForSamples(spec, samples[spec.name.toLowerCase()]))
+    .map(spec => statsForSamples(
+      spec,
+      samples[spec.name.toLowerCase()],
+      baselineSamples[spec.name.toLowerCase()] || [],
+    ))
+  const tested = stats.filter(stat => stat.pValue !== null)
+  const ordered = tested
+    .slice()
+    .sort((left, right) => (left.pValue || 1) - (right.pValue || 1))
+  const count = ordered.length
+  let previous = 0
+  for (let index = 0; index < ordered.length; index += 1) {
+    const stat = ordered[index]
+    const adjusted = Math.min(1, Math.max(previous, (stat.pValue || 0) * (count - index)))
+    stat.pAdjusted = adjusted
+    previous = adjusted
+    stat.significant = adjusted <= 0.05
+  }
+  return stats
 }
 
 /**
  * Compare required metric samples against targets, baseline deltas, and
- * approximate 95% confidence intervals. One sample cannot prove significance;
+ * Holm-adjusted approximate p-values. One sample cannot prove significance;
  * target/delta checks still apply, while the significance check only runs when
- * at least two samples exist.
+ * a test exists.
  */
 export function assessMetricOutcome(
   schema: ResearchMetricSpec[],
   samples: Record<string, number[]>,
+  baselineSamples: Record<string, number[]> = {},
 ): MetricVerdict {
   const decisive = schema.filter(spec =>
     spec.required
@@ -184,12 +260,15 @@ export function assessMetricOutcome(
     && (spec.target !== undefined || (spec.baseline !== undefined && spec.minDelta !== undefined)),
   )
   if (decisive.length === 0) return 'inconclusive'
+  const stats = summarizeMetricSamples(schema, samples, baselineSamples)
+  const byName = new Map(stats.map(stat => [stat.name.toLowerCase(), stat]))
   let pass = 0
   let fail = 0
   for (const spec of decisive) {
     const values = samples[spec.name.toLowerCase()]
     if (!Array.isArray(values) || values.length === 0) return 'inconclusive'
-    const stat = statsForSamples(spec, values)
+    const stat = byName.get(spec.name.toLowerCase())
+    if (!stat) return 'inconclusive'
     let ok = true
     if (spec.target !== undefined) {
       ok = spec.direction === 'max' ? stat.mean >= spec.target : stat.mean <= spec.target

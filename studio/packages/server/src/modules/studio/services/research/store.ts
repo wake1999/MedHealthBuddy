@@ -427,6 +427,10 @@ export interface ResearchMetricStats {
   baseline: number | null
   delta: number | null
   significant: boolean | null
+  test: string
+  pValue: number | null
+  pAdjusted: number | null
+  wilcoxonP?: number | null
 }
 
 export interface ResearchRunExperimentPlan {

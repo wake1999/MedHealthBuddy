@@ -85,8 +85,12 @@ optional. A result write-back must include the outcome
 (`supported|contradicted|mixed|inconclusive`), summary, required metric samples,
 and `confirmedFinal: true`. The server computes mean/std/95% CI/delta, rejects
 missing required metrics, and suggests an outcome from targets and baselines;
-overriding that outcome requires `overrideReason`. A single sample cannot prove
-significance; provide multiple seeds when making a significance claim. `refresh-experiment` also returns
+overriding that outcome requires `overrideReason`. Send `baselineSamples` with
+one value per seed for a paired t approximation; the result also carries a
+Wilcoxon approximation (`wilcoxonP`) and Holm-adjusted p-values
+(`pAdjusted`). A single sample cannot prove significance; provide multiple
+seeds when making a significance claim. These are approximations, not a
+replacement for a full statistical analysis. `refresh-experiment` also returns
 `insight.metrics` and `insight.failureClass` parsed from the job log; treat them
 as a preview, not as a verdict. Never approve the evidence gate or invent a
 result yourself.

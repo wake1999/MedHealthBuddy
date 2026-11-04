@@ -72,6 +72,7 @@ export interface ResultInput {
   metrics?: string
   metricValues?: Record<string, number>
   metricSamples?: Record<string, number[]>
+  baselineSamples?: Record<string, number[]>
   confirmedFinal?: boolean
   overrideReason?: string
   confidence?: number
@@ -552,13 +553,21 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       const cleanValues = values.map(Number).filter(value => Number.isFinite(value))
       if (cleanValues.length > 0) metricSamples[name.toLowerCase()] = cleanValues
     }
+    const baselineSamples: Record<string, number[]> = {}
+    if (input.baselineSamples && typeof input.baselineSamples === 'object') {
+      for (const [name, values] of Object.entries(input.baselineSamples)) {
+        if (!Array.isArray(values)) continue
+        const cleanValues = values.map(Number).filter(value => Number.isFinite(value))
+        if (cleanValues.length > 0) baselineSamples[name.toLowerCase()] = cleanValues
+      }
+    }
     const schema = run.experimentPlan?.metricSchema || []
     const missing = schema
       .filter(spec => spec.required && !(spec.name.toLowerCase() in metricSamples))
       .map(spec => spec.name)
     if (missing.length > 0) throw new Error(`research_result_missing_metrics:${missing.join(',')}`)
-    const metricStats = summarizeMetricSamples(schema, metricSamples)
-    const autoOutcome = assessMetricOutcome(schema, metricSamples)
+    const metricStats = summarizeMetricSamples(schema, metricSamples, baselineSamples)
+    const autoOutcome = assessMetricOutcome(schema, metricSamples, baselineSamples)
     const outcome = ['supported', 'contradicted', 'mixed', 'inconclusive'].includes(input.outcome || '')
       ? (input.outcome as ResearchRunResult['outcome'])
       : autoOutcome

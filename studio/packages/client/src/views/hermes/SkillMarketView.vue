@@ -263,8 +263,9 @@ function categoryLabelForList(name: string) {
   return name
 }
 
-/** Groups start collapsed so the installed tab reads as a one-screen index. */
+/** Groups start expanded so newly installed research skills are visible immediately. */
 const expandedGroups = ref<Set<string>>(new Set())
+const groupsAutoExpanded = ref(false)
 
 /** A keyword or directory filter opens every group — collapsed rows would hide the hits. */
 const groupsForcedOpen = computed(() => query.value.trim() !== '' || category.value !== '')
@@ -326,6 +327,15 @@ const groupedLocal = computed<InstalledGroup[]>(() => {
   }
   return groups
 })
+
+// The installed tab used to start with every group collapsed, which made the
+// list look empty even though the count showed 25. Expand once when the first
+// groups arrive; users can still collapse individual groups afterwards.
+watch(groupedLocal, (groups) => {
+  if (groupsAutoExpanded.value || groups.length === 0) return
+  groupsAutoExpanded.value = true
+  expandedGroups.value = new Set(groups.map(group => group.key))
+}, { immediate: true })
 
 const filteredFavorites = computed(() => {
   const keyword = query.value.trim().toLowerCase()

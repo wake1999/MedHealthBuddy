@@ -18,6 +18,7 @@ import {
   updateRun,
 } from '../services/research/runs'
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
+import { generateRunReport } from '../services/research/run-report'
 import {
   beginRunExtraction,
   finishRunExtraction,
@@ -285,6 +286,17 @@ export async function recordResultHandler(ctx: any) {
     ctx.body = {
       ok: true,
       run: await recordExperimentResult(profileOf(ctx) || 'default', String(ctx.params.id || ''), body as never),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function runReportHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await generateRunReport(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
     }
   } catch (error) {
     failRun(ctx, error)

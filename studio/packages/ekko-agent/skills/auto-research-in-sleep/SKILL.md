@@ -71,7 +71,12 @@ POST /api/studio/research/runs/:id/submit-experiment
 POST /api/studio/research/runs/:id/refresh-experiment
 POST /api/studio/research/runs/:id/result
 POST /api/studio/research/runs/:id/advance
+GET  /api/studio/research/runs/:id/report
 ```
+
+`report` is a deterministic Markdown export of persisted evidence, claims,
+hypothesis, plan, job insight, and statistics. It does not call a model; verify
+it before using any paragraph in a manuscript.
 
 Hypothesis and plan are artifacts, not free-form chat. Define a metric contract
 in `experiment-plan`, for example:

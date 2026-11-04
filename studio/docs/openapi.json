@@ -22661,6 +22661,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/report": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get report",
+        "description": "GET /api/studio/research/runs/:id/report",
+        "operationId": "runReportHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/result": {
       "post": {
         "tags": [

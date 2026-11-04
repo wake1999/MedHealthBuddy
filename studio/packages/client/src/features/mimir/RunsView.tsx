@@ -355,6 +355,8 @@ export function RunsView({
   const [serverId, setServerId] = useState('')
   const [experimentJob, setExperimentJob] = useState<{ id: string; state: string; note: string } | null>(null)
   const [jobBusy, setJobBusy] = useState(false)
+  const [reportBusy, setReportBusy] = useState(false)
+  const [report, setReport] = useState<{ markdown: string; filename: string } | null>(null)
   const [evidence, setEvidence] = useState({
     paperId: '',
     claim: '',
@@ -767,6 +769,43 @@ export function RunsView({
     }
   }
 
+  async function generateReport() {
+    if (!selected) return
+    setReportBusy(true)
+    setError('')
+    try {
+      const body = await request<{ markdown: string; filename: string }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/report`,
+      )
+      setReport({ markdown: body.markdown, filename: body.filename })
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setReportBusy(false)
+    }
+  }
+
+  async function copyReport() {
+    if (!report) return
+    try {
+      await navigator.clipboard.writeText(report.markdown)
+      setNotice(t('runs.reportCopied'))
+    } catch {
+      setError(t('runs.reportCopyFailed'))
+    }
+  }
+
+  function downloadReport() {
+    if (!report) return
+    const blob = new Blob([report.markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = report.filename
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function askAgentForEvidence() {
     if (!selected || !requestProjectSession) return
     const prompt = [
@@ -950,6 +989,14 @@ export function RunsView({
                   onClick={() => void advance()}
                 >
                   {t('runs.advance')}
+                </button>
+                <button
+                  type="button"
+                  className={css.btn}
+                  disabled={reportBusy}
+                  onClick={() => void generateReport()}
+                >
+                  {reportBusy ? t('runs.reportBusy') : t('runs.generateReport')}
                 </button>
                 <small>{t('runs.updated')}: {formatDate(selected.updatedAt)}</small>
               </div>
@@ -1308,6 +1355,20 @@ export function RunsView({
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {report && (
+                <div className={css.runsReport}>
+                  <div className={css.runsReportHead}>
+                    <h4>{t('runs.reportTitle')}</h4>
+                    <div>
+                      <button type="button" className={css.btn} onClick={() => void copyReport()}>{t('runs.copyReport')}</button>
+                      <button type="button" className={css.btn} onClick={downloadReport}>{t('runs.downloadReport')}</button>
+                      <button type="button" className={css.btn} onClick={() => setReport(null)}>{t('runs.close')}</button>
+                    </div>
+                  </div>
+                  <pre>{report.markdown}</pre>
                 </div>
               )}
             </div>

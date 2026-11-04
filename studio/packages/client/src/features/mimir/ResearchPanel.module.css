@@ -10752,6 +10752,47 @@ button.paperNoteBlockMeta:hover {
   font-size: 11px;
 }
 
+.runsReport {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--mimir-line, rgb(120 92 32 / 16%));
+  border-radius: 10px;
+  background: var(--mimir-paper, #fffaf0);
+}
+
+.runsReportHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.runsReportHead h4 {
+  margin: 0;
+}
+
+.runsReportHead > div {
+  display: flex;
+  gap: 6px;
+}
+
+.runsReport pre {
+  max-height: 520px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border-radius: 7px;
+  background: rgb(33 30 25 / 6%);
+  color: var(--mimir-ink, #211e19);
+  font-size: 10.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .runsMetricStats {
   display: flex;
   flex-wrap: wrap;

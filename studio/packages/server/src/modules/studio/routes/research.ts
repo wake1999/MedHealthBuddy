@@ -18,6 +18,8 @@ researchRoutes.delete('/api/studio/research/runs/:id', runCtrl.deleteRunHandler)
 researchRoutes.post('/api/studio/research/runs/:id/advance', runCtrl.advanceRunHandler)
 researchRoutes.post('/api/studio/research/runs/:id/approve-evidence', runCtrl.approveEvidenceHandler)
 researchRoutes.post('/api/studio/research/runs/:id/evidence', runCtrl.addEvidenceHandler)
+researchRoutes.post('/api/studio/research/runs/:id/extract-evidence', runCtrl.extractEvidenceHandler)
+researchRoutes.post('/api/studio/research/runs/:id/claims/derive', runCtrl.deriveClaimsHandler)
 researchRoutes.patch('/api/studio/research/runs/:id/evidence/:evidenceId', runCtrl.updateEvidenceHandler)
 researchRoutes.delete('/api/studio/research/runs/:id/evidence/:evidenceId', runCtrl.removeEvidenceHandler)
 

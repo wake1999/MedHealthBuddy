@@ -23,6 +23,15 @@ interface RunEvidence {
   note: string
 }
 
+interface RunClaim {
+  id: string
+  text: string
+  status: 'supported' | 'contradicted' | 'mixed' | 'gap'
+  evidenceIds: string[]
+  confidence: number
+  note: string
+}
+
 interface ResearchRun {
   id: string
   projectId: string
@@ -32,6 +41,7 @@ interface ResearchRun {
   status: 'running' | 'waiting_approval' | 'completed' | 'cancelled'
   paperIds: string[]
   evidence: RunEvidence[]
+  claims: RunClaim[]
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
   updatedAt: number
@@ -81,6 +91,9 @@ export function RunsView({
   const [runs, setRuns] = useState<ResearchRun[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [loading, setLoading] = useState(false)
+  const [extracting, setExtracting] = useState(false)
+  const [claimsBusy, setClaimsBusy] = useState(false)
+  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [question, setQuestion] = useState('')
   const [title, setTitle] = useState('')
@@ -192,6 +205,61 @@ export function RunsView({
     }
   }
 
+  function replaceRun(updated: ResearchRun) {
+    setRuns(current => {
+      const exists = current.some(run => run.id === updated.id)
+      return exists
+        ? current.map(run => (run.id === updated.id ? updated : run))
+        : [updated, ...current]
+    })
+    setSelectedId(updated.id)
+  }
+
+  async function extractEvidence() {
+    if (!selected) return
+    setExtracting(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{
+        run: ResearchRun
+        added: number
+        skipped: number
+        paperErrors: string[]
+      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/extract-evidence`, {
+        method: 'POST',
+        body: JSON.stringify({ maxPerPaper: 4 }),
+      })
+      replaceRun(body.run)
+      const skipped = body.skipped > 0 ? `，跳过 ${body.skipped} 条无法在原文中定位的引用` : ''
+      const failures = body.paperErrors.length > 0 ? `；${body.paperErrors.length} 篇文献读取失败` : ''
+      setNotice(t('runs.extractDone', { added: body.added, skipped, failures }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  async function deriveClaims() {
+    if (!selected) return
+    setClaimsBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun; count: number }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/claims/derive`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.claimsDerived', { count: body.count }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setClaimsBusy(false)
+    }
+  }
+
   async function approve() {
     if (!selected) return
     setLoading(true)
@@ -256,6 +324,7 @@ export function RunsView({
       </header>
 
       {error !== '' && <p className={css.failure} role="alert">{error}</p>}
+      {notice !== '' && <p className={css.hint} role="status">{notice}</p>}
 
       <div className={css.runsCreate}>
         <input
@@ -342,8 +411,16 @@ export function RunsView({
               <div className={css.runsActions}>
                 <button
                   type="button"
+                  className={css.btnPrimary}
+                  disabled={extracting || loading || selected.paperIds.length === 0}
+                  onClick={() => void extractEvidence()}
+                >
+                  {extracting ? t('runs.extracting') : t('runs.autoExtract')}
+                </button>
+                <button
+                  type="button"
                   className={css.btn}
-                  disabled={!requestProjectSession || loading}
+                  disabled={!requestProjectSession || loading || extracting}
                   onClick={() => void askAgentForEvidence()}
                 >
                   {t('runs.agentExtract')}
@@ -401,6 +478,32 @@ export function RunsView({
                   </table>
                 </div>
               )}
+
+              <div className={css.runsClaims}>
+                <div className={css.runsClaimsHead}>
+                  <h4>{t('runs.claimsTitle')} ({selected.claims?.length || 0})</h4>
+                  <button
+                    type="button"
+                    className={css.btn}
+                    disabled={claimsBusy || selected.evidence.length === 0}
+                    onClick={() => void deriveClaims()}
+                  >
+                    {claimsBusy ? t('runs.claimsBusy') : t('runs.deriveClaims')}
+                  </button>
+                </div>
+                {(selected.claims?.length || 0) === 0 && <p className={css.hint}>{t('runs.claimsEmpty')}</p>}
+                {(selected.claims || []).map(claim => (
+                  <article key={claim.id} className={css.runsClaimCard} data-status={claim.status}>
+                    <div className={css.runsClaimText}>{claim.text}</div>
+                    <div className={css.runsClaimMeta}>
+                      <span>{t(`runs.claimStatus.${claim.status}`)}</span>
+                      <span>{Math.round(claim.confidence * 100)}%</span>
+                      <span>{claim.evidenceIds.length} {t('runs.evidenceUnit')}</span>
+                    </div>
+                    {claim.note && <p>{claim.note}</p>}
+                  </article>
+                ))}
+              </div>
 
               <div className={css.runsEvidenceForm}>
                 <h4>{t('runs.addEvidence')}</h4>

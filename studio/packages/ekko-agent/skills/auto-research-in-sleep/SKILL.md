@@ -35,7 +35,22 @@ POST /api/studio/research/runs
 { "projectId": "...", "question": "...", "paperIds": ["..."] }
 ```
 
-Add each source-grounded row with:
+Ask the server to extract source-grounded rows directly:
+
+```text
+POST /api/studio/research/runs/:id/extract-evidence
+{ "maxPerPaper": 4 }
+```
+
+The server verifies each quote against the paper's page-delimited full text and
+drops paraphrases. Then derive a claim mapping:
+
+```text
+POST /api/studio/research/runs/:id/claims/derive
+```
+
+Every returned claim must cite at least one real evidence id. A manual row can
+also be added with:
 
 ```text
 POST /api/studio/research/runs/:id/evidence

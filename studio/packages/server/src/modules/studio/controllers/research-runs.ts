@@ -10,6 +10,7 @@ import {
   updateEvidence,
   updateRun,
 } from '../services/research/runs'
+import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 
 function profileOf(ctx: any): string | undefined {
   return ctx.state?.profile?.name
@@ -136,6 +137,43 @@ export async function removeEvidenceHandler(ctx: any) {
       String(ctx.params.evidenceId || ''),
     )
     ctx.body = { ok: true }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function extractEvidenceHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    const result = await extractEvidenceForRun(
+      profileOf(ctx) || 'default',
+      String(ctx.params.id || ''),
+      {
+        paperIds: Array.isArray(body.paperIds) ? body.paperIds.map(String) : undefined,
+        maxPerPaper: typeof body.maxPerPaper === 'number' ? body.maxPerPaper : undefined,
+      },
+    )
+    ctx.body = {
+      ok: true,
+      ...result,
+      run: await getRun(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function deriveClaimsHandler(ctx: any) {
+  try {
+    const count = await deriveClaimsForRun(
+      profileOf(ctx) || 'default',
+      String(ctx.params.id || ''),
+    )
+    ctx.body = {
+      ok: true,
+      count,
+      run: await getRun(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
   } catch (error) {
     failRun(ctx, error)
   }

@@ -381,6 +381,17 @@ export interface ResearchRunEvidence {
   updatedAt: number
 }
 
+export interface ResearchRunClaim {
+  id: string
+  text: string
+  status: 'supported' | 'contradicted' | 'mixed' | 'gap'
+  evidenceIds: string[]
+  confidence: number
+  note: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface ResearchRunApproval {
   stage: ResearchRunStage
   at: number
@@ -399,6 +410,7 @@ export interface ResearchRun {
   status: ResearchRunStatus
   paperIds: string[]
   evidence: ResearchRunEvidence[]
+  claims: ResearchRunClaim[]
   approvals: ResearchRunApproval[]
   createdAt: number
   updatedAt: number
@@ -538,6 +550,12 @@ function normalizeStore(input: unknown): ResearchStore {
     const value = raw[collection]
     store[collection] = Array.isArray(value) ? (value as never) : ([] as never)
   }
+  store.runs = store.runs.map(run => ({
+    ...run,
+    evidence: Array.isArray(run.evidence) ? run.evidence : [],
+    claims: Array.isArray(run.claims) ? run.claims : [],
+    approvals: Array.isArray(run.approvals) ? run.approvals : [],
+  }))
   const asRef = (value: unknown): ResearchMainlineRef | null => {
     if (!value || typeof value !== 'object') return null
     const row = value as Record<string, unknown>

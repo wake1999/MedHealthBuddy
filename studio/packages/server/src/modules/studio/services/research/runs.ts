@@ -1,4 +1,4 @@
-import { newId, readStore, updateStore, type ResearchRun, type ResearchRunEvidence, type ResearchRunStage } from './store'
+import { newId, readStore, updateStore, type ResearchRun, type ResearchRunClaim, type ResearchRunEvidence, type ResearchRunStage } from './store'
 
 const RUN_STAGES: ResearchRunStage[] = ['scope', 'literature', 'evidence', 'hypothesis']
 const SUPPORT_VALUES = new Set<ResearchRunEvidence['support']>(['supports', 'contradicts', 'mixed', 'context'])
@@ -18,6 +18,14 @@ export interface EvidenceInput {
   page?: number | null
   section?: string
   support?: ResearchRunEvidence['support']
+  confidence?: number
+  note?: string
+}
+
+export interface ClaimInput {
+  text: string
+  status?: ResearchRunClaim['status']
+  evidenceIds?: string[]
   confidence?: number
   note?: string
 }
@@ -77,6 +85,7 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     status: 'running',
     paperIds,
     evidence: [],
+    claims: [],
     approvals: [],
     createdAt: now,
     updatedAt: now,
@@ -202,6 +211,39 @@ export async function removeEvidence(profile: string, runId: string, evidenceId:
     if (run.evidence.length === before) throw new Error('research_evidence_not_found')
     run.updatedAt = Date.now()
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.evidence.removed' })
+}
+
+export async function replaceClaims(profile: string, runId: string, inputs: ClaimInput[]): Promise<ResearchRun> {
+  const now = Date.now()
+  return updateStore(profile, 'run.claims.replaced', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const validEvidence = new Set(run.evidence.map(row => row.id))
+    const claims: ResearchRunClaim[] = []
+    for (const input of inputs) {
+      const text = clean(input.text, 2000)
+      if (text === '') continue
+      const evidenceIds = normalizePaperIds(input.evidenceIds).filter(id => validEvidence.has(id))
+      if (evidenceIds.length === 0) continue
+      claims.push({
+        id: newId('claim'),
+        text,
+        status: ['supported', 'contradicted', 'mixed', 'gap'].includes(input.status || '')
+          ? (input.status as ResearchRunClaim['status'])
+          : 'supported',
+        evidenceIds,
+        confidence: typeof input.confidence === 'number' && Number.isFinite(input.confidence)
+          ? Math.max(0, Math.min(1, input.confidence))
+          : 0.5,
+        note: clean(input.note, 2000),
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+    run.claims = claims.slice(0, 12)
+    run.updatedAt = now
+    return run
+  }, { actor: { kind: 'agent', id: 'research-run' }, action: 'run.claims.replaced' })
 }
 
 export async function approveEvidence(profile: string, runId: string, note = ''): Promise<ResearchRun> {

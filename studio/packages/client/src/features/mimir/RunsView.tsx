@@ -107,6 +107,21 @@ interface RunServer {
   status?: string
 }
 
+interface RunFigure {
+  id: string
+  name: string
+  path: string
+  caption?: string
+}
+
+interface RunCompileResult {
+  ok: boolean
+  engine?: string
+  exitCode?: number
+  logTail?: string
+  durationMs?: number
+}
+
 interface ResearchRun {
   id: string
   projectId: string
@@ -293,6 +308,7 @@ export function RunsView({
   projectTitle,
   papers,
   servers,
+  figures,
   requestProjectSession,
   openPaperPage,
   t,
@@ -301,6 +317,7 @@ export function RunsView({
   projectTitle?: string
   papers: readonly RunPaper[]
   servers: readonly RunServer[]
+  figures: readonly RunFigure[]
   requestProjectSession?: (prompt: string) => Promise<{ ok: boolean; error?: string }>
   openPaperPage?: (paperId: string, page: number) => void
   t: (key: string, params?: Record<string, unknown>) => string
@@ -359,6 +376,13 @@ export function RunsView({
   const [report, setReport] = useState<{ markdown: string; filename: string } | null>(null)
   const [resultsBusy, setResultsBusy] = useState(false)
   const [resultsDraft, setResultsDraft] = useState<{ markdown: string; latex: string; warnings: string[] } | null>(null)
+  const [figureId, setFigureId] = useState('')
+  const [insertBusy, setInsertBusy] = useState(false)
+  const [insertResult, setInsertResult] = useState<{
+    snapshotId: string
+    insertedAt: number
+    compile: RunCompileResult
+  } | null>(null)
   const [evidence, setEvidence] = useState({
     paperId: '',
     claim: '',
@@ -383,6 +407,10 @@ export function RunsView({
   useEffect(() => {
     if (serverId === '' && servers.length > 0) setServerId(servers[0].id)
   }, [servers, serverId])
+
+  useEffect(() => {
+    if (figureId === '' && figures.length > 0) setFigureId(figures[0].id)
+  }, [figures, figureId])
 
   useEffect(() => {
     if (!selected) return
@@ -794,13 +822,38 @@ export function RunsView({
     try {
       const body = await request<{ markdown: string; latex: string; warnings: string[] }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/results-draft`,
-        { method: 'POST' },
+        { method: 'POST', body: JSON.stringify({ figureId }) },
       )
       setResultsDraft({ markdown: body.markdown, latex: body.latex, warnings: body.warnings || [] })
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setResultsBusy(false)
+    }
+  }
+
+  async function insertResults() {
+    if (!selected) return
+    setInsertBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{
+        draft: { markdown: string; latex: string; warnings: string[] }
+        snapshot: { id: string }
+        insertedAt: number
+        compile: RunCompileResult
+      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/insert-results`, {
+        method: 'POST',
+        body: JSON.stringify({ figureId }),
+      })
+      setResultsDraft(body.draft)
+      setInsertResult({ snapshotId: body.snapshot.id, insertedAt: body.insertedAt, compile: body.compile })
+      setNotice(body.compile.ok ? t('runs.insertCompiled') : t('runs.insertCompileFailed'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setInsertBusy(false)
     }
   }
 
@@ -1037,6 +1090,18 @@ export function RunsView({
                 >
                   {reportBusy ? t('runs.reportBusy') : t('runs.generateReport')}
                 </button>
+                {figures.length > 0 && (
+                  <select
+                    className={css.runsInput}
+                    value={figureId}
+                    onChange={event => setFigureId(event.target.value)}
+                    aria-label={t('runs.selectFigure')}
+                  >
+                    {figures.map(figure => (
+                      <option key={figure.id} value={figure.id}>{figure.name || figure.caption || figure.id}</option>
+                    ))}
+                  </select>
+                )}
                 <button
                   type="button"
                   className={css.btn}
@@ -1413,6 +1478,9 @@ export function RunsView({
                       <button type="button" className={css.btn} onClick={() => void copyResults(resultsDraft.markdown)}>{t('runs.copyResults')}</button>
                       <button type="button" className={css.btn} onClick={() => void copyResults(resultsDraft.latex)}>{t('runs.copyLatex')}</button>
                       <button type="button" className={css.btn} onClick={downloadResults}>{t('runs.downloadReport')}</button>
+                      <button type="button" className={css.btnPrimary} disabled={insertBusy} onClick={() => void insertResults()}>
+                        {insertBusy ? t('runs.inserting') : t('runs.insertResults')}
+                      </button>
                       <button type="button" className={css.btn} onClick={() => setResultsDraft(null)}>{t('runs.close')}</button>
                     </div>
                   </div>
@@ -1426,6 +1494,16 @@ export function RunsView({
                     <summary>{t('runs.showLatex')}</summary>
                     <pre>{resultsDraft.latex}</pre>
                   </details>
+                  {insertResult && (
+                    <div className={css.runsCompileResult} data-ok={insertResult.compile.ok || undefined}>
+                      <p>
+                        {insertResult.compile.ok ? t('runs.compileOk') : t('runs.compileFailed')}
+                        {' '}
+                        <code>{insertResult.snapshotId}</code>
+                      </p>
+                      {insertResult.compile.logTail && <pre>{insertResult.compile.logTail.slice(-3000)}</pre>}
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -78,13 +78,16 @@ function metricTableLatex(run: ResearchRun): string {
 export async function generateResultsDraft(
   profile: string,
   runId: string,
+  figureId = '',
 ): Promise<{ markdown: string; latex: string; warnings: string[] }> {
   const store = await readStore(profile)
   const run = store.runs.find(row => row.id === runId)
   if (!run) throw new Error('research_run_not_found')
   if (!run.result) throw new Error('research_result_required')
-  const project = store.projects.find(row => row.id === run.projectId)
   const figures = store.figures.filter(figure => figure.projectId === run.projectId)
+  const selectedFigure = figureId !== ''
+    ? figures.find(figure => figure.id === figureId)
+    : figures[0]
   const result = run.result
   const hypothesis = run.hypothesis?.text || run.question
   const plan = run.experimentPlan
@@ -93,8 +96,8 @@ export async function generateResultsDraft(
   const metrics = plan?.metrics || result.metricStats.map(stat => stat.name).join(', ')
   const labels = [`Table 1 (Table~\\ref{${tableRef(run)}})`]
   const warnings: string[] = []
-  if (figures.length > 0) {
-    labels.push(`Figure 1 (Figure~\\ref{${figureRef(figures[0])}})`)
+  if (selectedFigure) {
+    labels.push(`Figure 1 (Figure~\\ref{${figureRef(selectedFigure)}})`)
   } else {
     warnings.push('No figure is registered for this project. A placeholder is included instead of a real figure reference.')
   }
@@ -146,8 +149,8 @@ export async function generateResultsDraft(
     '',
     metricTableMarkdown(run),
     '',
-    figures.length > 0
-      ? `**Figure 1. ${figures[0].caption || figureLabel(figures[0])}.**\n\n![Figure 1](${figures[0].path})`
+    selectedFigure
+      ? `**Figure 1. ${selectedFigure.caption || figureLabel(selectedFigure)}.**\n\n![Figure 1](${selectedFigure.path})`
       : '**Figure 1 placeholder.** No registered figure exists yet; add a figure before submission.',
     '',
     '### Statistical analysis',
@@ -168,12 +171,19 @@ export async function generateResultsDraft(
     tex(setup),
     '',
     '\\subsection{Main results}',
-    `${tex(main)} Table~\\ref{${tableRef(run)}} reports the main results.${figures.length > 0 ? ` Figure~\\ref{${figureRef(figures[0])}} shows the corresponding figure.` : ' % TODO: insert a figure and a real figure reference.'}`,
+    `${tex(main)} Table~\\ref{${tableRef(run)}} reports the main results.${selectedFigure ? ` Figure~\\ref{${figureRef(selectedFigure)}} shows the corresponding figure.` : ' % TODO: insert a figure and a real figure reference.'}`,
     '',
     metricTableLatex(run),
     '',
-    figures.length > 0
-      ? `% Existing figure: ${tex(figures[0].name)}\n% ${tex(figures[0].caption || figureLabel(figures[0]))}\n% Figure label: ${figureRef(figures[0])}`
+    selectedFigure
+      ? [
+        '\\begin{figure}[t]',
+        '\\centering',
+        `\\includegraphics[width=\\linewidth]{figures/${selectedFigure.path.split(/[\\\\/]/).pop() || ''}}`,
+        `\\caption{${tex(selectedFigure.caption || figureLabel(selectedFigure))}}`,
+        `\\label{${figureRef(selectedFigure)}}`,
+        '\\end{figure}',
+      ].join('\n')
       : '% TODO: add a figure and replace this placeholder with a real figure reference.',
     '',
     '\\subsection{Statistical analysis}',

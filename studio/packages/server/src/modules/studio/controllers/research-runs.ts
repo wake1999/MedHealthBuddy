@@ -20,6 +20,7 @@ import {
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 import { generateRunReport } from '../services/research/run-report'
 import { generateResultsDraft } from '../services/research/run-results-draft'
+import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
   beginRunExtraction,
   finishRunExtraction,
@@ -298,6 +299,22 @@ export async function runResultsDraftHandler(ctx: any) {
     ctx.body = {
       ok: true,
       ...(await generateResultsDraft(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function insertResultsHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await insertResultsIntoPaper(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(body.figureId || ''),
+      )),
     }
   } catch (error) {
     failRun(ctx, error)

@@ -751,6 +751,7 @@ export function ResearchPanel({
             projectTitle={selectedProject?.title}
             papers={papers.list}
             servers={servers?.list || []}
+            figures={figures?.list || []}
             requestProjectSession={requestProjectSession}
             openPaperPage={(paperId, page) => {
               actions.setTab('papers')

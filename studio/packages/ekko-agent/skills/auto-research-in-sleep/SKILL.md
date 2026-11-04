@@ -73,14 +73,17 @@ POST /api/studio/research/runs/:id/result
 POST /api/studio/research/runs/:id/advance
 GET  /api/studio/research/runs/:id/report
 POST /api/studio/research/runs/:id/results-draft
+POST /api/studio/research/runs/:id/insert-results
 ```
 
 `report` is a deterministic Markdown export of persisted evidence, claims,
 hypothesis, plan, job insight, and statistics. `results-draft` returns a Results
 section plus a LaTeX version with a generated table and real figure references
-when figures exist, or explicit placeholders/warnings when they do not. Neither
-endpoint calls a model; verify every number and reference before using text in a
-manuscript.
+when figures exist, or explicit placeholders/warnings when they do not.
+`insert-results` creates a `main.tex` snapshot first, inserts the LaTeX before
+Conclusion, then compiles and returns the compile log. It refuses to insert a
+second Results section. None of these endpoints calls a model; verify every
+number and reference before using text in a manuscript.
 
 Hypothesis and plan are artifacts, not free-form chat. Define a metric contract
 in `experiment-plan`, for example:

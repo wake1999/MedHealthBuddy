@@ -10793,6 +10793,28 @@ button.paperNoteBlockMeta:hover {
   white-space: pre-wrap;
 }
 
+.runsCompileResult {
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgb(166 77 69 / 7%);
+  color: #9c3b32;
+  font-size: 10.5px;
+}
+
+.runsCompileResult[data-ok] {
+  background: rgb(80 130 90 / 7%);
+  color: #3f7049;
+}
+
+.runsCompileResult p {
+  margin: 0;
+}
+
+.runsCompileResult pre {
+  max-height: 180px;
+  margin-top: 6px;
+}
+
 .runsWarnings {
   margin: 0;
   padding: 7px 10px 7px 24px;

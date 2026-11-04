@@ -87,7 +87,7 @@ const showCategoryDialog = ref(false)
 const newCategoryName = ref('')
 const creatingCategory = ref(false)
 
-const SOURCES: SkillSource[] = ['builtin', 'hub', 'local', 'external']
+const SOURCES: SkillSource[] = ['local', 'builtin', 'hub', 'external']
 /** Product agent first; other agents join once the availability snapshot says they are installed. */
 const agentTargets = ref<SkillTarget[]>(['ekko'])
 const agentCategories = ref<Partial<Record<SkillTarget, SkillCategory[]>>>({})

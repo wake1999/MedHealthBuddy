@@ -105,6 +105,7 @@ POST  /api/studio/research/runs/:id/submit-experiment
 POST  /api/studio/research/runs/:id/refresh-experiment
 POST  /api/studio/research/runs/:id/result
 POST  /api/studio/research/runs/:id/advance
+POST  /api/studio/research/runs/:id/auto
 GET   /api/studio/research/runs/:id/report
 POST  /api/studio/research/runs/:id/results-draft
 POST  /api/studio/research/runs/:id/insert-results
@@ -144,8 +145,10 @@ See `docs/branch-merge-policy.md` and `docs/raw-data-merge-schema.md`.
 plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. `projects/:id/package` exports a
 portable project zip; `projects/package/import` verifies file hashes and refuses
-project-id collisions. `flows` is a fixture/dry-run/SSH runner; fixture mode normally stops at
-claim, plan, and result human gates. `auto:true` in fixture mode auto-approves
+project-id collisions. `runs/:id/auto` extracts evidence, auto-reviews Claims with usable source
+quotes, creates a hypothesis/plan, and stops at the experiment result gate. It
+never invents a result. `flows` is a fixture/dry-run/SSH runner; fixture mode
+normally stops at claim, plan, and result human gates. `auto:true` in fixture mode auto-approves
 those gates for a deterministic demo; it does not fabricate a result for a real
 Run. SSH mode supports `tick`, `resume`, and
 `cancel` with optional idempotency `key`; `artifactPath` downloads a remote

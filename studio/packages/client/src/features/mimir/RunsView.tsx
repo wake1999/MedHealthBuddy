@@ -502,6 +502,7 @@ export function RunsView({
   const [mergeDiff, setMergeDiff] = useState<Array<{ field: string; left: string; right: string }> | null>(null)
   const [artifactBusy, setArtifactBusy] = useState(false)
   const [flowBusy, setFlowBusy] = useState(false)
+  const [autoBusy, setAutoBusy] = useState(false)
   const [activeFlow, setActiveFlow] = useState<ResearchFlow | null>(null)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const selected = runs.find(run => run.id === selectedId) || null
@@ -1487,6 +1488,26 @@ export function RunsView({
     }
   }
 
+  async function autoRunToResultGate() {
+    if (!selected) return
+    setAutoBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{
+        run: ResearchRun
+        status: 'awaiting_result' | 'completed'
+        message: string
+      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/auto`, { method: 'POST' })
+      replaceRun(body.run)
+      setNotice(body.message)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setAutoBusy(false)
+    }
+  }
+
   async function createExperiment() {
     if (!selected) return
     setLoading(true)
@@ -1963,6 +1984,14 @@ export function RunsView({
                   onClick={() => void advance()}
                 >
                   {t('runs.advance')}
+                </button>
+                <button
+                  type="button"
+                  className={css.btnPrimary}
+                  disabled={autoBusy || branchFrozen || selected.paperIds.length === 0}
+                  onClick={() => void autoRunToResultGate()}
+                >
+                  {autoBusy ? t('runs.autoRealBusy') : t('runs.autoReal')}
                 </button>
                 <button
                   type="button"

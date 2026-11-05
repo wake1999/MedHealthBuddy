@@ -27,6 +27,7 @@ import {
 } from '../services/research/runs'
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 import { generateRunReport } from '../services/research/run-report'
+import { autoRunToResultGate } from '../services/research/run-auto'
 import { approveFlowGate, cancelFlow, createFlow, getFlow, listFlows, removeFlow, resumeFlow, tickFlow } from '../services/research/flow-runner'
 import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
@@ -849,6 +850,20 @@ export async function removeFlowHandler(ctx: any) {
   try {
     await removeFlow(profileOf(ctx) || 'default', String(ctx.params.flowId || ''))
     ctx.body = { ok: true }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function autoRunHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await autoRunToResultGate(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+      )),
+    }
   } catch (error) {
     failRun(ctx, error)
   }

@@ -22731,6 +22731,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/auto": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create auto",
+        "description": "POST /api/studio/research/runs/:id/auto",
+        "operationId": "autoRunHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/branches": {
       "post": {
         "tags": [

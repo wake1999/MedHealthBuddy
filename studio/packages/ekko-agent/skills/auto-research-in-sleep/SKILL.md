@@ -146,8 +146,10 @@ plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. `projects/:id/package` exports a
 portable project zip; `projects/package/import` verifies file hashes and refuses
 project-id collisions. `runs/:id/auto` extracts evidence, auto-reviews Claims with usable source
-quotes, creates a hypothesis/plan, and stops at the experiment result gate. It
-never invents a result. `flows` is a fixture/dry-run/SSH runner; fixture mode
+quotes, infers metric names, creates a hypothesis/plan, and stops at the
+experiment result gate. With `serverId` + `command` it submits an SSH job, polls
+it, downloads an optional `artifactPath`, records validated metric samples, and
+continues to analysis. It never invents a result. `flows` is a fixture/dry-run/SSH runner; fixture mode
 normally stops at claim, plan, and result human gates. `auto:true` in fixture mode auto-approves
 those gates for a deterministic demo; it does not fabricate a result for a real
 Run. SSH mode supports `tick`, `resume`, and

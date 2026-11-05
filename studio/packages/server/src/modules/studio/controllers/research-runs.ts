@@ -856,12 +856,22 @@ export async function removeFlowHandler(ctx: any) {
 }
 
 export async function autoRunHandler(ctx: any) {
+  const body = readBody(ctx) || {}
   try {
     ctx.body = {
       ok: true,
       ...(await autoRunToResultGate(
         profileOf(ctx) || 'default',
         String(ctx.params.id || ''),
+        {
+          serverId: String(body.serverId || ''),
+          command: String(body.command || ''),
+          artifactPath: String(body.artifactPath || ''),
+          dataset: String(body.dataset || ''),
+          baselines: String(body.baselines || ''),
+          metrics: String(body.metrics || ''),
+          timeoutMs: Number(body.timeoutMs || 120_000),
+        },
       )),
     }
   } catch (error) {

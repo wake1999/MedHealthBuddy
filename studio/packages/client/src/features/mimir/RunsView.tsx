@@ -1490,6 +1490,12 @@ export function RunsView({
 
   async function autoRunToResultGate() {
     if (!selected) return
+    const serverId = window.prompt(t('runs.autoServerPrompt'), servers[0]?.id || '')
+    if (serverId === null) return
+    const command = window.prompt(t('runs.autoCommandPrompt'), selected.experimentPlan?.command || '')
+    if (command === null) return
+    const artifactPath = window.prompt(t('runs.autoArtifactPrompt'), '')
+    if (artifactPath === null) return
     setAutoBusy(true)
     setError('')
     setNotice('')
@@ -1498,7 +1504,11 @@ export function RunsView({
         run: ResearchRun
         status: 'awaiting_result' | 'completed'
         message: string
-      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/auto`, { method: 'POST' })
+        jobId?: string
+      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/auto`, {
+        method: 'POST',
+        body: JSON.stringify({ serverId, command, artifactPath, timeoutMs: 120000 }),
+      })
       replaceRun(body.run)
       setNotice(body.message)
     } catch (err) {

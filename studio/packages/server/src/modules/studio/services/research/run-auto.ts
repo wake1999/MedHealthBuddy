@@ -6,10 +6,25 @@ import {
   approveEvidence,
   createExperimentRecord,
   getRun,
+  recordExperimentResult,
+  refreshExperimentJob,
   saveExperimentPlan,
   saveHypothesis,
+  submitExperimentJob,
 } from './runs'
-import { updateStore } from './store'
+import { uploadRawArtifact } from './run-merge-artifacts'
+import { downloadRemoteFile } from './ssh'
+import { readStore, updateStore } from './store'
+
+export interface AutoRunOptions {
+  serverId?: string
+  command?: string
+  artifactPath?: string
+  dataset?: string
+  baselines?: string
+  metrics?: string
+  timeoutMs?: number
+}
 
 export interface AutoRunResult {
   run: Awaited<ReturnType<typeof getRun>>
@@ -19,9 +34,126 @@ export interface AutoRunResult {
   claimsDerived: number
   claimsApproved: number
   message: string
+  jobId?: string
 }
 
-export async function autoRunToResultGate(profile: string, runId: string): Promise<AutoRunResult> {
+const KNOWN_METRICS = ['F1', 'AUC', 'accuracy', 'precision', 'recall', 'RMSE', 'MAE', 'BLEU', 'ROUGE']
+
+function deriveMetrics(run: Awaited<ReturnType<typeof getRun>>, requested: string): string {
+  if (requested.trim() !== '') return requested.trim()
+  const haystack = [run.question, run.title, ...run.claims.map(claim => claim.text)].join(' ')
+  const found = KNOWN_METRICS.filter(metric => new RegExp(`\\b${metric}\\b`, 'i').test(haystack))
+  return found.length > 0 ? found.join(', ') : 'score'
+}
+
+function metricSchemaFor(metrics: string): string {
+  return metrics
+    .split(/[,;]+/)
+    .map(metric => metric.trim())
+    .filter(Boolean)
+    .map(metric => `${metric}:${/rmse|mae/i.test(metric) ? 'min' : 'max'}:required`)
+    .join(', ')
+}
+
+function artifactSamples(content: string): { samples: Record<string, number[]>; metric: string } {
+  const parsed = JSON.parse(content) as {
+    schema?: string
+    metric?: string
+    rows?: Array<{ value?: unknown }>
+  }
+  if (parsed.schema !== 'mhb.raw-observations.v1') throw new Error('research_artifact_schema_invalid')
+  const metric = String(parsed.metric || 'score').trim()
+  const values = (parsed.rows || [])
+    .map(row => Number(row.value))
+    .filter(value => Number.isFinite(value))
+  if (values.length === 0) throw new Error('research_artifact_rows_invalid')
+  return { samples: { [metric.toLowerCase()]: values }, metric }
+}
+
+async function submitAndWait(
+  profile: string,
+  runId: string,
+  serverId: string,
+  command: string,
+  artifactPath: string,
+  timeoutMs: number,
+): Promise<{ run: Awaited<ReturnType<typeof getRun>>; message: string; jobId: string }> {
+  const submitted = await submitExperimentJob(profile, runId, serverId)
+  const jobId = String(submitted.job.id || '')
+  const deadline = Date.now() + Math.max(10_000, Math.min(timeoutMs, 300_000))
+  let insight: Awaited<ReturnType<typeof refreshExperimentJob>>['insight'] = null
+  let state = 'running'
+  while (Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    const refreshed = await refreshExperimentJob(profile, runId)
+    insight = refreshed.insight
+    state = refreshed.state?.state || 'unknown'
+    if (state === 'succeeded' || state === 'failed') break
+  }
+  if (state !== 'succeeded') {
+    return {
+      run: await getRun(profile, runId),
+      jobId,
+      message: state === 'failed' ? 'SSH 任务失败，未生成结果。' : 'SSH 任务仍在运行，已保留 job id。',
+    }
+  }
+
+  let run = await getRun(profile, runId)
+  let samples: Record<string, number[]> | null = null
+  let artifactName = ''
+  if (artifactPath !== '') {
+    const store = await readStore(profile)
+    const server = store.servers.find(row => row.id === serverId)
+    if (!server) throw new Error('research_server_not_found')
+    const downloaded = await downloadRemoteFile(
+      { host: server.host, user: server.user, port: server.port },
+      artifactPath,
+    )
+    if (!downloaded.ok) throw new Error(downloaded.detail || 'remote_artifact_download_failed')
+    const content = downloaded.data.toString('utf-8')
+    const parsed = artifactSamples(content)
+    samples = parsed.samples
+    artifactName = artifactPath.split('/').pop() || 'remote-artifact.json'
+    if (run.activeBranchId) {
+      await uploadRawArtifact(profile, runId, run.activeBranchId, {
+        name: artifactName,
+        content,
+      })
+    }
+    run = await getRun(profile, runId)
+  }
+
+  if (!samples && insight?.metrics?.length) {
+    samples = Object.fromEntries(insight.metrics.map(metric => [metric.name.toLowerCase(), [metric.value]]))
+  }
+  if (!samples) {
+    return {
+      run,
+      jobId,
+      message: 'SSH 任务成功，但未找到可解析的真实产物；等待人工录入结果。',
+    }
+  }
+  const metricText = Object.entries(samples)
+    .flatMap(([metric, values]) => values.map(value => `${metric}=${value}`))
+    .join('\n')
+  const result = await recordExperimentResult(profile, runId, {
+    summary: `SSH job ${jobId} completed${artifactName ? `; artifact ${artifactName}` : ''}.`,
+    metrics: metricText,
+    metricSamples: samples,
+    confirmedFinal: true,
+  })
+  return {
+    run: result,
+    jobId,
+    message: 'SSH 任务完成，真实产物已回传并记录结果。',
+  }
+}
+
+export async function autoRunToResultGate(
+  profile: string,
+  runId: string,
+  options: AutoRunOptions = {},
+): Promise<AutoRunResult> {
   let run = await getRun(profile, runId)
   if (run.paperIds.length === 0) throw new Error('research_run_no_papers')
 
@@ -76,6 +208,9 @@ export async function autoRunToResultGate(profile: string, runId: string): Promi
   run = approved.run
   if (approved.count === 0) throw new Error('research_claims_not_approved')
 
+  const metrics = deriveMetrics(run, String(options.metrics || run.experimentPlan?.metrics || ''))
+  const command = String(options.command || run.experimentPlan?.command || '').trim()
+
   if (!run.hypothesis) {
     const claimIds = run.claims
       .filter(claim => claim.reviewStatus === 'approved')
@@ -85,32 +220,58 @@ export async function autoRunToResultGate(profile: string, runId: string): Promi
     run = await saveHypothesis(profile, runId, {
       text: run.question || firstClaim?.text || 'Automated research hypothesis',
       independentVariable: '待确认',
-      dependentVariable: '待确认',
-      baselines: '待确认',
-      metric: '待确认',
+      dependentVariable: metrics,
+      baselines: String(options.baselines || run.experimentPlan?.baselines || '待确认'),
+      metric: metrics,
       expected: '待确认',
       falsification: '待确认',
       claimIds,
     })
   }
 
-  if (!run.experimentPlan) {
+  if (!run.experimentPlan || run.experimentPlan.command.trim() === '') {
     run = await saveExperimentPlan(profile, runId, {
-      dataset: '待确认',
-      baselines: '待确认',
-      metrics: '待确认',
-      metricSchema: '',
-      family: 'auto',
-      seeds: '',
-      command: '',
-      resources: '',
-      stopCondition: '',
-      successCriteria: '',
+      dataset: String(options.dataset || run.experimentPlan?.dataset || '待确认'),
+      baselines: String(options.baselines || run.experimentPlan?.baselines || '待确认'),
+      metrics,
+      metricSchema: run.experimentPlan?.metricSchema?.length
+        ? run.experimentPlan.metricSchema.map(spec => `${spec.name}:${spec.direction}:${spec.required ? 'required' : 'optional'}`).join(', ')
+        : metricSchemaFor(metrics),
+      family: run.experimentPlan?.family || 'auto',
+      seeds: run.experimentPlan?.seeds || '1-3',
+      command,
+      resources: run.experimentPlan?.resources || '',
+      stopCondition: run.experimentPlan?.stopCondition || '',
+      successCriteria: run.experimentPlan?.successCriteria || `Improve ${metrics} over the baseline.`,
     })
   }
 
   if (run.experimentId === '') {
     run = await createExperimentRecord(profile, runId)
+  }
+
+  if (!run.result && options.serverId && command) {
+    const waited = await submitAndWait(
+      profile,
+      runId,
+      String(options.serverId),
+      command,
+      String(options.artifactPath || ''),
+      Number(options.timeoutMs || 120_000),
+    )
+    run = waited.run
+    if (!run.result) {
+      return {
+        run,
+        status: 'awaiting_result',
+        evidenceAdded,
+        evidenceSkipped,
+        claimsDerived,
+        claimsApproved: approved.count,
+        message: waited.message,
+        jobId: waited.jobId,
+      }
+    }
   }
 
   if (!run.result) {
@@ -121,7 +282,9 @@ export async function autoRunToResultGate(profile: string, runId: string): Promi
       evidenceSkipped,
       claimsDerived,
       claimsApproved: approved.count,
-      message: '自动流程已到实验阶段，等待真实实验结果。',
+      message: command === ''
+        ? '计划已自动填充，但还没有可执行命令；填写命令并选择 SSH 服务器后可自动提交。'
+        : '自动流程已到实验阶段，等待真实实验结果。',
     }
   }
 

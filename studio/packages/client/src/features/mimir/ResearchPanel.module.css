@@ -10664,6 +10664,18 @@ button.paperNoteBlockMeta:hover {
   opacity: 0.55;
 }
 
+.runsBranchActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.runsBranchActions button {
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
 .runsExperimentPanel h4 {
   margin: 4px 0 0;
   color: var(--mimir-ink, #211e19);

@@ -74,6 +74,7 @@ DELETE /api/studio/research/runs/:id/branches/:branchId
 POST  /api/studio/research/runs/:id/hypothesis
 POST  /api/studio/research/runs/:id/experiment-plan
 GET   /api/studio/research/runs/:id/claim-graph
+GET   /api/studio/research/runs/:id/branches/compare
 GET   /api/studio/research/projects/:id/family-analysis
 POST  /api/studio/research/runs/:id/create-experiment
 POST  /api/studio/research/runs/:id/submit-experiment
@@ -93,8 +94,10 @@ hypothesis, experiment plan, experiment, result, and job; activate a branch
 before editing or reading its fields. Each branch has its own `stage`. Archived
 branches are hidden from the active selector and family analysis but can be
 restored; the last visible branch cannot be archived or deleted. `claim-graph` exports a deterministic Mermaid Claim–Evidence graph
-and Markdown table. `family-analysis` applies Holm correction to confirmed Run
-result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
+and Markdown table. `report?branchId=...` and `results-draft` with `branchId`
+export one branch; `branches/compare` returns approximate pairwise Welch z
+tests over persisted means/SDs/n, Holm-adjusted across branch pairs.
+`family-analysis` applies Holm correction to confirmed Run result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
 plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. Never approve evidence or claims
 yourself.

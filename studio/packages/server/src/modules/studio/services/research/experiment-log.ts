@@ -117,7 +117,7 @@ export function parseMetricSchema(text: string): ResearchMetricSpec[] {
 
 export type MetricVerdict = 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
 
-function normalCdf(value: number): number {
+export function normalCdf(value: number): number {
   // Abramowitz-Stegun erf approximation; enough for an approximate p-value.
   const sign = value < 0 ? -1 : 1
   const x = Math.abs(value) / Math.SQRT2

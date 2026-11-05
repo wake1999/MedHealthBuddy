@@ -146,6 +146,21 @@ interface FamilyAnalysis {
   rows: FamilyMetricRow[]
 }
 
+interface BranchPairComparison {
+  metric: string
+  branchALabel: string
+  branchBLabel: string
+  meanA: number
+  meanB: number
+  delta: number
+  pValue: number
+  pAdjusted: number
+  significant: boolean
+  effectSize: number | null
+  effectSizeType: string
+  test: string
+}
+
 interface RunServer {
   id: string
   name: string
@@ -231,6 +246,16 @@ function paperIdOf(paper: RunPaper): string {
 function formatDate(value: number): string {
   if (!value) return '-'
   return new Date(value).toLocaleString()
+}
+
+function downloadText(filename: string, text: string): void {
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function parseMetricValuesClient(text: string): Record<string, number> {
@@ -401,6 +426,8 @@ export function RunsView({
   const [familyAnalysis, setFamilyAnalysis] = useState<FamilyAnalysis | null>(null)
   const [branchBusy, setBranchBusy] = useState(false)
   const [showBranchCompare, setShowBranchCompare] = useState(false)
+  const [branchStats, setBranchStats] = useState<BranchPairComparison[] | null>(null)
+  const [branchStatsBusy, setBranchStatsBusy] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
@@ -827,6 +854,56 @@ export function RunsView({
     }
   }
 
+  async function compareBranchStats() {
+    if (!selected) return
+    setBranchStatsBusy(true)
+    setError('')
+    setShowBranchCompare(true)
+    try {
+      const body = await request<{ rows: BranchPairComparison[] }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/compare`,
+      )
+      setBranchStats(body.rows)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchStatsBusy(false)
+    }
+  }
+
+  async function exportBranchReport(branchId: string) {
+    if (!selected) return
+    setBranchBusy(true)
+    try {
+      const body = await request<{ markdown: string; filename: string }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/report?branchId=${encodeURIComponent(branchId)}`,
+      )
+      downloadText(body.filename, body.markdown)
+      setNotice(t('runs.branchReportDownloaded'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  async function exportBranchResults(branchId: string) {
+    if (!selected) return
+    setBranchBusy(true)
+    try {
+      const body = await request<{ markdown: string }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/results-draft`,
+        { method: 'POST', body: JSON.stringify({ figureId, branchId }) },
+      )
+      downloadText(`RESULTS_${selected.id}-${branchId.slice(-6)}.md`, body.markdown)
+      setNotice(t('runs.branchResultsDownloaded'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
   async function archiveBranch() {
     if (!selected || !selected.activeBranchId) return
     if (visibleBranches.length <= 1) return
@@ -1068,7 +1145,7 @@ export function RunsView({
     setError('')
     try {
       const body = await request<{ markdown: string; filename: string }>(
-        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/report`,
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/report?branchId=${encodeURIComponent(selected.activeBranchId || '')}`,
       )
       setReport({ markdown: body.markdown, filename: body.filename })
     } catch (err) {
@@ -1085,7 +1162,7 @@ export function RunsView({
     try {
       const body = await request<{ markdown: string; latex: string; warnings: string[] }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/results-draft`,
-        { method: 'POST', body: JSON.stringify({ figureId }) },
+        { method: 'POST', body: JSON.stringify({ figureId, branchId: selected.activeBranchId || '' }) },
       )
       setResultsDraft({ markdown: body.markdown, latex: body.latex, warnings: body.warnings || [] })
     } catch (err) {
@@ -1108,7 +1185,7 @@ export function RunsView({
         compile: RunCompileResult
       }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/insert-results`, {
         method: 'POST',
-        body: JSON.stringify({ figureId }),
+        body: JSON.stringify({ figureId, branchId: selected.activeBranchId || '' }),
       })
       setResultsDraft(body.draft)
       setInsertResult({ snapshotId: body.snapshot.id, insertedAt: body.insertedAt, compile: body.compile })
@@ -1662,6 +1739,9 @@ export function RunsView({
                     <button type="button" className={css.btn} onClick={() => setShowBranchCompare(current => !current)}>
                       {t('runs.branchCompare')}
                     </button>
+                    <button type="button" className={css.btn} disabled={branchStatsBusy} onClick={() => void compareBranchStats()}>
+                      {branchStatsBusy ? t('runs.branchStatsBusy') : t('runs.branchStats')}
+                    </button>
                   </div>
                   {showBranchCompare && (selected.branches || []).length > 0 && (
                     <div className={css.runsBranchCompare}>
@@ -1695,21 +1775,64 @@ export function RunsView({
                                 <td>{metricText || branch.result?.metrics || '—'}</td>
                                 <td>{branch.result ? t(`runs.outcome.${branch.result.outcome}`) : '—'}</td>
                                 <td>
-                                  {branch.archivedAt
-                                    ? (
+                                  <div className={css.runsBranchActions}>
+                                    <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void exportBranchReport(branch.id)}>
+                                      {t('runs.branchReport')}
+                                    </button>
+                                    {branch.result && (
+                                      <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void exportBranchResults(branch.id)}>
+                                        {t('runs.branchResults')}
+                                      </button>
+                                    )}
+                                    {branch.archivedAt && (
                                       <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void restoreBranch(branch.id)}>
                                         {t('runs.branchRestore')}
                                       </button>
-                                    )
-                                    : branch.id === selected.activeBranchId
-                                      ? t('runs.branchCurrent')
-                                      : '—'}
+                                    )}
+                                    {!branch.archivedAt && branch.id === selected.activeBranchId && <span>{t('runs.branchCurrent')}</span>}
+                                  </div>
                                 </td>
                               </tr>
                             )
                           })}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+                  {branchStats && showBranchCompare && (
+                    <div className={css.runsBranchCompare}>
+                      {branchStats.length === 0 ? (
+                        <p className={css.hint}>{t('runs.branchStatsEmpty')}</p>
+                      ) : (
+                        <table className={css.runsEvidenceTable}>
+                          <thead>
+                            <tr>
+                              <th>{t('runs.metric')}</th>
+                              <th>{t('runs.branchPair')}</th>
+                              <th>Δ mean</th>
+                              <th>p</th>
+                              <th>p adj.</th>
+                              <th>{t('runs.familyEffect')}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {branchStats.map(row => (
+                              <tr key={`${row.metric}:${row.branchALabel}:${row.branchBLabel}`}>
+                                <td>{row.metric}</td>
+                                <td>{row.branchALabel} vs {row.branchBLabel}</td>
+                                <td>{row.delta.toFixed(4)}</td>
+                                <td>{row.pValue.toFixed(4)}</td>
+                                <td>{row.pAdjusted.toFixed(4)}</td>
+                                <td>
+                                  {row.effectSize === null ? '—' : `d=${row.effectSize.toFixed(2)}`}
+                                  {' '}
+                                  {row.significant ? t('runs.familySignificant') : t('runs.familyNotSignificant')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
                     </div>
                   )}
                   <h4>{t('runs.hypothesisTitle')}</h4>

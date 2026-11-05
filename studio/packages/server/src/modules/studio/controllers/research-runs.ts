@@ -28,6 +28,7 @@ import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/
 import { generateRunReport } from '../services/research/run-report'
 import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
+import { compareRunBranches } from '../services/research/run-branch-compare'
 import { generateResultsDraft } from '../services/research/run-results-draft'
 import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
@@ -384,7 +385,12 @@ export async function runResultsDraftHandler(ctx: any) {
   try {
     ctx.body = {
       ok: true,
-      ...(await generateResultsDraft(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
+      ...(await generateResultsDraft(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        '',
+        String(ctx.query?.branchId || ''),
+      )),
     }
   } catch (error) {
     failRun(ctx, error)
@@ -400,7 +406,19 @@ export async function insertResultsHandler(ctx: any) {
         profileOf(ctx) || 'default',
         String(ctx.params.id || ''),
         String(body.figureId || ''),
+        String(body.branchId || ''),
       )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function branchCompareHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await compareRunBranches(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
     }
   } catch (error) {
     failRun(ctx, error)
@@ -437,7 +455,11 @@ export async function runReportHandler(ctx: any) {
   try {
     ctx.body = {
       ok: true,
-      ...(await generateRunReport(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
+      ...(await generateRunReport(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.query?.branchId || ''),
+      )),
     }
   } catch (error) {
     failRun(ctx, error)

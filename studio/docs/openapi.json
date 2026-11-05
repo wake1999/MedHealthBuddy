@@ -22326,6 +22326,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/branches/compare": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get compare",
+        "description": "GET /api/studio/research/runs/:id/branches/compare",
+        "operationId": "branchCompareHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/branches/{branchId}": {
       "delete": {
         "tags": [
@@ -23098,6 +23134,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "branchId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -23167,6 +23211,14 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }

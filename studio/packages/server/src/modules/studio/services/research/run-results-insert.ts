@@ -27,8 +27,9 @@ export async function insertResultsIntoPaper(
   profile: string,
   runId: string,
   figureId = '',
+  branchId = '',
 ): Promise<{
-  draft: { markdown: string; latex: string; warnings: string[] }
+  draft: { markdown: string; latex: string; warnings: string[]; branchId: string }
   snapshot: { id: string; label: string; at: number; file: string; bytes: number }
   compile: Awaited<ReturnType<typeof runCompile>>
   insertedAt: number
@@ -36,7 +37,7 @@ export async function insertResultsIntoPaper(
   const store = await readStore(profile)
   const run = store.runs.find(row => row.id === runId)
   if (!run) throw new Error('research_run_not_found')
-  const draft = await generateResultsDraft(profile, runId, figureId)
+  const draft = await generateResultsDraft(profile, runId, figureId, branchId)
   const paper = await readPaperSource(run.projectId, profile)
   if (!paper.exists || paper.source.trim() === '') throw new Error('paper_not_found')
   if (/\\section\*?\{Results\}/i.test(paper.source)) throw new Error('research_results_already_present')

@@ -1,3 +1,4 @@
+import { selectRunBranch } from './run-branch'
 import { readStore, type ResearchRun } from './store'
 
 function cell(value: unknown): string {
@@ -38,10 +39,15 @@ function stageLabel(stage: string): string {
  * and never fills missing facts with prose. That makes the report safe to paste
  * into a lab notebook before a human edits it into manuscript form.
  */
-export async function generateRunReport(profile: string, runId: string): Promise<{ markdown: string; filename: string }> {
+export async function generateRunReport(
+  profile: string,
+  runId: string,
+  branchId = '',
+): Promise<{ markdown: string; filename: string; branchId: string }> {
   const store = await readStore(profile)
-  const run: ResearchRun | undefined = store.runs.find(row => row.id === runId)
-  if (!run) throw new Error('research_run_not_found')
+  const source: ResearchRun | undefined = store.runs.find(row => row.id === runId)
+  if (!source) throw new Error('research_run_not_found')
+  const run = selectRunBranch(source, branchId)
   const project = store.projects.find(row => row.id === run.projectId)
   const experiment = store.experiments.find(row => row.id === run.experimentId)
   const job = store.jobs.find(row => row.id === run.experimentJobId)
@@ -174,5 +180,10 @@ export async function generateRunReport(profile: string, runId: string): Promise
   }
 
   lines.push('---', '', '_Generated deterministically from workbench records. Verify citations, metrics, and statistical claims before manuscript submission._', '')
-  return { markdown: lines.join('\n'), filename: `RUN_REPORT_${safeTitle}.md` }
+  const branchSuffix = branchId !== '' ? `-${branchId.slice(-6)}` : ''
+  return {
+    markdown: lines.join('\n'),
+    filename: `RUN_REPORT_${safeTitle}${branchSuffix}.md`,
+    branchId: run.activeBranchId,
+  }
 }

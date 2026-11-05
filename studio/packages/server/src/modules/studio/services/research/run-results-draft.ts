@@ -1,3 +1,4 @@
+import { selectRunBranch } from './run-branch'
 import { readStore, type ResearchFigure, type ResearchRun } from './store'
 
 function num(value: number | null | undefined, digits = 4): string {
@@ -16,7 +17,8 @@ function tex(value: string): string {
 }
 
 function tableRef(run: ResearchRun): string {
-  return `tab:run_${run.id.replace(/[^a-zA-Z0-9]+/g, '_')}`
+  const branch = run.activeBranchId ? `_${run.activeBranchId.slice(-6)}` : ''
+  return `tab:run_${run.id.replace(/[^a-zA-Z0-9]+/g, '_')}${branch}`
 }
 
 function figureRef(figure: ResearchFigure): string {
@@ -79,10 +81,12 @@ export async function generateResultsDraft(
   profile: string,
   runId: string,
   figureId = '',
-): Promise<{ markdown: string; latex: string; warnings: string[] }> {
+  branchId = '',
+): Promise<{ markdown: string; latex: string; warnings: string[]; branchId: string }> {
   const store = await readStore(profile)
-  const run = store.runs.find(row => row.id === runId)
-  if (!run) throw new Error('research_run_not_found')
+  const source = store.runs.find(row => row.id === runId)
+  if (!source) throw new Error('research_run_not_found')
+  const run = selectRunBranch(source, branchId)
   if (!run.result) throw new Error('research_result_required')
   const figures = store.figures.filter(figure => figure.projectId === run.projectId)
   const selectedFigure = figureId !== ''
@@ -194,5 +198,5 @@ export async function generateResultsDraft(
     '',
   ].join('\n')
 
-  return { markdown, latex, warnings }
+  return { markdown, latex, warnings, branchId: run.activeBranchId }
 }

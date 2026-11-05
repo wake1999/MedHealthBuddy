@@ -23338,6 +23338,17 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "usePrimaryBranches",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                "true"
+              ]
+            }
           }
         ]
       }

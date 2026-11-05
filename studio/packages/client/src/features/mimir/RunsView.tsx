@@ -194,6 +194,7 @@ interface ResearchRunBranch {
   stage: Stage
   archivedAt: number
   frozenAt: number
+  audit?: Array<{ action: string; at: number; note: string }>
   createdAt: number
   updatedAt: number
 }
@@ -430,6 +431,7 @@ export function RunsView({
   const [showBranchCompare, setShowBranchCompare] = useState(false)
   const [branchStats, setBranchStats] = useState<BranchPairComparison[] | null>(null)
   const [branchStatsBusy, setBranchStatsBusy] = useState(false)
+  const [resultsPrimary, setResultsPrimary] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
   const branchFrozen = Boolean(activeBranch?.frozenAt)
@@ -879,12 +881,14 @@ export function RunsView({
 
   async function toggleBranchFreeze() {
     if (!selected || !activeBranch) return
+    const reason = window.prompt(t('runs.branchFreezeReason'), '') 
+    if (reason === null) return
     setBranchBusy(true)
     setError('')
     try {
       const body = await request<{ run: ResearchRun }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/${encodeURIComponent(activeBranch.id)}/freeze`,
-        { method: 'POST', body: JSON.stringify({ frozen: !branchFrozen }) },
+        { method: 'POST', body: JSON.stringify({ frozen: !branchFrozen, reason }) },
       )
       replaceRun(body.run)
       setNotice(branchFrozen ? t('runs.branchUnfrozen') : t('runs.branchFrozen'))
@@ -1220,6 +1224,25 @@ export function RunsView({
         { method: 'POST', body: JSON.stringify({ figureId, branchId: selected.activeBranchId || '' }) },
       )
       setResultsDraft({ markdown: body.markdown, latex: body.latex, warnings: body.warnings || [] })
+      setResultsPrimary(false)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setResultsBusy(false)
+    }
+  }
+
+  async function generatePrimaryResultsDraft() {
+    if (!selected) return
+    setResultsBusy(true)
+    setError('')
+    try {
+      const body = await request<{ markdown: string; latex: string; warnings: string[] }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/results-draft`,
+        { method: 'POST', body: JSON.stringify({ figureId, usePrimaryBranches: true }) },
+      )
+      setResultsDraft({ markdown: body.markdown, latex: body.latex, warnings: body.warnings || [] })
+      setResultsPrimary(true)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -1240,7 +1263,7 @@ export function RunsView({
         compile: RunCompileResult
       }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/insert-results`, {
         method: 'POST',
-        body: JSON.stringify({ figureId, branchId: selected.activeBranchId || '' }),
+        body: JSON.stringify({ figureId, branchId: selected.activeBranchId || '', usePrimaryBranches: resultsPrimary }),
       })
       setResultsDraft(body.draft)
       setInsertResult({ snapshotId: body.snapshot.id, insertedAt: body.insertedAt, compile: body.compile })
@@ -1512,6 +1535,14 @@ export function RunsView({
                   onClick={() => void generateResultsDraft()}
                 >
                   {resultsBusy ? t('runs.resultsBusy') : t('runs.generateResults')}
+                </button>
+                <button
+                  type="button"
+                  className={css.btn}
+                  disabled={resultsBusy}
+                  onClick={() => void generatePrimaryResultsDraft()}
+                >
+                  {t('runs.generatePrimaryResults')}
                 </button>
                 <small>{t('runs.updated')}: {formatDate(selected.updatedAt)}</small>
               </div>

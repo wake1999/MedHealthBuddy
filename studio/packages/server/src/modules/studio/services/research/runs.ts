@@ -57,6 +57,7 @@ function emptyBranch(now = Date.now()): ResearchRunBranch {
     stage: 'hypothesis',
     archivedAt: 0,
     frozenAt: 0,
+    audit: [],
     createdAt: now,
     updatedAt: now,
   }
@@ -426,15 +427,22 @@ export async function setBranchFrozen(
   runId: string,
   branchId: string,
   frozen: boolean,
+  reason = '',
 ): Promise<ResearchRun> {
   return updateStore(profile, 'run.branch.frozen', draft => {
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
     const branch = run.branches.find(row => row.id === branchId)
     if (!branch) throw new Error('research_branch_not_found')
-    branch.frozenAt = frozen ? Date.now() : 0
-    branch.updatedAt = Date.now()
-    run.updatedAt = Date.now()
+    const now = Date.now()
+    branch.frozenAt = frozen ? now : 0
+    branch.audit.push({
+      action: frozen ? 'freeze' : 'unfreeze',
+      at: now,
+      note: reason.slice(0, 500),
+    })
+    branch.updatedAt = now
+    run.updatedAt = now
     return run
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.frozen' })
 }

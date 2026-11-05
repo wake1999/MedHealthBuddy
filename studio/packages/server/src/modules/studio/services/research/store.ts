@@ -470,6 +470,12 @@ export interface ResearchRunResult {
 }
 
 /** One independent hypothesis branch within a Research Run. */
+export interface ResearchRunBranchAudit {
+  action: 'freeze' | 'unfreeze' | string
+  at: number
+  note: string
+}
+
 export interface ResearchRunBranch {
   id: string
   hypothesis: ResearchRunHypothesis | null
@@ -484,6 +490,7 @@ export interface ResearchRunBranch {
   archivedAt: number
   /** Frozen branches reject hypothesis, plan, experiment, and result edits. */
   frozenAt: number
+  audit: ResearchRunBranchAudit[]
   createdAt: number
   updatedAt: number
 }
@@ -708,6 +715,7 @@ function normalizeStore(input: unknown): ResearchStore {
       stage: (branch.stage || (branch.result ? 'analysis' : branch.experimentId !== '' ? 'experiment' : 'hypothesis')) as ResearchRunStage,
       archivedAt: typeof branch.archivedAt === 'number' ? branch.archivedAt : 0,
       frozenAt: typeof branch.frozenAt === 'number' ? branch.frozenAt : 0,
+      audit: Array.isArray(branch.audit) ? branch.audit : [],
       createdAt: typeof branch.createdAt === 'number' ? branch.createdAt : run.createdAt,
       updatedAt: typeof branch.updatedAt === 'number' ? branch.updatedAt : run.updatedAt,
     })),
@@ -746,6 +754,7 @@ function normalizeStore(input: unknown): ResearchStore {
       stage: (run.result ? 'analysis' : run.experimentId !== '' ? 'experiment' : 'hypothesis') as ResearchRunStage,
       archivedAt: 0,
       frozenAt: 0,
+      audit: [],
       createdAt: run.createdAt,
       updatedAt: run.updatedAt,
     }

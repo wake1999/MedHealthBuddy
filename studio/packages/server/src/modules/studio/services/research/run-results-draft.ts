@@ -1,5 +1,5 @@
 import { selectRunBranch } from './run-branch'
-import { readStore, type ResearchFigure, type ResearchRun } from './store'
+import { readStore, type ResearchFigure, type ResearchMetricStats, type ResearchRun } from './store'
 
 function num(value: number | null | undefined, digits = 4): string {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—'
@@ -82,11 +82,36 @@ export async function generateResultsDraft(
   runId: string,
   figureId = '',
   branchId = '',
+  usePrimaryBranches = false,
 ): Promise<{ markdown: string; latex: string; warnings: string[]; branchId: string }> {
   const store = await readStore(profile)
   const source = store.runs.find(row => row.id === runId)
   if (!source) throw new Error('research_run_not_found')
-  const run = selectRunBranch(source, branchId)
+  let run = selectRunBranch(source, branchId)
+  if (usePrimaryBranches && source.branches.length > 1) {
+    const primaryStats: ResearchMetricStats[] = []
+    const counts = new Map<string, number>()
+    for (const branch of source.branches.filter(row => row.archivedAt === 0 && row.result)) {
+      for (const stat of branch.result!.metricStats) {
+        const key = stat.name.toLowerCase()
+        if (primaryStats.some(row => row.name.toLowerCase() === key)) continue
+        const chosen = source.branches.find(row =>
+          row.id === source.primaryMetricBranches[key]
+          && row.archivedAt === 0
+          && row.result?.metricStats.some(item => item.name.toLowerCase() === key),
+        ) || branch
+        const chosenStat = chosen.result?.metricStats.find(item => item.name.toLowerCase() === key)
+        if (!chosenStat) continue
+        primaryStats.push(chosenStat)
+        counts.set(chosen.id, (counts.get(chosen.id) || 0) + 1)
+      }
+    }
+    const mainBranchId = Array.from(counts.entries()).sort((left, right) => right[1] - left[1])[0]?.[0]
+    if (mainBranchId) run = selectRunBranch(source, mainBranchId)
+    if (primaryStats.length > 0 && run.result) {
+      run = { ...run, result: { ...run.result, metricStats: primaryStats } }
+    }
+  }
   if (!run.result) throw new Error('research_result_required')
   const figures = store.figures.filter(figure => figure.projectId === run.projectId)
   const selectedFigure = figureId !== ''
@@ -100,6 +125,9 @@ export async function generateResultsDraft(
   const metrics = plan?.metrics || result.metricStats.map(stat => stat.name).join(', ')
   const labels = [`Table 1 (Table~\\ref{${tableRef(run)}})`]
   const warnings: string[] = []
+  if (usePrimaryBranches && source.branches.length > 1) {
+    warnings.push('Metric rows are selected per metric from primary branches; the narrative still comes from one branch and must be checked manually.')
+  }
   if (selectedFigure) {
     labels.push(`Figure 1 (Figure~\\ref{${figureRef(selectedFigure)}})`)
   } else {

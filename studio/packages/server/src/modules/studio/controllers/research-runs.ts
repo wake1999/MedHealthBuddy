@@ -385,14 +385,16 @@ export async function recordResultHandler(ctx: any) {
 }
 
 export async function runResultsDraftHandler(ctx: any) {
+  const body = readBody(ctx) || {}
   try {
     ctx.body = {
       ok: true,
       ...(await generateResultsDraft(
         profileOf(ctx) || 'default',
         String(ctx.params.id || ''),
-        '',
-        String(ctx.query?.branchId || ''),
+        String(body.figureId || ''),
+        String(body.branchId || ctx.query?.branchId || ''),
+        body.usePrimaryBranches === true || ctx.query?.usePrimaryBranches === 'true',
       )),
     }
   } catch (error) {
@@ -410,6 +412,7 @@ export async function insertResultsHandler(ctx: any) {
         String(ctx.params.id || ''),
         String(body.figureId || ''),
         String(body.branchId || ''),
+        body.usePrimaryBranches === true,
       )),
     }
   } catch (error) {
@@ -455,6 +458,7 @@ export async function freezeBranchHandler(ctx: any) {
         String(ctx.params.id || ''),
         String(ctx.params.branchId || ''),
         body.frozen === true,
+        String(body.reason || ''),
       ),
     }
   } catch (error) {

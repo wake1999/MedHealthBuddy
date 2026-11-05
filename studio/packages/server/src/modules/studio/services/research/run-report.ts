@@ -158,6 +158,11 @@ export async function generateRunReport(
       lines.push(`### ${branch.hypothesis?.text || branch.id}`, '')
       lines.push(`- Branch: \`${branch.id}\``, `- Stage: ${branch.stage}`)
       if (branch.archivedAt) lines.push('- Archived: yes')
+      if (branch.frozenAt) lines.push('- Frozen: yes')
+      if (branch.audit.length > 0) {
+        const last = branch.audit[branch.audit.length - 1]
+        lines.push(`- Last audit: ${last.action} at ${new Date(last.at).toISOString()}${last.note ? ` — ${last.note}` : ''}`)
+      }
       if (branch.experimentPlan?.family) lines.push(`- Family: ${branch.experimentPlan.family}`)
       lines.push(`- Experiment: \`${branch.experimentId || '—'}\``)
       if (branch.result) {

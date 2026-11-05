@@ -150,11 +150,16 @@ interface ResearchFlow {
   id: string
   projectId: string
   runId: string
-  mode: 'dry-run' | 'fixture'
+  mode: 'dry-run' | 'fixture' | 'ssh'
   status: 'running' | 'waiting_approval' | 'completed' | 'failed'
   stage: string
   gate: 'claims' | 'plan' | 'result' | ''
   title: string
+  serverId: string
+  jobId: string
+  attempt: number
+  maxAttempts: number
+  checkpoint: string
   steps: Array<{ key: string; status: string; note: string; at: number }>
   error: string
 }
@@ -1014,8 +1019,10 @@ export function RunsView({
     }
   }
 
-  async function startFlow(mode: 'dry-run' | 'fixture') {
+  async function startFlow(mode: 'dry-run' | 'fixture' | 'ssh') {
     if (!projectId) return
+    const serverId = mode === 'ssh' ? window.prompt(t('runs.flowServerPrompt'), servers[0]?.id || '') : ''
+    if (mode === 'ssh' && serverId === null) return
     setFlowBusy(true)
     setError('')
     try {
@@ -1026,14 +1033,34 @@ export function RunsView({
           body: JSON.stringify({
             projectId,
             mode,
-            title: mode === 'fixture' ? 'UI fixture flow' : 'UI dry-run flow',
+            title: mode === 'fixture' ? 'UI fixture flow' : mode === 'ssh' ? 'UI SSH flow' : 'UI dry-run flow',
             idempotencyKey: `${mode}-${Date.now()}`,
+            serverId: serverId || undefined,
+            maxAttempts: 2,
           }),
         },
       )
       setActiveFlow(body.flow)
       setNotice(mode === 'dry-run' ? t('runs.flowDryCreated') : t('runs.flowFixtureCreated'))
       if (body.run) await loadRuns(body.run.id)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setFlowBusy(false)
+    }
+  }
+
+  async function tickActiveFlow() {
+    if (!activeFlow) return
+    setFlowBusy(true)
+    setError('')
+    try {
+      const body = await request<{ flow: ResearchFlow }>(
+        `/api/studio/research/flows/${encodeURIComponent(activeFlow.id)}/tick`,
+        { method: 'POST' },
+      )
+      setActiveFlow(body.flow)
+      setNotice(t('runs.flowTicked', { state: body.flow.checkpoint }))
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -1732,6 +1759,9 @@ export function RunsView({
           <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('fixture')}>
             {t('runs.flowFixture')}
           </button>
+          <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('ssh')}>
+            {t('runs.flowSsh')}
+          </button>
           <button type="button" className={css.btn} onClick={() => void loadRuns(selectedId)} disabled={loading}>
             {t('runs.refresh')}
           </button>
@@ -1747,6 +1777,11 @@ export function RunsView({
               {activeFlow.gate ? ` · ${t('runs.flowGate')}: ${activeFlow.gate}` : ''}
             </p>
           </div>
+          {activeFlow.mode === 'ssh' && activeFlow.status === 'running' && (
+            <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void tickActiveFlow()}>
+              {t('runs.flowTick')}
+            </button>
+          )}
           {activeFlow.gate && (
             <button type="button" className={css.btnPrimary} disabled={flowBusy} onClick={() => void approveActiveFlow()}>
               {t('runs.flowApprove', { gate: activeFlow.gate })}

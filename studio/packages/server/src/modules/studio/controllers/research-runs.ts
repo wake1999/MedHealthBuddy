@@ -27,7 +27,7 @@ import {
 } from '../services/research/runs'
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 import { generateRunReport } from '../services/research/run-report'
-import { approveFlowGate, createFlow, getFlow, listFlows, removeFlow } from '../services/research/flow-runner'
+import { approveFlowGate, createFlow, getFlow, listFlows, removeFlow, resumeFlow, tickFlow } from '../services/research/flow-runner'
 import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
@@ -108,10 +108,11 @@ function failRun(ctx: any, error: unknown) {
     || message.startsWith('research_consolidation_acknowledgements_required')
     || message.startsWith('research_result_missing_metrics')
     || message === 'research_flow_approval_note_required'
+    || message === 'research_flow_result_required'
   ) {
     return fail(ctx, 422, message, message)
   }
-  if (message === 'research_flow_gate_mismatch') {
+  if (message === 'research_flow_gate_mismatch' || message === 'research_flow_no_running_job') {
     return fail(ctx, 409, 'Flow gate changed; reload and retry', message)
   }
   if (/required|incomplete|project_not_found/.test(message)) {
@@ -743,9 +744,11 @@ export async function createFlowHandler(ctx: any) {
       ok: true,
       ...(await createFlow(profileOf(ctx) || 'default', {
         projectId: String(body.projectId || ''),
-        mode: body.mode === 'fixture' ? 'fixture' : 'dry-run',
+        mode: body.mode === 'fixture' || body.mode === 'ssh' ? body.mode : 'dry-run',
         idempotencyKey: String(body.idempotencyKey || ''),
         title: String(body.title || ''),
+        serverId: String(body.serverId || ''),
+        maxAttempts: Number(body.maxAttempts || 2),
       })),
     }
   } catch (error) {
@@ -785,6 +788,34 @@ export async function approveFlowHandler(ctx: any) {
         String(ctx.params.flowId || ''),
         String(body.gate || ''),
         String(body.note || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function tickFlowHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await tickFlow(
+        profileOf(ctx) || 'default',
+        String(ctx.params.flowId || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function resumeFlowHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await resumeFlow(
+        profileOf(ctx) || 'default',
+        String(ctx.params.flowId || ''),
       )),
     }
   } catch (error) {

@@ -6,8 +6,10 @@ import {
   createExperimentRecord,
   createRun,
   recordExperimentResult,
+  refreshExperimentJob,
   saveExperimentPlan,
   saveHypothesis,
+  submitExperimentJob,
 } from './runs'
 import { newId, readStore, updateStore, type ResearchFlow, type ResearchRun } from './store'
 
@@ -32,9 +34,11 @@ export const FLOW_FIXTURE = {
 
 export interface CreateFlowInput {
   projectId?: string
-  mode?: 'dry-run' | 'fixture'
+  mode?: 'dry-run' | 'fixture' | 'ssh'
   idempotencyKey?: string
   title?: string
+  serverId?: string
+  maxAttempts?: number
 }
 
 function flowSteps(): ResearchFlow['steps'] {
@@ -44,6 +48,7 @@ function flowSteps(): ResearchFlow['steps'] {
     { key: 'claims', status: 'planned', note: 'Human gate', at: Date.now() },
     { key: 'hypothesis', status: 'planned', note: 'Fixture hypothesis', at: Date.now() },
     { key: 'plan', status: 'planned', note: 'Human gate', at: Date.now() },
+    { key: 'experiment', status: 'planned', note: 'SSH job execution', at: Date.now() },
     { key: 'result', status: 'planned', note: 'Human gate', at: Date.now() },
     { key: 'analysis', status: 'planned', note: 'Report and Results draft', at: Date.now() },
   ]
@@ -124,13 +129,17 @@ export async function createFlow(
   profile: string,
   input: CreateFlowInput,
 ): Promise<{ flow: ResearchFlow; run: ResearchRun | null; reused: boolean }> {
-  const mode = input.mode === 'fixture' ? 'fixture' : 'dry-run'
+  const mode = input.mode === 'ssh' ? 'ssh' : input.mode === 'fixture' ? 'fixture' : 'dry-run'
   const idempotencyKey = (input.idempotencyKey || `flow-${Date.now()}`).trim()
   const store = await readStore(profile)
   const existing = store.flows.find(flow => flow.mode === mode && flow.idempotencyKey === idempotencyKey)
   if (existing) {
     const run = existing.runId ? store.runs.find(row => row.id === existing.runId) || null : null
     return { flow: existing, run, reused: true }
+  }
+  if (mode === 'ssh') {
+    const server = store.servers.find(row => row.id === String(input.serverId || ''))
+    if (!server || !server.host || !server.user) throw new Error('research_server_not_found')
   }
 
   const title = (input.title || 'Fixture Research Flow').trim()
@@ -148,6 +157,11 @@ export async function createFlow(
     question: FLOW_FIXTURE.question,
     steps: flowSteps(),
     error: '',
+    serverId: String(input.serverId || ''),
+    jobId: '',
+    attempt: 0,
+    maxAttempts: Math.max(1, Math.min(5, Math.floor(input.maxAttempts || 2))),
+    checkpoint: '',
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
@@ -258,7 +272,7 @@ export async function approveFlowGate(
 ): Promise<{ flow: ResearchFlow; run: ResearchRun | null }> {
   if (note.trim() === '') throw new Error('research_flow_approval_note_required')
   const { flow } = await getFlow(profile, flowId)
-  if (flow.mode !== 'fixture') throw new Error('research_flow_not_fixture')
+  if (flow.mode === 'dry-run') throw new Error('research_flow_not_fixture')
   if (flow.status === 'completed') return getFlow(profile, flowId)
   if (flow.gate !== gate) throw new Error('research_flow_gate_mismatch')
   const run = await readStore(profile).then(store => store.runs.find(row => row.id === flow.runId))
@@ -301,6 +315,30 @@ export async function approveFlowGate(
 
   if (gate === 'plan') {
     await createExperimentRecord(profile, run.id)
+    if (flow.mode === 'ssh') {
+      try {
+        const submitted = await submitExperimentJob(profile, run.id, flow.serverId)
+        const jobId = String(submitted.job.id || '')
+        const updated = await updateFlow(profile, flowId, current => {
+          current.stage = 'experiment'
+          current.gate = ''
+          current.status = 'running'
+          current.jobId = jobId
+          current.attempt = 1
+          current.checkpoint = JSON.stringify({ jobId, attempt: 1, state: 'running', at: Date.now() })
+          markStep(current, 'plan', 'done', note.trim())
+          markStep(current, 'experiment', 'running', `SSH job ${jobId} submitted`)
+        })
+        return { flow: updated, run: await readStore(profile).then(store => store.runs.find(row => row.id === run.id) || null) }
+      } catch (error) {
+        await updateFlow(profile, flowId, current => {
+          current.status = 'failed'
+          current.error = error instanceof Error ? error.message : 'ssh_submit_failed'
+          markStep(current, 'experiment', 'failed', current.error)
+        })
+        throw error
+      }
+    }
     await recordExperimentResult(profile, run.id, {
       outcome: 'supported',
       summary: 'Fixture result: MIL improves F1.',
@@ -319,6 +357,10 @@ export async function approveFlowGate(
   }
 
   if (gate === 'result') {
+    if (flow.mode === 'ssh') {
+      const current = await readStore(profile).then(store => store.runs.find(row => row.id === run.id) || null)
+      if (!current?.result) throw new Error('research_flow_result_required')
+    }
     await generateRunReport(profile, run.id)
     await generateResultsDraft(profile, run.id)
     const updated = await updateFlow(profile, flowId, current => {
@@ -332,4 +374,86 @@ export async function approveFlowGate(
   }
 
   throw new Error('research_flow_unknown_gate')
+}
+
+export async function tickFlow(
+  profile: string,
+  flowId: string,
+): Promise<{ flow: ResearchFlow; run: ResearchRun | null; state: string; detail: string; exitCode: number | null }> {
+  const { flow } = await getFlow(profile, flowId)
+  if (flow.mode !== 'ssh') throw new Error('research_flow_not_ssh')
+  if (flow.status === 'completed' || flow.status === 'failed') {
+    return { flow, run: flow.runId ? await readStore(profile).then(store => store.runs.find(row => row.id === flow.runId) || null) : null, state: flow.status, detail: flow.error, exitCode: null }
+  }
+  if (flow.gate !== '' || !flow.jobId) throw new Error('research_flow_no_running_job')
+
+  let refreshed: Awaited<ReturnType<typeof refreshExperimentJob>>
+  try {
+    refreshed = await refreshExperimentJob(profile, flow.runId)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'ssh_refresh_failed'
+    const updated = await updateFlow(profile, flowId, current => {
+      current.error = detail
+      current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state: 'refresh_error', detail, at: Date.now() })
+    })
+    return { flow: updated, run: null, state: 'unknown', detail, exitCode: null }
+  }
+  const state = refreshed.state?.state || 'unknown'
+  const detail = refreshed.state?.detail || ''
+  const exitCode = refreshed.state?.exitCode ?? null
+
+  if (state === 'running' || state === 'unknown') {
+    const updated = await updateFlow(profile, flowId, current => {
+      current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state, at: Date.now() })
+      current.error = state === 'unknown' ? detail : ''
+    })
+    return { flow: updated, run: refreshed.run, state, detail, exitCode }
+  }
+
+  if (state === 'succeeded') {
+    const updated = await updateFlow(profile, flowId, current => {
+      current.stage = 'result'
+      current.gate = 'result'
+      current.status = 'waiting_approval'
+      current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state, at: Date.now() })
+      markStep(current, 'experiment', 'done', `SSH job ${current.jobId} succeeded`)
+      markStep(current, 'result', 'waiting', 'Record result, then approve result gate')
+    })
+    return { flow: updated, run: refreshed.run, state, detail, exitCode }
+  }
+
+  if (flow.attempt < flow.maxAttempts) {
+    const submitted = await submitExperimentJob(profile, flow.runId, flow.serverId)
+    const jobId = String(submitted.job.id || '')
+    const attempt = flow.attempt + 1
+    const updated = await updateFlow(profile, flowId, current => {
+      current.jobId = jobId
+      current.attempt = attempt
+      current.status = 'running'
+      current.gate = ''
+      current.error = detail
+      current.checkpoint = JSON.stringify({ jobId, attempt, state: 'retrying', previousState: state, at: Date.now() })
+      markStep(current, 'experiment', 'retrying', `Attempt ${attempt}/${current.maxAttempts}; previous job ${state}`)
+    })
+    return { flow: updated, run: await readStore(profile).then(store => store.runs.find(row => row.id === flow.runId) || null), state: 'retrying', detail, exitCode }
+  }
+
+  const updated = await updateFlow(profile, flowId, current => {
+    current.status = 'failed'
+    current.stage = 'experiment'
+    current.gate = ''
+    current.error = detail || 'ssh_job_failed'
+    current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state: 'failed', exitCode, at: Date.now() })
+    markStep(current, 'experiment', 'failed', `Retry limit reached: ${detail}`)
+  })
+  return { flow: updated, run: refreshed.run, state: 'failed', detail, exitCode }
+}
+
+export async function resumeFlow(profile: string, flowId: string): Promise<{ flow: ResearchFlow; run: ResearchRun | null }> {
+  const current = await getFlow(profile, flowId)
+  if (current.flow.mode === 'ssh' && current.flow.status === 'running' && current.flow.gate === '' && current.flow.jobId) {
+    const ticked = await tickFlow(profile, flowId)
+    return { flow: ticked.flow, run: ticked.run }
+  }
+  return current
 }

@@ -642,7 +642,7 @@ export interface ResearchFlow {
   id: string
   projectId: string
   runId: string
-  mode: 'dry-run' | 'fixture'
+  mode: 'dry-run' | 'fixture' | 'ssh'
   status: 'running' | 'waiting_approval' | 'completed' | 'failed'
   stage: string
   gate: 'claims' | 'plan' | 'result' | ''
@@ -652,6 +652,11 @@ export interface ResearchFlow {
   question: string
   steps: Array<{ key: string; status: string; note: string; at: number }>
   error: string
+  serverId: string
+  jobId: string
+  attempt: number
+  maxAttempts: number
+  checkpoint: string
   createdAt: number
   updatedAt: number
 }
@@ -769,7 +774,15 @@ function normalizeStore(input: unknown): ResearchStore {
     version: typeof raw.version === 'number' ? raw.version : STORE_VERSION,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : 0,
     projects: Array.isArray(raw.projects) ? (raw.projects as ResearchProject[]) : [],
-    flows: Array.isArray(raw.flows) ? (raw.flows as ResearchFlow[]) : [],
+    flows: (Array.isArray(raw.flows) ? raw.flows : []).map(flow => ({
+      ...(flow as ResearchFlow),
+      mode: (flow as ResearchFlow).mode || 'fixture',
+      serverId: (flow as ResearchFlow).serverId || '',
+      jobId: (flow as ResearchFlow).jobId || '',
+      attempt: Number((flow as ResearchFlow).attempt) || 0,
+      maxAttempts: Number((flow as ResearchFlow).maxAttempts) || 2,
+      checkpoint: (flow as ResearchFlow).checkpoint || '',
+    })),
   }
   for (const collection of RESEARCH_COLLECTIONS) {
     const value = raw[collection]

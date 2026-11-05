@@ -80,6 +80,8 @@ POST  /api/studio/research/projects/package/import
 POST  /api/studio/research/flows
 GET   /api/studio/research/flows/:flowId
 POST  /api/studio/research/flows/:flowId/approve
+POST  /api/studio/research/flows/:flowId/tick
+POST  /api/studio/research/flows/:flowId/resume
 GET   /api/studio/research/runs/:id/branches/compare
 GET   /api/studio/research/runs/:id/branches/consistency
 GET   /api/studio/research/runs/:id/branches/results-table

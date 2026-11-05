@@ -10335,6 +10335,27 @@ button.paperNoteBlockMeta:hover {
   gap: 6px;
 }
 
+.runsFlowPanel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgb(80 130 90 / 22%);
+  border-radius: 8px;
+  background: rgb(80 130 90 / 5%);
+}
+
+.runsFlowPanel strong {
+  color: #3f7049;
+  font-size: 12px;
+}
+
+.runsFlowPanel p {
+  margin: 3px 0 0;
+}
+
 .runsPackageImport {
   position: relative;
   overflow: hidden;

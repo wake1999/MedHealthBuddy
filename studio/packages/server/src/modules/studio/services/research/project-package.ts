@@ -47,6 +47,7 @@ const PROJECT_COLLECTIONS = [
   'journal',
   'evidence',
   'runs',
+  'flows',
 ] as const
 
 function sha256(content: Buffer | string): string {

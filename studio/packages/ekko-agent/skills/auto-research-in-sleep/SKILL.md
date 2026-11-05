@@ -77,6 +77,9 @@ GET   /api/studio/research/runs/:id/claim-graph
 GET   /api/studio/research/projects/:id/package
 GET   /api/studio/research/projects/:id/package-info
 POST  /api/studio/research/projects/package/import
+POST  /api/studio/research/flows
+GET   /api/studio/research/flows/:flowId
+POST  /api/studio/research/flows/:flowId/approve
 GET   /api/studio/research/runs/:id/branches/compare
 GET   /api/studio/research/runs/:id/branches/consistency
 GET   /api/studio/research/runs/:id/branches/results-table
@@ -138,7 +141,9 @@ See `docs/branch-merge-policy.md` and `docs/raw-data-merge-schema.md`.
 plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. `projects/:id/package` exports a
 portable project zip; `projects/package/import` verifies file hashes and refuses
-project-id collisions. See `docs/project-package.md`. Never approve evidence or
+project-id collisions. `flows` is a fixture/dry-run runner; fixture mode stops at
+claim, plan, and result human gates. See `docs/project-package.md` and
+`docs/research-flow-runner.md`. Never approve evidence or
 claims yourself.
 
 `report` is a deterministic Markdown export of persisted evidence, claims,

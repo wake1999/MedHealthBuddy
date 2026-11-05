@@ -27,6 +27,7 @@ import {
 } from '../services/research/runs'
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 import { generateRunReport } from '../services/research/run-report'
+import { approveFlowGate, createFlow, getFlow, listFlows, removeFlow } from '../services/research/flow-runner'
 import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
@@ -106,8 +107,12 @@ function failRun(ctx: any, error: unknown) {
     || message.startsWith('research_raw_artifact_')
     || message.startsWith('research_consolidation_acknowledgements_required')
     || message.startsWith('research_result_missing_metrics')
+    || message === 'research_flow_approval_note_required'
   ) {
     return fail(ctx, 422, message, message)
+  }
+  if (message === 'research_flow_gate_mismatch') {
+    return fail(ctx, 409, 'Flow gate changed; reload and retry', message)
   }
   if (/required|incomplete|project_not_found/.test(message)) {
     return fail(ctx, 400, message, message)
@@ -726,6 +731,71 @@ export async function claimGraphHandler(ctx: any) {
       ok: true,
       ...(await generateClaimGraph(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
     }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function createFlowHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await createFlow(profileOf(ctx) || 'default', {
+        projectId: String(body.projectId || ''),
+        mode: body.mode === 'fixture' ? 'fixture' : 'dry-run',
+        idempotencyKey: String(body.idempotencyKey || ''),
+        title: String(body.title || ''),
+      })),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function listFlowsHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      flows: await listFlows(profileOf(ctx) || 'default', String(ctx.query?.projectId || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function getFlowHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await getFlow(profileOf(ctx) || 'default', String(ctx.params.flowId || ''))),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function approveFlowHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await approveFlowGate(
+        profileOf(ctx) || 'default',
+        String(ctx.params.flowId || ''),
+        String(body.gate || ''),
+        String(body.note || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function removeFlowHandler(ctx: any) {
+  try {
+    await removeFlow(profileOf(ctx) || 'default', String(ctx.params.flowId || ''))
+    ctx.body = { ok: true }
   } catch (error) {
     failRun(ctx, error)
   }

@@ -146,6 +146,19 @@ interface FamilyAnalysis {
   rows: FamilyMetricRow[]
 }
 
+interface ResearchFlow {
+  id: string
+  projectId: string
+  runId: string
+  mode: 'dry-run' | 'fixture'
+  status: 'running' | 'waiting_approval' | 'completed' | 'failed'
+  stage: string
+  gate: 'claims' | 'plan' | 'result' | ''
+  title: string
+  steps: Array<{ key: string; status: string; note: string; at: number }>
+  error: string
+}
+
 interface BranchConsistency {
   runId: string
   branchCount: number
@@ -479,6 +492,8 @@ export function RunsView({
   const [mergeDiff, setMergeDiff] = useState<Array<{ field: string; left: string; right: string }> | null>(null)
   const [artifactBusy, setArtifactBusy] = useState(false)
   const [packageBusy, setPackageBusy] = useState(false)
+  const [flowBusy, setFlowBusy] = useState(false)
+  const [activeFlow, setActiveFlow] = useState<ResearchFlow | null>(null)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
@@ -996,6 +1011,58 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setConsistencyBusy(false)
+    }
+  }
+
+  async function startFlow(mode: 'dry-run' | 'fixture') {
+    if (!projectId) return
+    setFlowBusy(true)
+    setError('')
+    try {
+      const body = await request<{ flow: ResearchFlow; run: ResearchRun | null; reused: boolean }>(
+        '/api/studio/research/flows',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            projectId,
+            mode,
+            title: mode === 'fixture' ? 'UI fixture flow' : 'UI dry-run flow',
+            idempotencyKey: `${mode}-${Date.now()}`,
+          }),
+        },
+      )
+      setActiveFlow(body.flow)
+      setNotice(mode === 'dry-run' ? t('runs.flowDryCreated') : t('runs.flowFixtureCreated'))
+      if (body.run) await loadRuns(body.run.id)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setFlowBusy(false)
+    }
+  }
+
+  async function approveActiveFlow() {
+    if (!activeFlow?.gate) return
+    const note = window.prompt(t('runs.flowApprovalNote'), '')
+    if (note === null) return
+    if (note.trim() === '') {
+      setError(t('runs.flowApprovalNoteRequired'))
+      return
+    }
+    setFlowBusy(true)
+    setError('')
+    try {
+      const body = await request<{ flow: ResearchFlow; run: ResearchRun | null }>(
+        `/api/studio/research/flows/${encodeURIComponent(activeFlow.id)}/approve`,
+        { method: 'POST', body: JSON.stringify({ gate: activeFlow.gate, note }) },
+      )
+      setActiveFlow(body.flow)
+      if (body.run) await loadRuns(body.run.id)
+      setNotice(body.flow.status === 'completed' ? t('runs.flowCompleted') : t('runs.flowAdvanced'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setFlowBusy(false)
     }
   }
 
@@ -1659,11 +1726,35 @@ export function RunsView({
             {t('runs.importPackage')}
             <input type="file" accept=".zip,application/zip" onChange={event => void importProjectPackageFile(event)} />
           </label>
+          <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('dry-run')}>
+            {t('runs.flowDryRun')}
+          </button>
+          <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('fixture')}>
+            {t('runs.flowFixture')}
+          </button>
           <button type="button" className={css.btn} onClick={() => void loadRuns(selectedId)} disabled={loading}>
             {t('runs.refresh')}
           </button>
         </div>
       </header>
+
+      {activeFlow && (
+        <div className={css.runsFlowPanel}>
+          <div>
+            <strong>{t('runs.flowPanelTitle')}</strong>
+            <p className={css.hint}>
+              {activeFlow.mode} · {activeFlow.status} · {activeFlow.stage}
+              {activeFlow.gate ? ` · ${t('runs.flowGate')}: ${activeFlow.gate}` : ''}
+            </p>
+          </div>
+          {activeFlow.gate && (
+            <button type="button" className={css.btnPrimary} disabled={flowBusy} onClick={() => void approveActiveFlow()}>
+              {t('runs.flowApprove', { gate: activeFlow.gate })}
+            </button>
+          )}
+          <button type="button" className={css.btn} onClick={() => setActiveFlow(null)}>{t('runs.close')}</button>
+        </div>
+      )}
 
       {error !== '' && <p className={css.failure} role="alert">{error}</p>}
       {notice !== '' && <p className={css.hint} role="status">{notice}</p>}

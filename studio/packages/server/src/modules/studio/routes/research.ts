@@ -10,6 +10,11 @@ researchRoutes.get('/api/studio/research/state', ctrl.getState)
 researchRoutes.get('/api/studio/research/events', ctrl.events)
 
 // Research Run MVP: explicit, resumable literature → evidence → hypothesis stage.
+researchRoutes.post('/api/studio/research/flows', runCtrl.createFlowHandler)
+researchRoutes.get('/api/studio/research/flows', runCtrl.listFlowsHandler)
+researchRoutes.get('/api/studio/research/flows/:flowId', runCtrl.getFlowHandler)
+researchRoutes.delete('/api/studio/research/flows/:flowId', runCtrl.removeFlowHandler)
+researchRoutes.post('/api/studio/research/flows/:flowId/approve', runCtrl.approveFlowHandler)
 researchRoutes.get('/api/studio/research/runs', runCtrl.listRunsHandler)
 researchRoutes.post('/api/studio/research/runs', runCtrl.createRunHandler)
 researchRoutes.get('/api/studio/research/runs/:id', runCtrl.getRunHandler)

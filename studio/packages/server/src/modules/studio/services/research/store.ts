@@ -638,9 +638,28 @@ export interface ResearchCollections {
   runs: ResearchRun[]
 }
 
+export interface ResearchFlow {
+  id: string
+  projectId: string
+  runId: string
+  mode: 'dry-run' | 'fixture'
+  status: 'running' | 'waiting_approval' | 'completed' | 'failed'
+  stage: string
+  gate: 'claims' | 'plan' | 'result' | ''
+  fixtureId: string
+  idempotencyKey: string
+  title: string
+  question: string
+  steps: Array<{ key: string; status: string; note: string; at: number }>
+  error: string
+  createdAt: number
+  updatedAt: number
+}
+
 export interface ResearchStore extends ResearchCollections {
   version: number
   projects: ResearchProject[]
+  flows: ResearchFlow[]
   updatedAt: number
   /** The lane the user declared as the mainline; null/absent until declared. */
   mainline?: ResearchMainlineRef | null
@@ -708,6 +727,7 @@ export function emptyStore(): ResearchStore {
   return {
     version: STORE_VERSION,
     projects: [],
+    flows: [],
     papers: [],
     folders: [],
     experiments: [],
@@ -749,6 +769,7 @@ function normalizeStore(input: unknown): ResearchStore {
     version: typeof raw.version === 'number' ? raw.version : STORE_VERSION,
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : 0,
     projects: Array.isArray(raw.projects) ? (raw.projects as ResearchProject[]) : [],
+    flows: Array.isArray(raw.flows) ? (raw.flows as ResearchFlow[]) : [],
   }
   for (const collection of RESEARCH_COLLECTIONS) {
     const value = raw[collection]

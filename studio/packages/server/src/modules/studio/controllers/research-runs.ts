@@ -754,6 +754,7 @@ export async function createFlowHandler(ctx: any) {
         serverId: String(body.serverId || ''),
         maxAttempts: Number(body.maxAttempts || 2),
         artifactPath: String(body.artifactPath || ''),
+        auto: body.auto === true,
       })),
     }
   } catch (error) {

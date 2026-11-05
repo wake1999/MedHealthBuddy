@@ -44,6 +44,7 @@ export interface CreateFlowInput {
   serverId?: string
   maxAttempts?: number
   artifactPath?: string
+  auto?: boolean
 }
 
 function flowSteps(): ResearchFlow['steps'] {
@@ -253,7 +254,23 @@ export async function createFlow(
     draft.flows.push(flow)
     return flow
   }, { actor: { kind: 'system', id: 'flow-runner' }, action: 'flow.created' })
+  if (input.auto && created.mode === 'fixture') {
+    const completed = await advanceFlowToCompletion(profile, created.id)
+    return { flow: completed, run: await readStore(profile).then(store => store.runs.find(row => row.id === created.runId) || null), reused: false }
+  }
   return { flow: created, run, reused: false }
+}
+
+export async function advanceFlowToCompletion(profile: string, flowId: string): Promise<ResearchFlow> {
+  for (let index = 0; index < 8; index += 1) {
+    const { flow } = await getFlow(profile, flowId)
+    if (flow.status === 'completed') return flow
+    if (flow.status === 'failed' || flow.status === 'cancelled') return flow
+    if (flow.mode !== 'fixture') throw new Error('research_flow_not_fixture')
+    if (!flow.gate) throw new Error('research_flow_no_runnable_gate')
+    await approveFlowGate(profile, flowId, flow.gate, 'Automatic fixture run')
+  }
+  throw new Error('research_flow_auto_limit')
 }
 
 export async function getFlow(profile: string, flowId: string): Promise<{ flow: ResearchFlow; run: ResearchRun | null }> {

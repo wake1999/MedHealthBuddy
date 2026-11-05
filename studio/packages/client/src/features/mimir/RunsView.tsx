@@ -1039,7 +1039,7 @@ export function RunsView({
     }
   }
 
-  async function startFlow(mode: 'dry-run' | 'fixture' | 'ssh') {
+  async function startFlow(mode: 'dry-run' | 'fixture' | 'ssh', auto = false) {
     if (!projectId) return
     const serverId = mode === 'ssh' ? window.prompt(t('runs.flowServerPrompt'), servers[0]?.id || '') : ''
     if (mode === 'ssh' && serverId === null) return
@@ -1060,11 +1060,14 @@ export function RunsView({
             serverId: serverId || undefined,
             artifactPath: artifactPath || undefined,
             maxAttempts: 2,
+            auto,
           }),
         },
       )
       setActiveFlow(body.flow)
-      setNotice(mode === 'dry-run' ? t('runs.flowDryCreated') : t('runs.flowFixtureCreated'))
+      setNotice(auto
+        ? t('runs.flowAutoCompleted')
+        : mode === 'dry-run' ? t('runs.flowDryCreated') : t('runs.flowFixtureCreated'))
       if (body.run) await loadRuns(body.run.id)
     } catch (err) {
       setError((err as Error).message)
@@ -1759,6 +1762,9 @@ export function RunsView({
           </button>
           <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('fixture')}>
             {t('runs.flowFixture')}
+          </button>
+          <button type="button" className={css.btnPrimary} disabled={flowBusy} onClick={() => void startFlow('fixture', true)}>
+            {t('runs.flowAuto')}
           </button>
           <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('ssh')}>
             {t('runs.flowSsh')}

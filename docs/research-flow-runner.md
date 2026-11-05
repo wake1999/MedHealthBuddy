@@ -44,6 +44,16 @@ result
 
 Every gate requires a non-empty note.
 
+## Full fixture automation
+
+`POST /flows` accepts `auto: true` for fixture mode. The runner then approves
+the claim, plan, and result gates sequentially and stops at `completed`. This is
+a deterministic demo of the full state machine; it does not use real papers or
+invent a scientific result for a normal Run.
+
+For a real Run, the pipeline still stops at the experiment/result gate until a
+real result is recorded.
+
 ## Idempotency
 
 The same `idempotencyKey` and mode returns the existing flow instead of creating

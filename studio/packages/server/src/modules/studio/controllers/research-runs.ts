@@ -27,7 +27,7 @@ import {
 } from '../services/research/runs'
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 import { generateRunReport } from '../services/research/run-report'
-import { approveFlowGate, createFlow, getFlow, listFlows, removeFlow, resumeFlow, tickFlow } from '../services/research/flow-runner'
+import { approveFlowGate, cancelFlow, createFlow, getFlow, listFlows, removeFlow, resumeFlow, tickFlow } from '../services/research/flow-runner'
 import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
@@ -109,11 +109,15 @@ function failRun(ctx: any, error: unknown) {
     || message.startsWith('research_result_missing_metrics')
     || message === 'research_flow_approval_note_required'
     || message === 'research_flow_result_required'
+    || message === 'research_flow_retry_exhausted'
   ) {
     return fail(ctx, 422, message, message)
   }
-  if (message === 'research_flow_gate_mismatch' || message === 'research_flow_no_running_job') {
+  if (message === 'research_flow_gate_mismatch' || message === 'research_flow_no_running_job' || message === 'research_flow_lease_busy') {
     return fail(ctx, 409, 'Flow gate changed; reload and retry', message)
+  }
+  if (message === 'research_flow_not_ssh') {
+    return fail(ctx, 400, 'Only SSH flows can use this action', message)
   }
   if (/required|incomplete|project_not_found/.test(message)) {
     return fail(ctx, 400, message, message)
@@ -800,6 +804,20 @@ export async function tickFlowHandler(ctx: any) {
     ctx.body = {
       ok: true,
       ...(await tickFlow(
+        profileOf(ctx) || 'default',
+        String(ctx.params.flowId || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function cancelFlowHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await cancelFlow(
         profileOf(ctx) || 'default',
         String(ctx.params.flowId || ''),
       )),

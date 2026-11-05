@@ -17,6 +17,7 @@ researchRoutes.delete('/api/studio/research/flows/:flowId', runCtrl.removeFlowHa
 researchRoutes.post('/api/studio/research/flows/:flowId/approve', runCtrl.approveFlowHandler)
 researchRoutes.post('/api/studio/research/flows/:flowId/tick', runCtrl.tickFlowHandler)
 researchRoutes.post('/api/studio/research/flows/:flowId/resume', runCtrl.resumeFlowHandler)
+researchRoutes.post('/api/studio/research/flows/:flowId/cancel', runCtrl.cancelFlowHandler)
 researchRoutes.get('/api/studio/research/runs', runCtrl.listRunsHandler)
 researchRoutes.post('/api/studio/research/runs', runCtrl.createRunHandler)
 researchRoutes.get('/api/studio/research/runs/:id', runCtrl.getRunHandler)

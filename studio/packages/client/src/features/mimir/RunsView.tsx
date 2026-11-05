@@ -151,7 +151,7 @@ interface ResearchFlow {
   projectId: string
   runId: string
   mode: 'dry-run' | 'fixture' | 'ssh'
-  status: 'running' | 'waiting_approval' | 'completed' | 'failed'
+  status: 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled'
   stage: string
   gate: 'claims' | 'plan' | 'result' | ''
   title: string
@@ -159,6 +159,9 @@ interface ResearchFlow {
   jobId: string
   attempt: number
   maxAttempts: number
+  retryAt: number
+  leaseOwner: string
+  leaseUntil: number
   checkpoint: string
   steps: Array<{ key: string; status: string; note: string; at: number }>
   error: string
@@ -1068,6 +1071,44 @@ export function RunsView({
     }
   }
 
+  async function cancelActiveFlow() {
+    if (!activeFlow) return
+    if (!window.confirm(t('runs.flowCancelConfirm'))) return
+    setFlowBusy(true)
+    setError('')
+    try {
+      const body = await request<{ flow: ResearchFlow }>(
+        `/api/studio/research/flows/${encodeURIComponent(activeFlow.id)}/cancel`,
+        { method: 'POST' },
+      )
+      setActiveFlow(body.flow)
+      setNotice(t('runs.flowCancelled'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setFlowBusy(false)
+    }
+  }
+
+  async function resumeActiveFlow() {
+    if (!activeFlow) return
+    setFlowBusy(true)
+    setError('')
+    try {
+      const body = await request<{ flow: ResearchFlow; run: ResearchRun | null }>(
+        `/api/studio/research/flows/${encodeURIComponent(activeFlow.id)}/resume`,
+        { method: 'POST' },
+      )
+      setActiveFlow(body.flow)
+      if (body.run) await loadRuns(body.run.id)
+      setNotice(t('runs.flowResumed'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setFlowBusy(false)
+    }
+  }
+
   async function approveActiveFlow() {
     if (!activeFlow?.gate) return
     const note = window.prompt(t('runs.flowApprovalNote'), '')
@@ -1778,8 +1819,18 @@ export function RunsView({
             </p>
           </div>
           {activeFlow.mode === 'ssh' && activeFlow.status === 'running' && (
-            <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void tickActiveFlow()}>
-              {t('runs.flowTick')}
+            <>
+              <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void tickActiveFlow()}>
+                {t('runs.flowTick')}
+              </button>
+              <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void cancelActiveFlow()}>
+                {t('runs.flowCancel')}
+              </button>
+            </>
+          )}
+          {activeFlow.mode === 'ssh' && activeFlow.status === 'cancelled' && (
+            <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void resumeActiveFlow()}>
+              {t('runs.flowResume')}
             </button>
           )}
           {activeFlow.gate && (

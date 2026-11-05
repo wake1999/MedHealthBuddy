@@ -12,6 +12,7 @@ import {
   submitExperimentJob,
 } from './runs'
 import { newId, readStore, updateStore, type ResearchFlow, type ResearchRun } from './store'
+import { cancelJob } from './ssh'
 
 export const FLOW_FIXTURE = {
   id: 'fixture-milcaf1-v1',
@@ -161,6 +162,9 @@ export async function createFlow(
     jobId: '',
     attempt: 0,
     maxAttempts: Math.max(1, Math.min(5, Math.floor(input.maxAttempts || 2))),
+    retryAt: 0,
+    leaseOwner: '',
+    leaseUntil: 0,
     checkpoint: '',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -376,7 +380,7 @@ export async function approveFlowGate(
   throw new Error('research_flow_unknown_gate')
 }
 
-export async function tickFlow(
+async function tickFlowUnlocked(
   profile: string,
   flowId: string,
 ): Promise<{ flow: ResearchFlow; run: ResearchRun | null; state: string; detail: string; exitCode: number | null }> {
@@ -423,6 +427,27 @@ export async function tickFlow(
   }
 
   if (flow.attempt < flow.maxAttempts) {
+    if (flow.retryAt === 0) {
+      const retryAt = Date.now() + Math.min(60000, 1000 * 2 ** Math.max(0, flow.attempt - 1))
+      const scheduled = await updateFlow(profile, flowId, current => {
+        current.status = 'running'
+        current.retryAt = retryAt
+        current.error = detail
+        current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state: 'backoff', retryAt, at: Date.now() })
+        markStep(current, 'experiment', 'backoff', `Failed; retry scheduled at ${new Date(retryAt).toISOString()}`)
+      })
+      return { flow: scheduled, run: refreshed.run, state: 'backoff', detail, exitCode }
+    }
+    if (flow.retryAt > Date.now()) {
+      const updated = await updateFlow(profile, flowId, current => {
+        current.status = 'running'
+        current.gate = ''
+        current.error = detail
+        current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state: 'backoff', retryAt: current.retryAt, at: Date.now() })
+        markStep(current, 'experiment', 'backoff', `Waiting until ${new Date(current.retryAt).toISOString()}`)
+      })
+      return { flow: updated, run: refreshed.run, state: 'backoff', detail, exitCode }
+    }
     const submitted = await submitExperimentJob(profile, flow.runId, flow.serverId)
     const jobId = String(submitted.job.id || '')
     const attempt = flow.attempt + 1
@@ -431,6 +456,7 @@ export async function tickFlow(
       current.attempt = attempt
       current.status = 'running'
       current.gate = ''
+      current.retryAt = 0
       current.error = detail
       current.checkpoint = JSON.stringify({ jobId, attempt, state: 'retrying', previousState: state, at: Date.now() })
       markStep(current, 'experiment', 'retrying', `Attempt ${attempt}/${current.maxAttempts}; previous job ${state}`)
@@ -438,15 +464,89 @@ export async function tickFlow(
     return { flow: updated, run: await readStore(profile).then(store => store.runs.find(row => row.id === flow.runId) || null), state: 'retrying', detail, exitCode }
   }
 
-  const updated = await updateFlow(profile, flowId, current => {
+  const failed = await updateFlow(profile, flowId, current => {
     current.status = 'failed'
     current.stage = 'experiment'
     current.gate = ''
+    current.retryAt = 0
     current.error = detail || 'ssh_job_failed'
     current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state: 'failed', exitCode, at: Date.now() })
     markStep(current, 'experiment', 'failed', `Retry limit reached: ${detail}`)
   })
-  return { flow: updated, run: refreshed.run, state: 'failed', detail, exitCode }
+  return { flow: failed, run: refreshed.run, state: 'failed', detail, exitCode }
+}
+
+const LEASE_MS = 30_000
+
+async function acquireFlowLease(profile: string, flowId: string, owner: string): Promise<ResearchFlow> {
+  return updateStore(profile, 'flow.lease.acquired', draft => {
+    const flow = draft.flows.find(row => row.id === flowId)
+    if (!flow) throw new Error('research_flow_not_found')
+    const now = Date.now()
+    if (flow.leaseUntil > now && flow.leaseOwner !== owner) throw new Error('research_flow_lease_busy')
+    flow.leaseOwner = owner
+    flow.leaseUntil = now + LEASE_MS
+    flow.updatedAt = now
+    return flow
+  }, { actor: { kind: 'system', id: 'flow-runner' }, action: 'flow.lease.acquired' })
+}
+
+async function releaseFlowLease(profile: string, flowId: string, owner: string): Promise<void> {
+  await updateStore(profile, 'flow.lease.released', draft => {
+    const flow = draft.flows.find(row => row.id === flowId)
+    if (flow && flow.leaseOwner === owner) {
+      flow.leaseOwner = ''
+      flow.leaseUntil = 0
+      flow.updatedAt = Date.now()
+    }
+    return null
+  }, { actor: { kind: 'system', id: 'flow-runner' }, action: 'flow.lease.released' })
+}
+
+export async function tickFlow(
+  profile: string,
+  flowId: string,
+): Promise<{ flow: ResearchFlow; run: ResearchRun | null; state: string; detail: string; exitCode: number | null }> {
+  const owner = `tick_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  await acquireFlowLease(profile, flowId, owner)
+  try {
+    return await tickFlowUnlocked(profile, flowId)
+  } finally {
+    await releaseFlowLease(profile, flowId, owner).catch(() => undefined)
+  }
+}
+
+export async function cancelFlow(profile: string, flowId: string): Promise<{ flow: ResearchFlow; detail: string }> {
+  const { flow } = await getFlow(profile, flowId)
+  if (flow.mode !== 'ssh') throw new Error('research_flow_not_ssh')
+  if (!flow.jobId) throw new Error('research_flow_no_running_job')
+  const store = await readStore(profile)
+  const job = store.jobs.find(row => row.id === flow.jobId)
+  const server = job ? store.servers.find(row => row.id === job.serverId) : null
+  if (!job || !server) throw new Error('research_job_not_found')
+  const cancelled = await cancelJob(
+    { host: server.host, user: server.user, port: server.port },
+    job.pid || '',
+  )
+  const updated = await updateStore(profile, 'flow.cancelled', draft => {
+    const current = draft.flows.find(row => row.id === flowId)
+    if (!current) throw new Error('research_flow_not_found')
+    const target = draft.jobs.find(row => row.id === flow.jobId)
+    if (target) {
+      target.state = 'cancelled'
+      target.endedAt = Date.now()
+      target.note = cancelled.detail
+    }
+    current.status = 'cancelled'
+    current.error = cancelled.detail || 'cancelled by user'
+    current.gate = ''
+    current.leaseOwner = ''
+    current.leaseUntil = 0
+    current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state: 'cancelled', at: Date.now() })
+    markStep(current, 'experiment', 'cancelled', current.error)
+    return current
+  })
+  return { flow: updated, detail: cancelled.detail }
 }
 
 export async function resumeFlow(profile: string, flowId: string): Promise<{ flow: ResearchFlow; run: ResearchRun | null }> {
@@ -454,6 +554,30 @@ export async function resumeFlow(profile: string, flowId: string): Promise<{ flo
   if (current.flow.mode === 'ssh' && current.flow.status === 'running' && current.flow.gate === '' && current.flow.jobId) {
     const ticked = await tickFlow(profile, flowId)
     return { flow: ticked.flow, run: ticked.run }
+  }
+  if (current.flow.mode === 'ssh' && current.flow.status === 'cancelled') {
+    if (current.flow.attempt >= current.flow.maxAttempts) throw new Error('research_flow_retry_exhausted')
+    const owner = `resume_${process.pid}_${Date.now()}`
+    await acquireFlowLease(profile, flowId, owner)
+    try {
+      const submitted = await submitExperimentJob(profile, current.flow.runId, current.flow.serverId)
+      const jobId = String(submitted.job.id || '')
+      const flow = await updateFlow(profile, flowId, row => {
+        row.status = 'running'
+        row.gate = ''
+        row.error = ''
+        row.jobId = jobId
+        row.attempt += 1
+        row.retryAt = 0
+        row.leaseOwner = ''
+        row.leaseUntil = 0
+        row.checkpoint = JSON.stringify({ jobId, attempt: row.attempt, state: 'resumed', at: Date.now() })
+        markStep(row, 'experiment', 'running', `Resumed with job ${jobId}`)
+      })
+      return { flow, run: await readStore(profile).then(store => store.runs.find(row => row.id === flow.runId) || null) }
+    } finally {
+      await releaseFlowLease(profile, flowId, owner).catch(() => undefined)
+    }
   }
   return current
 }

@@ -643,7 +643,7 @@ export interface ResearchFlow {
   projectId: string
   runId: string
   mode: 'dry-run' | 'fixture' | 'ssh'
-  status: 'running' | 'waiting_approval' | 'completed' | 'failed'
+  status: 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled'
   stage: string
   gate: 'claims' | 'plan' | 'result' | ''
   fixtureId: string
@@ -656,6 +656,9 @@ export interface ResearchFlow {
   jobId: string
   attempt: number
   maxAttempts: number
+  retryAt: number
+  leaseOwner: string
+  leaseUntil: number
   checkpoint: string
   createdAt: number
   updatedAt: number
@@ -781,6 +784,9 @@ function normalizeStore(input: unknown): ResearchStore {
       jobId: (flow as ResearchFlow).jobId || '',
       attempt: Number((flow as ResearchFlow).attempt) || 0,
       maxAttempts: Number((flow as ResearchFlow).maxAttempts) || 2,
+      retryAt: Number((flow as ResearchFlow).retryAt) || 0,
+      leaseOwner: (flow as ResearchFlow).leaseOwner || '',
+      leaseUntil: Number((flow as ResearchFlow).leaseUntil) || 0,
       checkpoint: (flow as ResearchFlow).checkpoint || '',
     })),
   }

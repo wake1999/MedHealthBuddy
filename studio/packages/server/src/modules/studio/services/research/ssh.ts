@@ -118,6 +118,18 @@ export async function submitJob(target: SshTarget, name: string, command: string
   }
 }
 
+export async function cancelJob(target: SshTarget, pid: string): Promise<{ ok: boolean; detail: string }> {
+  if (!target.host) return { ok: false, detail: '缺少主机' }
+  const numeric = Number(pid)
+  if (!Number.isFinite(numeric) || numeric <= 0) return { ok: false, detail: '没有有效 pid' }
+  try {
+    await exec(target, `kill -TERM ${Math.floor(numeric)} 2>/dev/null || true; sleep 1; if kill -0 ${Math.floor(numeric)} 2>/dev/null; then echo RUNNING; else echo STOPPED; fi`)
+    return { ok: true, detail: '已发送取消信号' }
+  } catch (error: any) {
+    return { ok: false, detail: describeError(error) }
+  }
+}
+
 export async function jobState(target: SshTarget, pid: string, logPath: string): Promise<SshJobState> {
   if (!pid) return { state: 'unknown', detail: '没有记录 pid', logTail: '', exitCode: null }
   const script = [

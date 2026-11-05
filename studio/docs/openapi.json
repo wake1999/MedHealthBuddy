@@ -19461,6 +19461,42 @@
         ]
       }
     },
+    "/api/studio/research/flows/{flowId}/cancel": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create cancel",
+        "description": "POST /api/studio/research/flows/:flowId/cancel",
+        "operationId": "cancelFlowHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/flows/{flowId}/resume": {
       "post": {
         "tags": [

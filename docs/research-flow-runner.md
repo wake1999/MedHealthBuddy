@@ -58,6 +58,7 @@ GET    /api/studio/research/flows/:flowId
 POST   /api/studio/research/flows/:flowId/approve
 POST   /api/studio/research/flows/:flowId/tick
 POST   /api/studio/research/flows/:flowId/resume
+POST   /api/studio/research/flows/:flowId/cancel
 DELETE /api/studio/research/flows/:flowId
 ```
 
@@ -90,8 +91,21 @@ checkpoint (job, attempt, state, timestamp)
 error
 ```
 
-`tick` is idempotent for the current job. A failed job is resubmitted only while
-`attempt < maxAttempts`; once exhausted the flow becomes `failed` and stops.
+`tick` acquires a 30-second flow lease (`leaseOwner`, `leaseUntil`); a second
+concurrent tick gets `409 research_flow_lease_busy`. The lease is released in a
+`finally` block.
+
+A failed job is retried only while `attempt < maxAttempts`. Retry delay is
+exponential (`1s`, `2s`, `4s`, capped at `60s`) and stored in `retryAt`; a tick
+before the due time returns `backoff` without submitting. Once exhausted the
+flow becomes `failed` and stops.
+
+## Cancel and resume
+
+`POST /flows/:flowId/cancel` sends `kill -TERM` to the current remote pid and
+marks the flow `cancelled` with a checkpoint. `POST /flows/:flowId/resume`
+either continues polling a running SSH job or, for a cancelled flow, submits a
+new job while attempts remain.
 
 ## Current boundary
 

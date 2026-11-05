@@ -82,6 +82,7 @@ GET   /api/studio/research/flows/:flowId
 POST  /api/studio/research/flows/:flowId/approve
 POST  /api/studio/research/flows/:flowId/tick
 POST  /api/studio/research/flows/:flowId/resume
+POST  /api/studio/research/flows/:flowId/cancel
 GET   /api/studio/research/runs/:id/branches/compare
 GET   /api/studio/research/runs/:id/branches/consistency
 GET   /api/studio/research/runs/:id/branches/results-table

@@ -29,3 +29,6 @@ artifact listing is metadata-only.
 - Artifact metadata is exposed through the authenticated run API.
 - Raw artifact content is not served by the current HTTP API.
 - The filesystem path is server-generated and never accepted from the client.
+- Rollback uses a single confirmation with a required reason; the reason is
+  written to the audit trail. No multi-user identity or role binding is needed
+  for a personal workbench.

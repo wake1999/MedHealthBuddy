@@ -1046,28 +1046,6 @@ export function RunsView({
     }
   }
 
-  async function approveRollbackLatest() {
-    if (!selected || !(selected.merges || []).length) return
-    const latest = selected.merges![selected.merges!.length - 1]
-    const note = window.prompt(t('runs.rollbackNote'), '')
-    if (note === null) return
-    const approver = window.prompt(t('runs.rollbackApprover'), 'workbench')
-    if (approver === null) return
-    setMergeBusy(true)
-    try {
-      const body = await request<{ run: ResearchRun }>(
-        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/rollback/approve`,
-        { method: 'POST', body: JSON.stringify({ note, approver }) },
-      )
-      replaceRun(body.run)
-      setNotice(t('runs.rollbackApproved'))
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setMergeBusy(false)
-    }
-  }
-
   async function executeRawMergeLatest() {
     if (!selected || !(selected.merges || []).length) return
     const latest = selected.merges![selected.merges!.length - 1]
@@ -1089,9 +1067,21 @@ export function RunsView({
   async function rollbackLatestMerge() {
     if (!selected || !(selected.merges || []).length) return
     const latest = selected.merges![selected.merges!.length - 1]
+    const note = window.prompt(t('runs.rollbackNote'), '')
+    if (note === null) return
+    if (note.trim() === '') {
+      setError(t('runs.rollbackNoteRequired'))
+      return
+    }
     setMergeBusy(true)
     setError('')
     try {
+      if ((latest.rollbackApprovals || []).length === 0) {
+        await request<{ run: ResearchRun }>(
+          `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/rollback/approve`,
+          { method: 'POST', body: JSON.stringify({ note, approver: 'workbench' }) },
+        )
+      }
       const body = await request<{ run: ResearchRun; merge: ResearchRunMerge }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/rollback`,
         { method: 'POST' },
@@ -2288,9 +2278,6 @@ export function RunsView({
                                 </button>
                                 <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void executeRawMergeLatest()}>
                                   {t('runs.executeRawMerge')}
-                                </button>
-                                <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void approveRollbackLatest()}>
-                                  {t('runs.approveRollback')}
                                 </button>
                                 <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void rollbackLatestMerge()}>
                                   {t('runs.rollbackMerge')}

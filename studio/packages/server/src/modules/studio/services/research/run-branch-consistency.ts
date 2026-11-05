@@ -312,7 +312,7 @@ export async function rollbackMergeRecord(
     if (!run) throw new Error('research_run_not_found')
     const old = run.merges.find(row => row.id === mergeId)
     if (!old) throw new Error('research_merge_not_found')
-    if ((old.rollbackApprovals || []).length < 2) throw new Error('research_rollback_approval_required')
+    if ((old.rollbackApprovals || []).length < 1) throw new Error('research_rollback_approval_required')
     const previous = run.merges[run.merges.length - 1]
     const merge: ResearchRunMerge = {
       ...old,

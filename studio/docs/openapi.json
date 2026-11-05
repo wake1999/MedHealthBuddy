@@ -20731,6 +20731,32 @@
         }
       }
     },
+    "/api/studio/research/projects/package/import": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create import",
+        "description": "POST /api/studio/research/projects/package/import",
+        "operationId": "importProjectPackageHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/api/studio/research/projects/{id}": {
       "patch": {
         "tags": [
@@ -21481,6 +21507,78 @@
             "name": "name",
             "in": "query",
             "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/package": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get package",
+        "description": "GET /api/studio/research/projects/:id/package",
+        "operationId": "exportProjectPackageHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/projects/{id}/package-info": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get package-info",
+        "description": "GET /api/studio/research/projects/:id/package-info",
+        "operationId": "projectPackageInfoHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "string"
             }

@@ -478,6 +478,7 @@ export function RunsView({
   const [mergeRight, setMergeRight] = useState('')
   const [mergeDiff, setMergeDiff] = useState<Array<{ field: string; left: string; right: string }> | null>(null)
   const [artifactBusy, setArtifactBusy] = useState(false)
+  const [packageBusy, setPackageBusy] = useState(false)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
@@ -995,6 +996,59 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setConsistencyBusy(false)
+    }
+  }
+
+  async function exportProjectPackage() {
+    if (!projectId) return
+    setPackageBusy(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/studio/research/projects/${encodeURIComponent(projectId)}/package`, {
+        headers: apiHeaders(),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const blob = await response.blob()
+      const disposition = response.headers.get('content-disposition') || ''
+      const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+      const filename = match ? decodeURIComponent(match[1]) : `${projectTitle || projectId}.mhb.zip`
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+      setNotice(t('runs.packageExported'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setPackageBusy(false)
+    }
+  }
+
+  async function importProjectPackageFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setPackageBusy(true)
+    setError('')
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      let binary = ''
+      for (let index = 0; index < bytes.length; index += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+      }
+      const content = btoa(binary)
+      const body = await request<{ project: { projectId: string } }>(
+        '/api/studio/research/projects/package/import',
+        { method: 'POST', body: JSON.stringify({ content }) },
+      )
+      setNotice(t('runs.packageImported', { title: body.project.projectId }))
+      window.location.reload()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setPackageBusy(false)
     }
   }
 
@@ -1597,9 +1651,18 @@ export function RunsView({
           <h2>{t('runs.title')}</h2>
           <p>{t('runs.subtitle')}</p>
         </div>
-        <button type="button" className={css.btn} onClick={() => void loadRuns(selectedId)} disabled={loading}>
-          {t('runs.refresh')}
-        </button>
+        <div className={css.runsHeaderActions}>
+          <button type="button" className={css.btn} onClick={() => void exportProjectPackage()} disabled={packageBusy}>
+            {t('runs.exportPackage')}
+          </button>
+          <label className={css.runsPackageImport}>
+            {t('runs.importPackage')}
+            <input type="file" accept=".zip,application/zip" onChange={event => void importProjectPackageFile(event)} />
+          </label>
+          <button type="button" className={css.btn} onClick={() => void loadRuns(selectedId)} disabled={loading}>
+            {t('runs.refresh')}
+          </button>
+        </div>
       </header>
 
       {error !== '' && <p className={css.failure} role="alert">{error}</p>}

@@ -74,6 +74,9 @@ DELETE /api/studio/research/runs/:id/branches/:branchId
 POST  /api/studio/research/runs/:id/hypothesis
 POST  /api/studio/research/runs/:id/experiment-plan
 GET   /api/studio/research/runs/:id/claim-graph
+GET   /api/studio/research/projects/:id/package
+GET   /api/studio/research/projects/:id/package-info
+POST  /api/studio/research/projects/package/import
 GET   /api/studio/research/runs/:id/branches/compare
 GET   /api/studio/research/runs/:id/branches/consistency
 GET   /api/studio/research/runs/:id/branches/results-table
@@ -133,8 +136,10 @@ Its narrative still comes from one branch. Never pool raw branch observations.
 See `docs/branch-merge-policy.md` and `docs/raw-data-merge-schema.md`.
 `family-analysis` applies Holm correction to confirmed Run result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
 plan has that family; without it the project is one family. This is not a
-replacement for a pre-registered analysis plan. Never approve evidence or claims
-yourself.
+replacement for a pre-registered analysis plan. `projects/:id/package` exports a
+portable project zip; `projects/package/import` verifies file hashes and refuses
+project-id collisions. See `docs/project-package.md`. Never approve evidence or
+claims yourself.
 
 `report` is a deterministic Markdown export of persisted evidence, claims,
 hypothesis, plan, job insight, and statistics. `results-draft` returns a Results

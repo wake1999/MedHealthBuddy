@@ -84,6 +84,9 @@ researchRoutes.post('/api/studio/research/projects/:id/decks', ctrl.createDeck)
 researchRoutes.get('/api/studio/research/projects/:id/decks', ctrl.listDecksHandler)
 researchRoutes.get('/api/studio/research/projects/:id/decks/:deckId/file', ctrl.downloadDeck)
 // Compiled paper, for the editor's preview pane
+researchRoutes.get('/api/studio/research/projects/:id/package', ctrl.exportProjectPackageHandler)
+researchRoutes.get('/api/studio/research/projects/:id/package-info', ctrl.projectPackageInfoHandler)
+researchRoutes.post('/api/studio/research/projects/package/import', ctrl.importProjectPackageHandler)
 researchRoutes.get('/api/studio/research/projects/:id/pdf', ctrl.getPaperPdf)
 // One paper's fetched PDF bytes, for the reader's iframe（走 query，旧式 id 带斜杠）
 researchRoutes.get('/api/studio/research/paper-pdf', ctrl.getPaperFilePdf)

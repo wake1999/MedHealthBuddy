@@ -56,6 +56,7 @@ import { readArtifactView } from '../services/research/artifacts'
 import { addEvidenceEdge, addJournalEntry, retractEvidenceEdge } from '../services/research/ledger-writes'
 import { fetchPaperPdf, readPaperPdfFile } from '../services/research/pdf'
 import { importProject } from '../services/research/project-import'
+import { exportProjectPackage, getProjectExportInfo, importProjectPackage } from '../services/research/project-package'
 import { convertProjectFigure } from '../services/research/figures'
 import {
   getImageGenConfig,
@@ -1699,6 +1700,54 @@ export async function clearVenueTemplateHandler(ctx: any) {
     return row ?? null
   })
   ctx.body = { venue: null }
+}
+
+// GET /api/studio/research/projects/:id/package
+export async function exportProjectPackageHandler(ctx: any) {
+  try {
+    const result = await exportProjectPackage(profileOf(ctx) || 'default', String(ctx.params.id || ''))
+    ctx.set('Content-Type', 'application/zip')
+    ctx.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`)
+    ctx.set('Content-Length', String(result.buffer.length))
+    ctx.body = result.buffer
+  } catch (error: any) {
+    const code = error?.message || ''
+    if (code === 'research_project_not_found') return fail(ctx, 404, '找不到项目', 'not_found')
+    if (code === 'invalid_project_id') return fail(ctx, 400, '项目 id 非法', 'invalid_path')
+    return fail(ctx, 500, '导出项目包失败', 'project_package_export_failed')
+  }
+}
+
+// GET /api/studio/research/projects/:id/package-info
+export async function projectPackageInfoHandler(ctx: any) {
+  try {
+    ctx.body = { package: await getProjectExportInfo(profileOf(ctx) || 'default', String(ctx.params.id || '')) }
+  } catch {
+    return fail(ctx, 404, '找不到项目', 'not_found')
+  }
+}
+
+// POST /api/studio/research/projects/package/import
+export async function importProjectPackageHandler(ctx: any) {
+  const body = readBody(ctx)
+  if (!body || typeof body.content !== 'string') return fail(ctx, 400, '缺少项目包内容', 'invalid_body')
+  let buffer: Buffer
+  try {
+    buffer = Buffer.from(body.content, 'base64')
+  } catch {
+    return fail(ctx, 400, '项目包编码无效', 'invalid_package')
+  }
+  try {
+    const result = await importProjectPackage(profileOf(ctx) || 'default', buffer)
+    ctx.body = { project: result, warnings: result.warnings }
+  } catch (error: any) {
+    const code = error?.message || ''
+    if (code === 'research_package_project_exists') return fail(ctx, 409, '项目 ID 已存在，未导入', 'project_exists')
+    if (code.startsWith('research_package_hash_mismatch') || code.startsWith('research_package_file_missing')) {
+      return fail(ctx, 422, '项目包校验失败', code)
+    }
+    return fail(ctx, 400, '项目包无效', code || 'invalid_package')
+  }
 }
 
 // GET /api/studio/research/venues/catalog?q=&ccf=&limit=&force=1

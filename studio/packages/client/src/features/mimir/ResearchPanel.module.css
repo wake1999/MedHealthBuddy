@@ -10328,6 +10328,32 @@ button.paperNoteBlockMeta:hover {
   gap: 16px;
 }
 
+.runsHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.runsPackageImport {
+  position: relative;
+  overflow: hidden;
+  padding: 5px 8px;
+  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 18%));
+  border-radius: 6px;
+  color: var(--mimir-ink, #211e19);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.runsPackageImport input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .runsHeader h2,
 .runsDetailHead h3 {
   margin: 0;

@@ -66,8 +66,9 @@ Then stop and let the human approve the evidence table and review claims:
 POST  /api/studio/research/runs/:id/approve-evidence
 GET   /api/studio/research/runs/:id/claim-coverage
 PATCH /api/studio/research/runs/:id/claims/:claimId
-POST  /api/studio/research/runs/:id/branches
-POST  /api/studio/research/runs/:id/branches/:branchId/activate
+POST   /api/studio/research/runs/:id/branches
+POST   /api/studio/research/runs/:id/branches/:branchId/activate
+DELETE /api/studio/research/runs/:id/branches/:branchId
 POST  /api/studio/research/runs/:id/hypothesis
 POST  /api/studio/research/runs/:id/experiment-plan
 GET   /api/studio/research/runs/:id/claim-graph
@@ -87,7 +88,8 @@ approved claim, no `needs_evidence` claim, and a review note for an approved
 contradictory claim. A hypothesis must send `claimIds` containing only approved
 claim ids. `branches` creates an independent hypothesis branch with its own
 hypothesis, experiment plan, experiment, result, and job; activate a branch
-before editing or reading its fields. `claim-graph` exports a deterministic Mermaid Claim–Evidence graph
+before editing or reading its fields. The last remaining branch cannot be
+deleted. `claim-graph` exports a deterministic Mermaid Claim–Evidence graph
 and Markdown table. `family-analysis` applies Holm correction to confirmed Run
 result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
 plan has that family; without it the project is one family. This is not a

@@ -410,6 +410,31 @@ export async function createHypothesisBranch(profile: string, runId: string): Pr
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.created' })
 }
 
+export async function removeHypothesisBranch(profile: string, runId: string, branchId: string): Promise<ResearchRun> {
+  return updateStore(profile, 'run.branch.removed', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const branch = run.branches.find(row => row.id === branchId)
+    if (!branch) throw new Error('research_branch_not_found')
+    if (run.branches.length <= 1) throw new Error('research_branch_last')
+    run.branches = run.branches.filter(row => row.id !== branchId)
+    if (run.activeBranchId === branchId) {
+      const next = run.branches[0]
+      run.activeBranchId = next.id
+      run.hypothesis = next.hypothesis
+      run.experimentPlan = next.experimentPlan
+      run.experimentId = next.experimentId
+      run.experimentJobId = next.experimentJobId
+      run.jobInsight = next.jobInsight
+      run.result = next.result
+      run.stage = next.result ? 'analysis' : next.experimentId !== '' ? 'experiment' : 'hypothesis'
+      run.status = 'running'
+    }
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.removed' })
+}
+
 export async function activateHypothesisBranch(profile: string, runId: string, branchId: string): Promise<ResearchRun> {
   return updateStore(profile, 'run.branch.activated', draft => {
     const run = draft.runs.find(row => row.id === runId)

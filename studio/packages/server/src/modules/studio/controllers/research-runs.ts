@@ -6,6 +6,7 @@ import {
   createExperimentRecord,
   createHypothesisBranch,
   createRun,
+  removeHypothesisBranch,
   getClaimCoverage,
   getRun,
   importWorkbenchEvidence,
@@ -66,6 +67,7 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_claims_missing_evidence'
     || message === 'research_claim_contradiction_note_required'
     || message === 'research_hypothesis_claim_required'
+    || message === 'research_branch_last'
     || message.startsWith('research_result_missing_metrics')
   ) {
     return fail(ctx, 422, message, message)
@@ -230,6 +232,21 @@ export async function createBranchHandler(ctx: any) {
     ctx.body = {
       ok: true,
       run: await createHypothesisBranch(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function removeBranchHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      run: await removeHypothesisBranch(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.branchId || ''),
+      ),
     }
   } catch (error) {
     failRun(ctx, error)

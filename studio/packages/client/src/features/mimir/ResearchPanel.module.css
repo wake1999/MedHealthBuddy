@@ -10649,6 +10649,17 @@ button.paperNoteBlockMeta:hover {
   width: auto;
 }
 
+.runsBranchCompare {
+  overflow: auto;
+  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 10%));
+  border-radius: 8px;
+}
+
+.runsBranchCompare tr[data-active] td {
+  background: rgb(154 106 47 / 7%);
+  font-weight: 600;
+}
+
 .runsExperimentPanel h4 {
   margin: 4px 0 0;
   color: var(--mimir-ink, #211e19);

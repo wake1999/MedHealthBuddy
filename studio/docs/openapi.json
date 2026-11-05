@@ -22326,6 +22326,47 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/branches/{branchId}": {
+      "delete": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Delete :branchId",
+        "description": "DELETE /api/studio/research/runs/:id/branches/:branchId",
+        "operationId": "removeBranchHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/branches/{branchId}/activate": {
       "post": {
         "tags": [

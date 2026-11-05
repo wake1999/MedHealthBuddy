@@ -398,6 +398,7 @@ export function RunsView({
   const [familyBusy, setFamilyBusy] = useState(false)
   const [familyAnalysis, setFamilyAnalysis] = useState<FamilyAnalysis | null>(null)
   const [branchBusy, setBranchBusy] = useState(false)
+  const [showBranchCompare, setShowBranchCompare] = useState(false)
   const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
   const [coverage, setCoverage] = useState<ClaimCoverage | null>(null)
@@ -816,6 +817,27 @@ export function RunsView({
       )
       replaceRun(body.run)
       setNotice(t('runs.branchCreated'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  async function removeBranch() {
+    if (!selected || !selected.activeBranchId) return
+    if ((selected.branches || []).length <= 1) return
+    if (!window.confirm(t('runs.branchDeleteConfirm'))) return
+    setBranchBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/${encodeURIComponent(selected.activeBranchId)}`,
+        { method: 'DELETE' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.branchDeleted'))
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -1581,7 +1603,42 @@ export function RunsView({
                     <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void createBranch()}>
                       {branchBusy ? t('runs.branchBusy') : t('runs.branchNew')}
                     </button>
+                    <button
+                      type="button"
+                      className={css.btn}
+                      disabled={(selected.branches || []).length <= 1 || branchBusy}
+                      onClick={() => void removeBranch()}
+                    >
+                      {t('runs.branchDelete')}
+                    </button>
+                    <button type="button" className={css.btn} onClick={() => setShowBranchCompare(current => !current)}>
+                      {t('runs.branchCompare')}
+                    </button>
                   </div>
+                  {showBranchCompare && (selected.branches || []).length > 0 && (
+                    <div className={css.runsBranchCompare}>
+                      <table className={css.runsEvidenceTable}>
+                        <thead>
+                          <tr>
+                            <th>{t('runs.branchTitle')}</th>
+                            <th>{t('runs.hypothesisTitle')}</th>
+                            <th>{t('runs.dataset')}</th>
+                            <th>{t('runs.branchOutcome')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(selected.branches || []).map((branch, index) => (
+                            <tr key={branch.id} data-active={branch.id === selected.activeBranchId || undefined}>
+                              <td>{index + 1}</td>
+                              <td>{branch.hypothesis?.text || t('runs.branchUntitled')}</td>
+                              <td>{branch.experimentPlan?.dataset || '—'}</td>
+                              <td>{branch.result ? t(`runs.outcome.${branch.result.outcome}`) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   <h4>{t('runs.hypothesisTitle')}</h4>
                   <div className={css.runsHypothesisClaims}>
                     <span>{t('runs.hypothesisClaims')}</span>

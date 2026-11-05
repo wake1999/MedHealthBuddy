@@ -505,6 +505,7 @@ export function RunsView({
   const [flowBusy, setFlowBusy] = useState(false)
   const [activeFlow, setActiveFlow] = useState<ResearchFlow | null>(null)
   const [resultsPrimary, setResultsPrimary] = useState(false)
+  const selected = runs.find(run => run.id === selectedId) || null
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
   const branchFrozen = Boolean(activeBranch?.frozenAt)
@@ -576,7 +577,6 @@ export function RunsView({
     note: '',
   })
 
-  const selected = runs.find(run => run.id === selectedId) || null
   const stageIndex = selected ? STAGES.indexOf(selected.stage) : 0
   const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
   const resultSchema = selected?.experimentPlan?.metricSchema || []

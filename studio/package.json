@@ -48,7 +48,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "cross-env HERMES_WEB_UI_BACKEND_PORT=8647 vite --host 127.0.0.1 --port 8648 --strictPort",
     "dev:server": "nodemon",
-    "build": "npm run openapi:generate && vue-tsc -b && vite build && tsc --noEmit -p packages/server/tsconfig.json && node scripts/build-server.mjs",
+    "build": "npm run openapi:generate && vue-tsc -b && node scripts/build-client-safe.mjs && tsc --noEmit -p packages/server/tsconfig.json && node scripts/build-server.mjs",
     "harness:check": "node scripts/harness-check.mjs && npm --prefix packages/ekko-agent run api:docs:check",
     "harness:memory": "vitest run tests/ekko-agent/memory-service.test.ts tests/server/group-chat-agent-workspace.test.ts tests/server/run-chat-ekko-context.test.ts",
     "test:ekko-agent": "vitest run tests/ekko-agent",

@@ -179,6 +179,7 @@ interface ResearchRunMerge {
   snapshotHash: string
   metricRowsHash: string
   rollbackApproval: { at: number; note: string } | null
+  rollbackApprovals: Array<{ at: number; note: string; approver: string }>
   rawMerge: { at: number; file: string; sha256: string; rowCount: number; metrics: string[] } | null
 }
 
@@ -997,6 +998,33 @@ export function RunsView({
     }
   }
 
+  async function cleanupUnusedArtifacts() {
+    if (!selected) return
+    setArtifactBusy(true)
+    setError('')
+    try {
+      const preview = await request<{ remove: Array<{ id: string }>; keep: Array<{ id: string }> }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/artifacts/cleanup`,
+        { method: 'POST', body: JSON.stringify({ dryRun: true, keepLatest: 1, olderThanDays: 30 }) },
+      )
+      if (preview.remove.length === 0) {
+        setNotice(t('runs.artifactCleanupNone'))
+        return
+      }
+      if (!window.confirm(t('runs.artifactCleanupConfirm', { count: preview.remove.length }))) return
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/artifacts/cleanup`,
+        { method: 'POST', body: JSON.stringify({ dryRun: false, keepLatest: 1, olderThanDays: 30 }) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.artifactCleanupDone', { count: preview.remove.length }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setArtifactBusy(false)
+    }
+  }
+
   async function uploadArtifactFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -1023,11 +1051,13 @@ export function RunsView({
     const latest = selected.merges![selected.merges!.length - 1]
     const note = window.prompt(t('runs.rollbackNote'), '')
     if (note === null) return
+    const approver = window.prompt(t('runs.rollbackApprover'), 'workbench')
+    if (approver === null) return
     setMergeBusy(true)
     try {
       const body = await request<{ run: ResearchRun }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/rollback/approve`,
-        { method: 'POST', body: JSON.stringify({ note }) },
+        { method: 'POST', body: JSON.stringify({ note, approver }) },
       )
       replaceRun(body.run)
       setNotice(t('runs.rollbackApproved'))
@@ -2074,6 +2104,9 @@ export function RunsView({
                       {artifactBusy ? t('runs.artifactBusy') : t('runs.artifactUpload')}
                       <input type="file" accept=".json,application/json" onChange={event => void uploadArtifactFile(event)} />
                     </label>
+                    <button type="button" className={css.btn} disabled={artifactBusy} onClick={() => void cleanupUnusedArtifacts()}>
+                      {t('runs.artifactCleanup')}
+                    </button>
                   </div>
                   {showBranchCompare && (selected.branches || []).length > 0 && (
                     <div className={css.runsBranchCompare}>

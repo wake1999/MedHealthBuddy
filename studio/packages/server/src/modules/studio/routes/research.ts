@@ -32,6 +32,8 @@ researchRoutes.post('/api/studio/research/runs/:id/merges/:mergeId/rollback', ru
 researchRoutes.post('/api/studio/research/runs/:id/merges/:mergeId/rollback/approve', runCtrl.approveRollbackHandler)
 researchRoutes.post('/api/studio/research/runs/:id/merges/:mergeId/execute-raw', runCtrl.executeRawMergeHandler)
 researchRoutes.post('/api/studio/research/runs/:id/branches/:branchId/artifacts', runCtrl.uploadArtifactHandler)
+researchRoutes.get('/api/studio/research/runs/:id/artifacts', runCtrl.listArtifactsHandler)
+researchRoutes.post('/api/studio/research/runs/:id/artifacts/cleanup', runCtrl.cleanupArtifactsHandler)
 researchRoutes.post('/api/studio/research/runs/:id/primary-branch', runCtrl.primaryBranchHandler)
 researchRoutes.post('/api/studio/research/runs/:id/branches/:branchId/freeze', runCtrl.freezeBranchHandler)
 researchRoutes.get('/api/studio/research/projects/:id/family-analysis', runCtrl.familyAnalysisHandler)

@@ -87,6 +87,8 @@ POST  /api/studio/research/runs/:id/merges/:mergeId/rollback
 POST  /api/studio/research/runs/:id/merges/:mergeId/rollback/approve
 POST  /api/studio/research/runs/:id/merges/:mergeId/execute-raw
 POST  /api/studio/research/runs/:id/branches/:branchId/artifacts
+GET   /api/studio/research/runs/:id/artifacts
+POST  /api/studio/research/runs/:id/artifacts/cleanup
 POST  /api/studio/research/runs/:id/branches/:branchId/freeze
 GET   /api/studio/research/projects/:id/family-analysis
 POST  /api/studio/research/runs/:id/create-experiment
@@ -122,9 +124,11 @@ primary mapping. `merges` creates an immutable merge record with selected metric
 snapshot, and snapshot/metric-row hashes; `validate` checks all of them,
 `execute` only succeeds while valid, `rollback` requires its own approval before
 creating a linked new version, and `compare` diffs two records. Raw artifacts use
-`schema: "mhb.raw-observations.v1"`; `artifacts` verifies the SHA-256 and
-`execute-raw` merges them only after the merge record is validated. It never
-edits source branches.
+`schema: "mhb.raw-observations.v1"`; `artifacts` verifies the SHA-256, strips row fields other than `seed`, `value`,
+and `group`, and returns metadata only. `artifacts/cleanup` is dry-run by default
+and never removes artifacts on branches referenced by a merge. Rollback requires
+two distinct approver names. `execute-raw` merges artifacts only after the merge
+record is validated. It never edits source branches.
 Its narrative still comes from one branch. Never pool raw branch observations.
 See `docs/branch-merge-policy.md` and `docs/raw-data-merge-schema.md`.
 `family-analysis` applies Holm correction to confirmed Run result p-values. Pass `?family=<name>` to restrict it to runs whose experiment

@@ -496,6 +496,7 @@ export interface ResearchRunArtifact {
   sha256: string
   size: number
   file: string
+  redactedFields: string[]
   createdAt: number
 }
 
@@ -524,6 +525,7 @@ export interface ResearchRunMerge {
   snapshotHash: string
   metricRowsHash: string
   rollbackApproval: { at: number; note: string } | null
+  rollbackApprovals: Array<{ at: number; note: string; approver: string }>
   rawMerge: ResearchRunRawMerge | null
 }
 
@@ -805,6 +807,11 @@ function normalizeStore(input: unknown): ResearchStore {
     merges: (Array.isArray(run.merges) ? run.merges : []).map(merge => ({
       ...merge,
       rollbackApproval: merge.rollbackApproval || null,
+      rollbackApprovals: Array.isArray(merge.rollbackApprovals)
+        ? merge.rollbackApprovals
+        : merge.rollbackApproval
+          ? [{ ...merge.rollbackApproval, approver: 'legacy' }]
+          : [],
       rawMerge: merge.rawMerge || null,
     })),
     artifacts: Array.isArray(run.artifacts) ? run.artifacts : [],

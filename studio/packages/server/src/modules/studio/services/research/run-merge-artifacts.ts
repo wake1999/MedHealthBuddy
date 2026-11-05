@@ -8,8 +8,11 @@ interface RawArtifactPayload {
   metric?: string
   dataset?: string
   split?: string
-  rows?: Array<{ seed?: number; value?: number }>
+  rows?: Array<Record<string, unknown>>
+  redactedFields?: string[]
 }
+
+const ALLOWED_ROW_FIELDS = new Set(['seed', 'value', 'group'])
 
 function sha256(text: string): string {
   return createHash('sha256').update(text).digest('hex')
@@ -33,12 +36,24 @@ function parsePayload(content: string, fallbackMetric = ''): RawArtifactPayload 
   if (rows.length === 0 || rows.some(row => typeof row.value !== 'number' || !Number.isFinite(row.value))) {
     throw new Error('research_artifact_rows_invalid')
   }
+  const redacted = new Set<string>()
+  const sanitized = rows.map(row => {
+    for (const key of Object.keys(row)) {
+      if (!ALLOWED_ROW_FIELDS.has(key)) redacted.add(key)
+    }
+    return {
+      value: Number(row.value),
+      ...(typeof row.seed === 'number' ? { seed: row.seed } : {}),
+      ...(typeof row.group === 'string' ? { group: row.group } : {}),
+    }
+  })
   return {
     ...payload,
     metric,
     dataset: String(payload.dataset || '').trim(),
     split: String(payload.split || '').trim(),
-    rows,
+    rows: sanitized,
+    redactedFields: Array.from(redacted),
   }
 }
 
@@ -79,6 +94,7 @@ export async function uploadRawArtifact(
     sha256: storedDigest,
     size: Buffer.byteLength(normalized),
     file,
+    redactedFields: payload.redactedFields || [],
     createdAt: Date.now(),
   }
   const updated = await updateStore(profile, 'run.artifact.uploaded', draft => {
@@ -89,6 +105,74 @@ export async function uploadRawArtifact(
     return target
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.artifact.uploaded' })
   return { run: updated, artifact }
+}
+
+export interface ArtifactCleanupPlan {
+  keep: ResearchRunArtifact[]
+  remove: ResearchRunArtifact[]
+  protectedBranchIds: string[]
+  reason: string
+}
+
+export async function planArtifactCleanup(
+  profile: string,
+  runId: string,
+  options: { keepLatest?: number; olderThanDays?: number } = {},
+): Promise<ArtifactCleanupPlan> {
+  const store = await readStore(profile)
+  const run = store.runs.find(row => row.id === runId)
+  if (!run) throw new Error('research_run_not_found')
+  const protectedBranchIds = Array.from(new Set(run.merges.flatMap(merge => merge.branchIds)))
+  const keepLatest = Math.max(0, Math.floor(options.keepLatest ?? 1))
+  const cutoff = Date.now() - Math.max(0, options.olderThanDays ?? 30) * 24 * 60 * 60 * 1000
+  const keep: ResearchRunArtifact[] = []
+  const remove: ResearchRunArtifact[] = []
+  for (const artifact of run.artifacts) {
+    const protectedByMerge = protectedBranchIds.includes(artifact.branchId)
+    const newerThanCutoff = artifact.createdAt >= cutoff
+    const sameBranch = run.artifacts
+      .filter(row => row.branchId === artifact.branchId)
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .slice(0, keepLatest)
+    const retainedLatest = sameBranch.some(row => row.id === artifact.id)
+    if (protectedByMerge || newerThanCutoff || retainedLatest) keep.push(artifact)
+    else remove.push(artifact)
+  }
+  return {
+    keep,
+    remove,
+    protectedBranchIds,
+    reason: 'Artifacts on branches referenced by a merge record are always retained; otherwise keep newest N per branch and anything newer than the cutoff.',
+  }
+}
+
+export async function cleanupArtifacts(
+  profile: string,
+  runId: string,
+  options: { keepLatest?: number; olderThanDays?: number } = {},
+): Promise<{ run: Awaited<ReturnType<typeof readStore>>['runs'][number]; removed: ResearchRunArtifact[]; plan: ArtifactCleanupPlan }> {
+  const plan = await planArtifactCleanup(profile, runId, options)
+  for (const artifact of plan.remove) {
+    try {
+      await fs.unlink(artifact.file)
+    } catch {
+      // The metadata is still removed below; a missing file is already clean.
+    }
+  }
+  const removeIds = new Set(plan.remove.map(artifact => artifact.id))
+  const updated = await updateStore(profile, 'run.artifacts.cleaned', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    run.artifacts = run.artifacts.filter(artifact => !removeIds.has(artifact.id))
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'system', id: 'artifact-retention' }, action: 'run.artifacts.cleaned' })
+  return { run: updated, removed: plan.remove, plan }
+}
+
+export function publicArtifact(artifact: ResearchRunArtifact): Omit<ResearchRunArtifact, 'file'> {
+  const { file: _file, ...metadata } = artifact
+  return metadata
 }
 
 export async function executeRawMerge(
@@ -154,6 +238,7 @@ export async function approveRollback(
   runId: string,
   mergeId: string,
   note: string,
+  approver = 'workbench',
 ): Promise<{ run: Awaited<ReturnType<typeof readStore>>['runs'][number]; merge: ResearchRunMerge }> {
   return updateStore(profile, 'run.merge.rollback-approved', draft => {
     const run = draft.runs.find(row => row.id === runId)
@@ -161,8 +246,14 @@ export async function approveRollback(
     const merge = run.merges.find(row => row.id === mergeId)
     if (!merge) throw new Error('research_merge_not_found')
     const clean = note.trim().slice(0, 2000)
+    const actor = approver.trim().slice(0, 100) || 'workbench'
     if (clean === '') throw new Error('research_rollback_note_required')
-    merge.rollbackApproval = { at: Date.now(), note: clean }
+    if (merge.rollbackApprovals.some(row => row.approver === actor)) {
+      throw new Error('research_rollback_approver_duplicate')
+    }
+    const approval = { at: Date.now(), note: clean, approver: actor }
+    merge.rollbackApprovals.push(approval)
+    merge.rollbackApproval = { at: approval.at, note: approval.note }
     run.updatedAt = Date.now()
     return { run, merge }
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.merge.rollback-approved' })

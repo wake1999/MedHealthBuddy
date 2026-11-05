@@ -22290,6 +22290,78 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/artifacts": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get artifacts",
+        "description": "GET /api/studio/research/runs/:id/artifacts",
+        "operationId": "listArtifactsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/artifacts/cleanup": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create cleanup",
+        "description": "POST /api/studio/research/runs/:id/artifacts/cleanup",
+        "operationId": "cleanupArtifactsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/branches": {
       "post": {
         "tags": [

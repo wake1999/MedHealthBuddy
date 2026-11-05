@@ -31,7 +31,14 @@ import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
 import { generateBranchResultsTable, setPrimaryBranch } from '../services/research/run-branch-results'
-import { approveRollback, executeRawMerge, uploadRawArtifact } from '../services/research/run-merge-artifacts'
+import {
+  approveRollback,
+  cleanupArtifacts,
+  executeRawMerge,
+  planArtifactCleanup,
+  publicArtifact,
+  uploadRawArtifact,
+} from '../services/research/run-merge-artifacts'
 import {
   approveBranchConsolidation,
   compareMergeRecords,
@@ -93,6 +100,7 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_merge_validate_first'
     || message === 'research_rollback_approval_required'
     || message === 'research_rollback_note_required'
+    || message === 'research_rollback_approver_duplicate'
     || message === 'research_artifact_hash_mismatch'
     || message.startsWith('research_merge_snapshot_stale')
     || message.startsWith('research_raw_artifact_')
@@ -474,18 +482,65 @@ export async function approveConsolidationHandler(ctx: any) {
 export async function uploadArtifactHandler(ctx: any) {
   const body = readBody(ctx) || {}
   try {
+    const result = await uploadRawArtifact(
+      profileOf(ctx) || 'default',
+      String(ctx.params.id || ''),
+      String(ctx.params.branchId || ''),
+      {
+        name: body.name ? String(body.name) : '',
+        content: body.content ? String(body.content) : '',
+        sha256: body.sha256 ? String(body.sha256) : '',
+      },
+    )
     ctx.body = {
       ok: true,
-      ...(await uploadRawArtifact(
-        profileOf(ctx) || 'default',
-        String(ctx.params.id || ''),
-        String(ctx.params.branchId || ''),
-        {
-          name: body.name ? String(body.name) : '',
-          content: body.content ? String(body.content) : '',
-          sha256: body.sha256 ? String(body.sha256) : '',
-        },
-      )),
+      run: result.run,
+      artifact: publicArtifact(result.artifact),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function listArtifactsHandler(ctx: any) {
+  try {
+    const run = await getRun(profileOf(ctx) || 'default', String(ctx.params.id || ''))
+    ctx.body = {
+      ok: true,
+      artifacts: run.artifacts.map(publicArtifact),
+      access: 'metadata-only',
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function cleanupArtifactsHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  const options = {
+    keepLatest: Number.isFinite(Number(body.keepLatest)) ? Number(body.keepLatest) : 1,
+    olderThanDays: Number.isFinite(Number(body.olderThanDays)) ? Number(body.olderThanDays) : 30,
+  }
+  try {
+    if (body.dryRun !== false) {
+      const plan = await planArtifactCleanup(profileOf(ctx) || 'default', String(ctx.params.id || ''), options)
+      ctx.body = {
+        ok: true,
+        dryRun: true,
+        keep: plan.keep.map(publicArtifact),
+        remove: plan.remove.map(publicArtifact),
+        protectedBranchIds: plan.protectedBranchIds,
+        reason: plan.reason,
+      }
+      return
+    }
+    const result = await cleanupArtifacts(profileOf(ctx) || 'default', String(ctx.params.id || ''), options)
+    ctx.body = {
+      ok: true,
+      dryRun: false,
+      run: result.run,
+      removed: result.removed.map(publicArtifact),
+      reason: result.plan.reason,
     }
   } catch (error) {
     failRun(ctx, error)
@@ -517,6 +572,7 @@ export async function approveRollbackHandler(ctx: any) {
         String(ctx.params.id || ''),
         String(ctx.params.mergeId || ''),
         String(body.note || ''),
+        String(body.approver || 'workbench'),
       )),
     }
   } catch (error) {

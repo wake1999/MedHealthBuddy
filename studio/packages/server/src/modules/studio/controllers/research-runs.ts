@@ -9,6 +9,7 @@ import {
   createHypothesisBranch,
   createRun,
   removeHypothesisBranch,
+  setBranchFrozen,
   getClaimCoverage,
   getRun,
   importWorkbenchEvidence,
@@ -29,6 +30,7 @@ import { generateRunReport } from '../services/research/run-report'
 import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
+import { generateBranchResultsTable, setPrimaryBranch } from '../services/research/run-branch-results'
 import { generateResultsDraft } from '../services/research/run-results-draft'
 import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
@@ -71,6 +73,7 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_claim_contradiction_note_required'
     || message === 'research_hypothesis_claim_required'
     || message === 'research_branch_last'
+    || message === 'research_branch_frozen'
     || message.startsWith('research_result_missing_metrics')
   ) {
     return fail(ctx, 422, message, message)
@@ -408,6 +411,51 @@ export async function insertResultsHandler(ctx: any) {
         String(body.figureId || ''),
         String(body.branchId || ''),
       )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function branchResultsTableHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await generateBranchResultsTable(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function primaryBranchHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      run: await setPrimaryBranch(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(body.metric || ''),
+        String(body.branchId || ''),
+      ),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function freezeBranchHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      run: await setBranchFrozen(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.branchId || ''),
+        body.frozen === true,
+      ),
     }
   } catch (error) {
     failRun(ctx, error)

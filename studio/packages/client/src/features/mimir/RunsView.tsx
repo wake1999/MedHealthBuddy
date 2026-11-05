@@ -193,6 +193,7 @@ interface ResearchRunBranch {
   result: RunResult | null
   stage: Stage
   archivedAt: number
+  frozenAt: number
   createdAt: number
   updatedAt: number
 }
@@ -215,6 +216,7 @@ interface ResearchRun {
   result: RunResult | null
   branches?: ResearchRunBranch[]
   activeBranchId?: string
+  primaryMetricBranches?: Record<string, string>
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
   updatedAt: number
@@ -429,6 +431,11 @@ export function RunsView({
   const [branchStats, setBranchStats] = useState<BranchPairComparison[] | null>(null)
   const [branchStatsBusy, setBranchStatsBusy] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
+  const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
+  const branchFrozen = Boolean(activeBranch?.frozenAt)
+  const branchMetricNames = Array.from(new Set(
+    visibleBranches.flatMap(branch => (branch.result?.metricStats || []).map(stat => stat.name)),
+  ))
   const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
   const [coverage, setCoverage] = useState<ClaimCoverage | null>(null)
@@ -851,6 +858,54 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setBranchBusy(false)
+    }
+  }
+
+  async function downloadBranchResultsTable() {
+    if (!selected) return
+    setBranchBusy(true)
+    try {
+      const body = await request<{ markdown: string; filename: string }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/results-table`,
+      )
+      downloadText(body.filename, body.markdown)
+      setNotice(t('runs.branchTableDownloaded'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  async function toggleBranchFreeze() {
+    if (!selected || !activeBranch) return
+    setBranchBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/${encodeURIComponent(activeBranch.id)}/freeze`,
+        { method: 'POST', body: JSON.stringify({ frozen: !branchFrozen }) },
+      )
+      replaceRun(body.run)
+      setNotice(branchFrozen ? t('runs.branchUnfrozen') : t('runs.branchFrozen'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  async function setPrimaryBranch(metric: string, branchId: string) {
+    if (!selected || branchId === '') return
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/primary-branch`,
+        { method: 'POST', body: JSON.stringify({ metric, branchId }) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.primaryBranchSaved'))
+    } catch (err) {
+      setError((err as Error).message)
     }
   }
 
@@ -1742,6 +1797,13 @@ export function RunsView({
                     <button type="button" className={css.btn} disabled={branchStatsBusy} onClick={() => void compareBranchStats()}>
                       {branchStatsBusy ? t('runs.branchStatsBusy') : t('runs.branchStats')}
                     </button>
+                    <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void downloadBranchResultsTable()}>
+                      {t('runs.branchTable')}
+                    </button>
+                    <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void toggleBranchFreeze()}>
+                      {branchFrozen ? t('runs.branchUnfreeze') : t('runs.branchFreeze')}
+                    </button>
+                    {branchFrozen && <span className={css.runsFrozenBadge}>{t('runs.branchFrozenBadge')}</span>}
                   </div>
                   {showBranchCompare && (selected.branches || []).length > 0 && (
                     <div className={css.runsBranchCompare}>
@@ -1801,6 +1863,29 @@ export function RunsView({
                   )}
                   {branchStats && showBranchCompare && (
                     <div className={css.runsBranchCompare}>
+                      {branchMetricNames.length > 0 && (
+                        <div className={css.runsPrimaryBranches}>
+                          {branchMetricNames.map(metric => (
+                            <label key={metric}>
+                              <span>{t('runs.primaryBranch')}: {metric}</span>
+                              <select
+                                className={css.runsInput}
+                                value={selected.primaryMetricBranches?.[metric.toLowerCase()] || ''}
+                                onChange={event => void setPrimaryBranch(metric, event.target.value)}
+                              >
+                                <option value="">—</option>
+                                {visibleBranches
+                                  .filter(branch => (branch.result?.metricStats || []).some(stat => stat.name === metric))
+                                  .map(branch => (
+                                    <option key={branch.id} value={branch.id}>
+                                      {branch.hypothesis?.text?.slice(0, 36) || branch.id.slice(-6)}
+                                    </option>
+                                  ))}
+                              </select>
+                            </label>
+                          ))}
+                        </div>
+                      )}
                       {branchStats.length === 0 ? (
                         <p className={css.hint}>{t('runs.branchStatsEmpty')}</p>
                       ) : (
@@ -1876,7 +1961,7 @@ export function RunsView({
                   <button
                     type="button"
                     className={css.btn}
-                    disabled={loading || hypothesis.text.trim() === '' || (hypothesis.claimIds || []).length === 0}
+                    disabled={loading || branchFrozen || hypothesis.text.trim() === '' || (hypothesis.claimIds || []).length === 0}
                     onClick={() => void saveHypothesisForm()}
                   >
                     {t('runs.saveHypothesis')}
@@ -1900,14 +1985,14 @@ export function RunsView({
                   />
                   <input className={css.runsInput} value={plan.command} onChange={event => setPlan({ ...plan, command: event.target.value })} placeholder={t('runs.command')} />
                   <input className={css.runsInput} value={plan.stopCondition} onChange={event => setPlan({ ...plan, stopCondition: event.target.value })} placeholder={t('runs.stopCondition')} />
-                  <button type="button" className={css.btn} disabled={loading || plan.dataset.trim() === '' || plan.metrics.trim() === ''} onClick={() => void savePlanForm()}>
+                  <button type="button" className={css.btn} disabled={loading || branchFrozen || plan.dataset.trim() === '' || plan.metrics.trim() === ''} onClick={() => void savePlanForm()}>
                     {t('runs.savePlan')}
                   </button>
 
                   {selected.experimentId !== '' ? (
                     <p className={css.runsLinked}>✓ {t('runs.experimentLinked')}: <code>{selected.experimentId}</code></p>
                   ) : (
-                    <button type="button" className={css.btnPrimary} disabled={loading || !selected.hypothesis || !selected.experimentPlan} onClick={() => void createExperiment()}>
+                    <button type="button" className={css.btnPrimary} disabled={loading || branchFrozen || !selected.hypothesis || !selected.experimentPlan} onClick={() => void createExperiment()}>
                       {t('runs.createExperiment')}
                     </button>
                   )}
@@ -1924,7 +2009,7 @@ export function RunsView({
                         <button
                           type="button"
                           className={css.btnPrimary}
-                          disabled={jobBusy || serverId === '' || selected.experimentJobId !== '' || !selected.experimentPlan?.command}
+                          disabled={jobBusy || branchFrozen || serverId === '' || selected.experimentJobId !== '' || !selected.experimentPlan?.command}
                           onClick={() => void submitExperiment()}
                         >
                           {jobBusy ? t('runs.jobBusy') : t('runs.submitJob')}
@@ -2039,7 +2124,7 @@ export function RunsView({
                       <button
                         type="button"
                         className={css.btnPrimary}
-                        disabled={loading || resultDraft.summary.trim() === '' || !resultDraft.confirmedFinal || (outcomeOverridden && (resultDraft.overrideReason || '').trim() === '')}
+                        disabled={loading || branchFrozen || resultDraft.summary.trim() === '' || !resultDraft.confirmedFinal || (outcomeOverridden && (resultDraft.overrideReason || '').trim() === '')}
                         onClick={() => void recordResult()}
                       >
                         {t('runs.saveResult')}

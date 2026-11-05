@@ -482,6 +482,8 @@ export interface ResearchRunBranch {
   stage: ResearchRunStage
   /** 0 means active/visible; a timestamp means archived. */
   archivedAt: number
+  /** Frozen branches reject hypothesis, plan, experiment, and result edits. */
+  frozenAt: number
   createdAt: number
   updatedAt: number
 }
@@ -522,6 +524,8 @@ export interface ResearchRun {
   /** Persistent branches; the top-level fields mirror the active branch. */
   branches: ResearchRunBranch[]
   activeBranchId: string
+  /** Optional preferred branch per metric for manuscript tables. */
+  primaryMetricBranches: Record<string, string>
   approvals: ResearchRunApproval[]
   createdAt: number
   updatedAt: number
@@ -703,10 +707,12 @@ function normalizeStore(input: unknown): ResearchStore {
       result: branch.result || null,
       stage: (branch.stage || (branch.result ? 'analysis' : branch.experimentId !== '' ? 'experiment' : 'hypothesis')) as ResearchRunStage,
       archivedAt: typeof branch.archivedAt === 'number' ? branch.archivedAt : 0,
+      frozenAt: typeof branch.frozenAt === 'number' ? branch.frozenAt : 0,
       createdAt: typeof branch.createdAt === 'number' ? branch.createdAt : run.createdAt,
       updatedAt: typeof branch.updatedAt === 'number' ? branch.updatedAt : run.updatedAt,
     })),
     activeBranchId: typeof run.activeBranchId === 'string' ? run.activeBranchId : '',
+    primaryMetricBranches: run.primaryMetricBranches || {},
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
   })).map(run => {
     if (run.branches.length > 0) {
@@ -739,6 +745,7 @@ function normalizeStore(input: unknown): ResearchStore {
       result: run.result,
       stage: (run.result ? 'analysis' : run.experimentId !== '' ? 'experiment' : 'hypothesis') as ResearchRunStage,
       archivedAt: 0,
+      frozenAt: 0,
       createdAt: run.createdAt,
       updatedAt: run.updatedAt,
     }

@@ -56,6 +56,7 @@ function emptyBranch(now = Date.now()): ResearchRunBranch {
     result: null,
     stage: 'hypothesis',
     archivedAt: 0,
+    frozenAt: 0,
     createdAt: now,
     updatedAt: now,
   }
@@ -69,6 +70,11 @@ function ensureActiveBranch(run: ResearchRun): ResearchRunBranch {
     run.activeBranchId = branch.id
   }
   return branch
+}
+
+function assertActiveEditable(run: ResearchRun): void {
+  const branch = run.branches.find(row => row.id === run.activeBranchId)
+  if (branch?.frozenAt) throw new Error('research_branch_frozen')
 }
 
 function mirrorActiveBranch(run: ResearchRun): ResearchRunBranch {
@@ -185,6 +191,7 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     result: null,
     branches: [],
     activeBranchId: '',
+    primaryMetricBranches: {},
     approvals: [],
     createdAt: now,
     updatedAt: now,
@@ -414,6 +421,24 @@ export async function createHypothesisBranch(profile: string, runId: string): Pr
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.created' })
 }
 
+export async function setBranchFrozen(
+  profile: string,
+  runId: string,
+  branchId: string,
+  frozen: boolean,
+): Promise<ResearchRun> {
+  return updateStore(profile, 'run.branch.frozen', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const branch = run.branches.find(row => row.id === branchId)
+    if (!branch) throw new Error('research_branch_not_found')
+    branch.frozenAt = frozen ? Date.now() : 0
+    branch.updatedAt = Date.now()
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.frozen' })
+}
+
 export async function archiveHypothesisBranch(profile: string, runId: string, branchId: string): Promise<ResearchRun> {
   return updateStore(profile, 'run.branch.archived', draft => {
     const run = draft.runs.find(row => row.id === runId)
@@ -510,6 +535,7 @@ export async function saveHypothesis(profile: string, runId: string, input: Hypo
   return updateStore(profile, 'run.hypothesis.saved', draft => {
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
+    assertActiveEditable(run)
     const text = clean(input.text, 3000)
     if (text === '') throw new Error('research_hypothesis_required')
     const approved = new Set(run.claims.filter(claim => claim.reviewStatus === 'approved').map(claim => claim.id))
@@ -540,6 +566,7 @@ export async function saveExperimentPlan(profile: string, runId: string, input: 
   return updateStore(profile, 'run.experiment-plan.saved', draft => {
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
+    assertActiveEditable(run)
     const plan: ResearchRunExperimentPlan = {
       dataset: clean(input.dataset, 2000),
       baselines: clean(input.baselines, 2000),
@@ -565,6 +592,7 @@ export async function createExperimentRecord(profile: string, runId: string): Pr
   return updateStore(profile, 'run.experiment.created', draft => {
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
+    assertActiveEditable(run)
     if (!run.hypothesis) throw new Error('research_hypothesis_required')
     if (!run.experimentPlan) throw new Error('research_experiment_plan_required')
     if (run.experimentId !== '') return run
@@ -618,6 +646,7 @@ export async function submitExperimentJob(
   const store = await readStore(profile)
   const run = store.runs.find(row => row.id === runId)
   if (!run) throw new Error('research_run_not_found')
+  assertActiveEditable(run)
   if (!run.experimentId || !run.experimentPlan) throw new Error('research_experiment_required')
   const experiment = store.experiments.find(row => row.id === run.experimentId)
   if (!experiment) throw new Error('research_experiment_not_found')
@@ -713,6 +742,7 @@ export async function recordExperimentResult(profile: string, runId: string, inp
   return updateStore(profile, 'run.experiment.result', draft => {
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
+    assertActiveEditable(run)
     if (!run.hypothesis || run.experimentId === '') throw new Error('research_experiment_required')
     if (input.confirmedFinal !== true) throw new Error('research_result_confirmation_required')
     const summary = clean(input.summary, 4000)

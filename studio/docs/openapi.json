@@ -22362,6 +22362,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/branches/results-table": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get results-table",
+        "description": "GET /api/studio/research/runs/:id/branches/results-table",
+        "operationId": "branchResultsTableHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/branches/{branchId}": {
       "delete": {
         "tags": [
@@ -22455,6 +22491,50 @@
         "summary": "Create archive",
         "description": "POST /api/studio/research/runs/:id/branches/:branchId/archive",
         "operationId": "archiveBranchHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/branches/{branchId}/freeze": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create freeze",
+        "description": "POST /api/studio/research/runs/:id/branches/:branchId/freeze",
+        "operationId": "freezeBranchHandler",
         "security": [
           {
             "BearerAuth": []
@@ -23038,6 +23118,42 @@
         "summary": "Create insert-results",
         "description": "POST /api/studio/research/runs/:id/insert-results",
         "operationId": "insertResultsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/primary-branch": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create primary-branch",
+        "description": "POST /api/studio/research/runs/:id/primary-branch",
+        "operationId": "primaryBranchHandler",
         "security": [
           {
             "BearerAuth": []

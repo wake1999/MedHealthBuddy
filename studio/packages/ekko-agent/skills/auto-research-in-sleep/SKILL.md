@@ -75,6 +75,9 @@ POST  /api/studio/research/runs/:id/hypothesis
 POST  /api/studio/research/runs/:id/experiment-plan
 GET   /api/studio/research/runs/:id/claim-graph
 GET   /api/studio/research/runs/:id/branches/compare
+GET   /api/studio/research/runs/:id/branches/results-table
+POST  /api/studio/research/runs/:id/primary-branch
+POST  /api/studio/research/runs/:id/branches/:branchId/freeze
 GET   /api/studio/research/projects/:id/family-analysis
 POST  /api/studio/research/runs/:id/create-experiment
 POST  /api/studio/research/runs/:id/submit-experiment
@@ -97,7 +100,11 @@ restored; the last visible branch cannot be archived or deleted. `claim-graph` e
 and Markdown table. `report?branchId=...` and `results-draft` with `branchId`
 export one branch; `branches/compare` returns approximate pairwise Welch z
 tests over persisted means/SDs/n, Holm-adjusted across branch pairs.
-`family-analysis` applies Holm correction to confirmed Run result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
+`branches/results-table` exports a Markdown/LaTeX branch table;
+`primary-branch` chooses the preferred branch per metric. `freeze` with
+`frozen:true` locks hypothesis, plan, experiment, and result edits; exports and
+activation still work. `family-analysis` applies Holm correction to confirmed
+Run result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
 plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. Never approve evidence or claims
 yourself.

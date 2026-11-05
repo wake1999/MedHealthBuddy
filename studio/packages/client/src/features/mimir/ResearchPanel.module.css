@@ -10889,6 +10889,17 @@ button.paperNoteBlockMeta:hover {
   background: rgb(120 92 32 / 4%);
 }
 
+.runsFamily {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid rgb(80 130 90 / 20%);
+  border-radius: 10px;
+  background: rgb(80 130 90 / 4%);
+}
+
 .runsCoverageStats {
   display: flex;
   flex-wrap: wrap;

@@ -22,6 +22,7 @@ import {
 import { deriveClaimsForRun, extractEvidenceForRun } from '../services/research/run-evidence'
 import { generateRunReport } from '../services/research/run-report'
 import { generateClaimGraph } from '../services/research/run-claim-graph'
+import { analyzeRunFamily } from '../services/research/run-family'
 import { generateResultsDraft } from '../services/research/run-results-draft'
 import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
@@ -323,6 +324,20 @@ export async function insertResultsHandler(ctx: any) {
         String(ctx.params.id || ''),
         String(body.figureId || ''),
       )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function familyAnalysisHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      analysis: await analyzeRunFamily(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+      ),
     }
   } catch (error) {
     failRun(ctx, error)

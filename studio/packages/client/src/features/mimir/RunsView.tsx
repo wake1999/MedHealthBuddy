@@ -122,6 +122,28 @@ interface RunJobInsight {
   exitCode: number | null
 }
 
+interface FamilyMetricRow {
+  runId: string
+  runTitle: string
+  metric: string
+  n: number
+  mean: number
+  pValue: number
+  pAdjusted: number
+  significant: boolean
+  effectSize: number | null
+  effectSizeType: string
+}
+
+interface FamilyAnalysis {
+  projectId: string
+  family: string
+  alpha: number
+  runCount: number
+  testedMetricCount: number
+  rows: FamilyMetricRow[]
+}
+
 interface RunServer {
   id: string
   name: string
@@ -357,6 +379,8 @@ export function RunsView({
   const [claimsBusy, setClaimsBusy] = useState(false)
   const [reviewBusy, setReviewBusy] = useState('')
   const [graphBusy, setGraphBusy] = useState(false)
+  const [familyBusy, setFamilyBusy] = useState(false)
+  const [familyAnalysis, setFamilyAnalysis] = useState<FamilyAnalysis | null>(null)
   const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
   const [coverage, setCoverage] = useState<ClaimCoverage | null>(null)
@@ -715,6 +739,24 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setClaimsBusy(false)
+    }
+  }
+
+  async function analyzeFamily() {
+    if (!projectId) return
+    setFamilyBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ analysis: FamilyAnalysis }>(
+        `/api/studio/research/projects/${encodeURIComponent(projectId)}/family-analysis`,
+      )
+      setFamilyAnalysis(body.analysis)
+      setNotice(t('runs.familyAnalyzed', { count: body.analysis.testedMetricCount }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setFamilyBusy(false)
     }
   }
 
@@ -1193,6 +1235,14 @@ export function RunsView({
                 >
                   {reportBusy ? t('runs.reportBusy') : t('runs.generateReport')}
                 </button>
+                <button
+                  type="button"
+                  className={css.btn}
+                  disabled={familyBusy}
+                  onClick={() => void analyzeFamily()}
+                >
+                  {familyBusy ? t('runs.familyBusy') : t('runs.familyAnalyze')}
+                </button>
                 {figures.length > 0 && (
                   <select
                     className={css.runsInput}
@@ -1667,6 +1717,57 @@ export function RunsView({
                           {t(`runs.outcome.${selected.result.outcome}`)} · {selected.result.summary.slice(0, 180)}
                         </p>
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {familyAnalysis && (
+                <div className={css.runsFamily}>
+                  <div className={css.runsReportHead}>
+                    <h4>{t('runs.familyTitle')}</h4>
+                    <div>
+                      <button type="button" className={css.btn} onClick={() => setFamilyAnalysis(null)}>{t('runs.close')}</button>
+                    </div>
+                  </div>
+                  <p className={css.hint}>
+                    {t('runs.familySummary', {
+                      runs: familyAnalysis.runCount,
+                      metrics: familyAnalysis.testedMetricCount,
+                    })}
+                  </p>
+                  {familyAnalysis.rows.length === 0 ? (
+                    <p className={css.hint}>{t('runs.familyEmpty')}</p>
+                  ) : (
+                    <div className={css.runsEvidenceTableWrap}>
+                      <table className={css.runsEvidenceTable}>
+                        <thead>
+                          <tr>
+                            <th>{t('runs.familyRun')}</th>
+                            <th>{t('runs.metric')}</th>
+                            <th>n</th>
+                            <th>p</th>
+                            <th>p adj.</th>
+                            <th>{t('runs.familyEffect')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {familyAnalysis.rows.map(row => (
+                            <tr key={`${row.runId}:${row.metric}`}>
+                              <td>{row.runTitle}</td>
+                              <td>{row.metric}</td>
+                              <td>{row.n}</td>
+                              <td>{row.pValue.toFixed(4)}</td>
+                              <td>{row.pAdjusted.toFixed(4)}</td>
+                              <td>
+                                {row.effectSize === null ? '—' : `${row.effectSizeType}=${row.effectSize.toFixed(2)}`}
+                                {' '}
+                                {row.significant ? t('runs.familySignificant') : t('runs.familyNotSignificant')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
                 </div>

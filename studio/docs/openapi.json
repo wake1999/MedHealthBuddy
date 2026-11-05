@@ -21237,6 +21237,42 @@
         ]
       }
     },
+    "/api/studio/research/projects/{id}/family-analysis": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get family-analysis",
+        "description": "GET /api/studio/research/projects/:id/family-analysis",
+        "operationId": "familyAnalysisHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/projects/{id}/figure": {
       "get": {
         "tags": [

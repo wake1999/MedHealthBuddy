@@ -760,6 +760,30 @@
   flex: 1;
 }
 
+.projectPackageImport {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));
+  border-radius: 6px;
+  background: var(--dsw-specific-menu, #fff);
+  color: var(--dsw-alias-label-secondary, #3c4557);
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.projectPackageImport input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 /* The rail's session switcher: the delivery target of the panel's
    "… with AI" verbs (the wiki itself is shared across sessions). */
 .sessionBar {

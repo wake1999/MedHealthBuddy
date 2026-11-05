@@ -41,6 +41,15 @@ import { ToastHost } from './ToastHost.tsx'
 import { ImportProjectDialog } from './ImportProjectDialog.tsx'
 import css from './ResearchPanel.module.css'
 
+function researchApiHeaders(): Record<string, string> {
+  const apiKey = window.localStorage.getItem('hermes_api_key') || ''
+  const profile = window.localStorage.getItem('hermes_active_profile_name') || ''
+  return {
+    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    ...(profile ? { 'X-Hermes-Profile': profile } : {}),
+  }
+}
+
 /** Locale key of one tab label. */
 const TAB_KEYS: Record<ResearchTab, ResearchKey> = {
   overview: 'tab.overview',
@@ -260,6 +269,7 @@ export function ResearchPanel({
   )
   // The "import existing project" dialog of the sidebar project list.
   const [importOpen, setImportOpen] = useState(false)
+  const [packageBusy, setPackageBusy] = useState(false)
   // The sidebar's project management: the inline create form, the row being
   // renamed (with its draft), a mutation in flight (guards double submits),
   // and the last mutation failure (shown as one line under the list).
@@ -395,6 +405,58 @@ export function ResearchPanel({
   // The sidebar's create form: an invalid title is rejected client-side (the
   // host re-checks); a success closes the form (the inject mapping has
   // already selected the new project), a failure shows under the list.
+  const backupProjectPackage = async (): Promise<void> => {
+    if (!selectedProjectId || packageBusy) return
+    setPackageBusy(true)
+    try {
+      const response = await fetch(
+        `/api/studio/research/projects/${encodeURIComponent(selectedProjectId)}/package`,
+        { headers: researchApiHeaders() },
+      )
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const blob = await response.blob()
+      const disposition = response.headers.get('content-disposition') || ''
+      const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+      const filename = match ? decodeURIComponent(match[1]) : `${selectedProjectId}.mhb.zip`
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPackageBusy(false)
+    }
+  }
+
+  const restoreProjectPackage = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || packageBusy) return
+    setPackageBusy(true)
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      let binary = ''
+      for (let index = 0; index < bytes.length; index += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+      }
+      const response = await fetch('/api/studio/research/projects/package/import', {
+        method: 'POST',
+        headers: { ...researchApiHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: btoa(binary) }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body?.error || `HTTP ${response.status}`)
+      window.location.reload()
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPackageBusy(false)
+    }
+  }
+
   const submitCreateProject = async (): Promise<void> => {
     const title = cleanProjectTitle(createTitle)
     if (title === null || projectBusy) return
@@ -711,14 +773,25 @@ export function ResearchPanel({
             </div>
           )}
           {!projectsCollapsed && projectsStatus === 'ready' && !createOpen && (
-            <div className={css.projectButtons}>
-              <button type="button" className={css.btn} onClick={() => { setCreateOpen(true); setCreateTitle(''); setProjectError(null) }}>
-                {t('projects.new')}
-              </button>
-              <button type="button" className={css.btn} onClick={() => { setImportOpen(true) }}>
-                {t('projects.import')}
-              </button>
-            </div>
+            <>
+              <div className={css.projectButtons}>
+                <button type="button" className={css.btn} onClick={() => { setCreateOpen(true); setCreateTitle(''); setProjectError(null) }}>
+                  {t('projects.new')}
+                </button>
+                <button type="button" className={css.btn} onClick={() => { setImportOpen(true) }}>
+                  {t('projects.import')}
+                </button>
+              </div>
+              <div className={css.projectButtons}>
+                <button type="button" className={css.btn} disabled={!selectedProjectId || packageBusy} onClick={() => void backupProjectPackage()}>
+                  {t('projects.packageBackup')}
+                </button>
+                <label className={css.projectPackageImport}>
+                  {packageBusy ? t('projects.packageBusy') : t('projects.packageRestore')}
+                  <input type="file" accept=".zip,application/zip" onChange={event => void restoreProjectPackage(event)} />
+                </label>
+              </div>
+            </>
           )}
         </div>
         {/* The session switcher: picks the host-GLOBAL current session — the

@@ -23254,6 +23254,146 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/merges/compare": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get compare",
+        "description": "GET /api/studio/research/runs/:id/merges/compare",
+        "operationId": "compareMergesHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "left",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "right",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/merges/{mergeId}/execute": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create execute",
+        "description": "POST /api/studio/research/runs/:id/merges/:mergeId/execute",
+        "operationId": "executeMergeHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mergeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/merges/{mergeId}/validate": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get validate",
+        "description": "GET /api/studio/research/runs/:id/merges/:mergeId/validate",
+        "operationId": "validateMergeHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mergeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/primary-branch": {
       "post": {
         "tags": [

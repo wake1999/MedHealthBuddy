@@ -163,6 +163,18 @@ interface BranchConsistency {
   approval: { at: number; note: string; branchIds: string[]; acknowledgedConflicts?: string[] } | null
 }
 
+interface ResearchRunMerge {
+  id: string
+  at: number
+  branchIds: string[]
+  primaryMetricBranches: Record<string, string>
+  acknowledgedConflicts: string[]
+  note: string
+  metricRows: Array<{ metric: string; branchId: string; n: number; mean: number }>
+  status: string
+  executedAt: number
+}
+
 interface BranchPairComparison {
   metric: string
   branchALabel: string
@@ -236,7 +248,7 @@ interface ResearchRun {
   activeBranchId?: string
   primaryMetricBranches?: Record<string, string>
   consolidationApproval?: { at: number; note: string; branchIds: string[] } | null
-  merges?: Array<{ id: string; at: number; branchIds: string[]; note: string }>
+  merges?: ResearchRunMerge[]
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
   updatedAt: number
@@ -454,6 +466,9 @@ export function RunsView({
   const [consistencyBusy, setConsistencyBusy] = useState(false)
   const [ackedConflicts, setAckedConflicts] = useState<string[]>([])
   const [mergeBusy, setMergeBusy] = useState(false)
+  const [mergeLeft, setMergeLeft] = useState('')
+  const [mergeRight, setMergeRight] = useState('')
+  const [mergeDiff, setMergeDiff] = useState<Array<{ field: string; left: string; right: string }> | null>(null)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
@@ -971,6 +986,58 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setConsistencyBusy(false)
+    }
+  }
+
+  async function validateLatestMerge() {
+    if (!selected || !(selected.merges || []).length) return
+    const latest = selected.merges![selected.merges!.length - 1]
+    setMergeBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun; valid: boolean; changes: string[] }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/validate`,
+      )
+      replaceRun(body.run)
+      setNotice(body.valid ? t('runs.mergeValid') : t('runs.mergeStale', { changes: body.changes.join(', ') }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMergeBusy(false)
+    }
+  }
+
+  async function executeLatestMerge() {
+    if (!selected || !(selected.merges || []).length) return
+    const latest = selected.merges![selected.merges!.length - 1]
+    setMergeBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/execute`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.mergeExecuted'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMergeBusy(false)
+    }
+  }
+
+  async function compareMergeVersions() {
+    if (!selected || mergeLeft === '' || mergeRight === '') return
+    setMergeBusy(true)
+    try {
+      const body = await request<{ rows: Array<{ field: string; left: string; right: string }> }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/compare?left=${encodeURIComponent(mergeLeft)}&right=${encodeURIComponent(mergeRight)}`,
+      )
+      setMergeDiff(body.rows)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMergeBusy(false)
     }
   }
 
@@ -2077,9 +2144,50 @@ export function RunsView({
                             {mergeBusy ? t('runs.mergeBusy') : t('runs.createMerge')}
                           </button>
                           {(selected.merges || []).length > 0 && (
-                            <p className={css.hint}>
-                              {t('runs.mergeCount', { count: (selected.merges || []).length })}
-                            </p>
+                            <div className={css.runsMergeHistory}>
+                              <p className={css.hint}>
+                                {t('runs.mergeCount', { count: (selected.merges || []).length })}
+                              </p>
+                              <p className={css.runsLinked}>
+                                {t('runs.mergeLatest', {
+                                  id: selected.merges![selected.merges!.length - 1].id,
+                                  status: selected.merges![selected.merges!.length - 1].status,
+                                })}
+                              </p>
+                              <div className={css.runsBranchActions}>
+                                <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void validateLatestMerge()}>
+                                  {t('runs.validateMerge')}
+                                </button>
+                                <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void executeLatestMerge()}>
+                                  {t('runs.executeMerge')}
+                                </button>
+                              </div>
+                              {(selected.merges || []).length > 1 && (
+                                <div className={css.runsMergeCompare}>
+                                  <select className={css.runsInput} value={mergeLeft} onChange={event => setMergeLeft(event.target.value)}>
+                                    <option value="">{t('runs.mergeLeft')}</option>
+                                    {(selected.merges || []).map(merge => <option key={merge.id} value={merge.id}>{merge.id}</option>)}
+                                  </select>
+                                  <select className={css.runsInput} value={mergeRight} onChange={event => setMergeRight(event.target.value)}>
+                                    <option value="">{t('runs.mergeRight')}</option>
+                                    {(selected.merges || []).map(merge => <option key={merge.id} value={merge.id}>{merge.id}</option>)}
+                                  </select>
+                                  <button type="button" className={css.btn} disabled={mergeBusy || mergeLeft === '' || mergeRight === ''} onClick={() => void compareMergeVersions()}>
+                                    {t('runs.compareMerges')}
+                                  </button>
+                                </div>
+                              )}
+                              {mergeDiff && (
+                                <table className={css.runsEvidenceTable}>
+                                  <thead><tr><th>{t('runs.mergeField')}</th><th>Left</th><th>Right</th></tr></thead>
+                                  <tbody>
+                                    {mergeDiff.length === 0
+                                      ? <tr><td colSpan={3}>{t('runs.mergeSame')}</td></tr>
+                                      : mergeDiff.map(row => <tr key={row.field}><td>{row.field}</td><td>{row.left}</td><td>{row.right}</td></tr>)}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
                           )}
                         </>
                       ) : (

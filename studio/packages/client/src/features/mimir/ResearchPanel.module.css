@@ -10741,6 +10741,27 @@ button.paperNoteBlockMeta:hover {
   cursor: pointer;
 }
 
+.runsMergeHistory {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgb(156 59 50 / 16%);
+}
+
+.runsMergeCompare {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.runsMergeCompare select {
+  width: auto;
+  min-width: 120px;
+  padding: 4px 6px;
+  font-size: 10px;
+}
+
 .runsExperimentPanel h4 {
   margin: 4px 0 0;
   color: var(--mimir-ink, #211e19);

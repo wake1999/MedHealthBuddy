@@ -472,6 +472,19 @@ export interface ResearchRunConsolidationSnapshot {
   warnings: string[]
 }
 
+export interface ResearchRunMergeMetric {
+  metric: string
+  branchId: string
+  n: number
+  mean: number
+  std: number
+  ciLow: number | null
+  ciHigh: number | null
+  pAdjusted: number | null
+  effectSize: number | null
+  effectSizeType: string
+}
+
 export interface ResearchRunMerge {
   id: string
   at: number
@@ -480,6 +493,9 @@ export interface ResearchRunMerge {
   acknowledgedConflicts: string[]
   note: string
   snapshot: ResearchRunConsolidationSnapshot
+  metricRows: ResearchRunMergeMetric[]
+  status: 'created' | 'validated' | 'stale' | 'executed'
+  executedAt: number
 }
 
 export interface ResearchRunResult {

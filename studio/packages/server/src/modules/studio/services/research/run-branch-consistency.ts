@@ -1,4 +1,12 @@
-import { newId, readStore, updateStore, type ResearchRun, type ResearchRunConsolidationSnapshot } from './store'
+import {
+  newId,
+  readStore,
+  updateStore,
+  type ResearchRun,
+  type ResearchRunConsolidationSnapshot,
+  type ResearchRunMerge,
+  type ResearchRunMergeMetric,
+} from './store'
 
 export interface BranchConflict {
   key: string
@@ -131,6 +139,35 @@ export async function approveBranchConsolidation(
   return result || { run: updated, consistency: consistencyOf(updated) }
 }
 
+function mergeMetricRows(run: ResearchRun): ResearchRunMergeMetric[] {
+  const branches = run.branches.filter(branch => branch.archivedAt === 0 && branch.result)
+  const metrics = Array.from(new Set(
+    branches.flatMap(branch => (branch.result?.metricStats || []).map(stat => stat.name.toLowerCase())),
+  ))
+  const rows: ResearchRunMergeMetric[] = []
+  for (const metric of metrics) {
+    const preferred = run.primaryMetricBranches[metric]
+    const branch = branches.find(row => row.id === preferred
+      && row.result?.metricStats.some(stat => stat.name.toLowerCase() === metric))
+      || branches.find(row => row.result?.metricStats.some(stat => stat.name.toLowerCase() === metric))
+    const stat = branch?.result?.metricStats.find(row => row.name.toLowerCase() === metric)
+    if (!branch || !stat) continue
+    rows.push({
+      metric: stat.name,
+      branchId: branch.id,
+      n: stat.n,
+      mean: stat.mean,
+      std: stat.std,
+      ciLow: stat.ciLow,
+      ciHigh: stat.ciHigh,
+      pAdjusted: stat.pAdjusted,
+      effectSize: stat.effectSize ?? null,
+      effectSizeType: stat.effectSizeType || 'd',
+    })
+  }
+  return rows
+}
+
 export async function createMergeRecord(
   profile: string,
   runId: string,
@@ -152,9 +189,91 @@ export async function createMergeRecord(
       acknowledgedConflicts: [...approval.acknowledgedConflicts],
       note: approval.note,
       snapshot: approval.snapshot,
+      metricRows: mergeMetricRows(run),
+      status: 'created' as const,
+      executedAt: 0,
     }
     run.merges.push(merge)
     run.updatedAt = Date.now()
     return { run, mergeId: merge.id }
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.merge.created' })
+}
+
+function snapshotChanges(run: ResearchRun, merge: ResearchRunMerge): string[] {
+  const changes: string[] = []
+  const current = run.branches.filter(branch => branch.archivedAt === 0 && branch.result)
+  const currentIds = current.map(branch => branch.id).sort()
+  if (currentIds.join(',') !== merge.branchIds.slice().sort().join(',')) {
+    changes.push('branch_set_changed')
+  }
+  if (JSON.stringify(run.primaryMetricBranches) !== JSON.stringify(merge.primaryMetricBranches)) {
+    changes.push('primary_mapping_changed')
+  }
+  for (const saved of merge.snapshot.branches) {
+    const branch = run.branches.find(row => row.id === saved.id)
+    if (!branch) {
+      changes.push(`branch_removed:${saved.id}`)
+      continue
+    }
+    if (branch.frozenAt !== saved.frozenAt) changes.push(`freeze_changed:${saved.id}`)
+    if ((branch.experimentPlan?.dataset || '') !== saved.dataset) changes.push(`dataset_changed:${saved.id}`)
+    if ((branch.experimentPlan?.baselines || '') !== saved.baselines) changes.push(`baseline_changed:${saved.id}`)
+    if ((branch.experimentPlan?.family || '') !== saved.family) changes.push(`family_changed:${saved.id}`)
+  }
+  return changes
+}
+
+export async function validateMergeRecord(
+  profile: string,
+  runId: string,
+  mergeId: string,
+): Promise<{ run: ResearchRun; merge: ResearchRunMerge; valid: boolean; changes: string[] }> {
+  return updateStore(profile, 'run.merge.validated', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const merge = run.merges.find(row => row.id === mergeId)
+    if (!merge) throw new Error('research_merge_not_found')
+    const changes = snapshotChanges(run, merge)
+    merge.status = changes.length === 0 ? 'validated' : 'stale'
+    run.updatedAt = Date.now()
+    return { run, merge, valid: changes.length === 0, changes }
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.merge.validated' })
+}
+
+export async function executeMergeRecord(
+  profile: string,
+  runId: string,
+  mergeId: string,
+): Promise<{ run: ResearchRun; merge: ResearchRunMerge }> {
+  return updateStore(profile, 'run.merge.executed', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const merge = run.merges.find(row => row.id === mergeId)
+    if (!merge) throw new Error('research_merge_not_found')
+    const changes = snapshotChanges(run, merge)
+    if (changes.length > 0) throw new Error(`research_merge_snapshot_stale:${changes.join(',')}`)
+    if (merge.status === 'executed') throw new Error('research_merge_already_executed')
+    merge.status = 'executed'
+    merge.executedAt = Date.now()
+    run.updatedAt = Date.now()
+    return { run, merge }
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.merge.executed' })
+}
+
+export function compareMergeRecords(
+  left: ResearchRunMerge,
+  right: ResearchRunMerge,
+): Array<{ field: string; left: string; right: string }> {
+  const rows: Array<{ field: string; left: string; right: string }> = []
+  const diff = (field: string, a: unknown, b: unknown) => {
+    const leftText = JSON.stringify(a)
+    const rightText = JSON.stringify(b)
+    if (leftText !== rightText) rows.push({ field, left: leftText, right: rightText })
+  }
+  diff('branchIds', left.branchIds, right.branchIds)
+  diff('primaryMetricBranches', left.primaryMetricBranches, right.primaryMetricBranches)
+  diff('acknowledgedConflicts', left.acknowledgedConflicts, right.acknowledgedConflicts)
+  diff('metricMeans', left.metricRows.map(row => [row.metric, row.branchId, row.mean]), right.metricRows.map(row => [row.metric, row.branchId, row.mean]))
+  diff('status', left.status, right.status)
+  return rows
 }

@@ -32,9 +32,14 @@ what may be combined and what must remain separate.
    record with source branch ids, primary mapping, conflict acknowledgements,
    note, and a scope snapshot. It does not mutate source branches, pool samples,
    or create a synthetic experiment.
-9. **No automatic data merge.** A true data merge requires an explicitly designed
-   schema (which experiment, result, claims, and approvals survive). Until that
-   exists, use the frozen comparison table plus primary-branch Results draft.
+9. **Merge execution requires a valid snapshot.** A merge record stores selected
+   metric rows. `validate` recomputes branch scope, freeze timestamps, dataset,
+   baseline, family, and primary mapping; `execute` is rejected if anything
+   changed. Executing a record does not mutate source branches or pool raw
+   observations.
+10. **No automatic data merge.** A true data merge requires an explicitly designed
+    schema (which experiment, result, claims, and approvals survive). Until that
+    exists, use the frozen comparison table plus primary-branch Results draft.
 
 ## Current workflow
 

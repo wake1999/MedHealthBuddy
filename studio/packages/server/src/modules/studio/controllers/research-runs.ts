@@ -31,7 +31,14 @@ import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
 import { generateBranchResultsTable, setPrimaryBranch } from '../services/research/run-branch-results'
-import { approveBranchConsolidation, createMergeRecord, getBranchConsistency } from '../services/research/run-branch-consistency'
+import {
+  approveBranchConsolidation,
+  compareMergeRecords,
+  createMergeRecord,
+  executeMergeRecord,
+  getBranchConsistency,
+  validateMergeRecord,
+} from '../services/research/run-branch-consistency'
 import { generateResultsDraft } from '../services/research/run-results-draft'
 import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
@@ -80,6 +87,8 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_consolidation_branches_required'
     || message === 'research_consolidation_note_required'
     || message === 'research_consolidation_approval_stale'
+    || message === 'research_merge_already_executed'
+    || message.startsWith('research_merge_snapshot_stale')
     || message.startsWith('research_consolidation_acknowledgements_required')
     || message.startsWith('research_result_missing_metrics')
   ) {
@@ -450,6 +459,48 @@ export async function approveConsolidationHandler(ctx: any) {
         Array.isArray(body.acknowledgedConflicts) ? body.acknowledgedConflicts.map(String) : [],
       )),
     }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function validateMergeHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await validateMergeRecord(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.mergeId || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function executeMergeHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await executeMergeRecord(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.mergeId || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function compareMergesHandler(ctx: any) {
+  try {
+    const run = await getRun(profileOf(ctx) || 'default', String(ctx.params.id || ''))
+    const left = run.merges.find(row => row.id === String(ctx.query?.left || ''))
+    const right = run.merges.find(row => row.id === String(ctx.query?.right || ''))
+    if (!left || !right) throw new Error('research_merge_not_found')
+    ctx.body = { ok: true, left: left.id, right: right.id, rows: compareMergeRecords(left, right) }
   } catch (error) {
     failRun(ctx, error)
   }

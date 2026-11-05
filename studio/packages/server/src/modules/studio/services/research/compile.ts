@@ -15,7 +15,9 @@ import { detectCompileEnvironment, paperPdfPath, paperSourcePath } from './paper
 import { researchRoot } from './store'
 
 const run = promisify(execFile)
-const TIMEOUT_MS = 240_000
+// First Tectonic run may need to download its package bundle. Subsequent runs
+// are fast, but the first compile must not be reported as a timeout.
+const TIMEOUT_MS = 600_000
 const MAX_BUFFER = 8 * 1024 * 1024
 const LOG_TAIL = 6000
 
@@ -87,17 +89,18 @@ export async function runCompile(projectId: string, profile?: string): Promise<C
   let engine: string = environment.engine
 
   const attempts: Array<{ bin: string; args: string[]; label: string }> = []
+  const engineBin = environment.bin || environment.engine
   if (environment.engine === 'latexmk') {
     attempts.push({
-      bin: 'latexmk',
+      bin: engineBin,
       args: ['-pdf', '-interaction=nonstopmode', '-halt-on-error', '-file-line-error', 'main.tex'],
       label: 'latexmk',
     })
   } else if (environment.engine === 'tectonic') {
-    attempts.push({ bin: 'tectonic', args: ['--keep-logs', 'main.tex'], label: 'tectonic' })
+    attempts.push({ bin: engineBin, args: ['--keep-logs', 'main.tex'], label: 'tectonic' })
   } else if (environment.engine === 'xelatex') {
-    attempts.push({ bin: 'xelatex', args: ['-interaction=nonstopmode', '-halt-on-error', 'main.tex'], label: 'xelatex' })
-    attempts.push({ bin: 'xelatex', args: ['-interaction=nonstopmode', '-halt-on-error', 'main.tex'], label: 'xelatex(2)' })
+    attempts.push({ bin: engineBin, args: ['-interaction=nonstopmode', '-halt-on-error', 'main.tex'], label: 'xelatex' })
+    attempts.push({ bin: engineBin, args: ['-interaction=nonstopmode', '-halt-on-error', 'main.tex'], label: 'xelatex(2)' })
   } else {
     attempts.push({ bin: 'pdflatex', args: ['-interaction=nonstopmode', '-halt-on-error', 'main.tex'], label: 'pdflatex' })
     attempts.push({ bin: 'pdflatex', args: ['-interaction=nonstopmode', '-halt-on-error', 'main.tex'], label: 'pdflatex(2)' })

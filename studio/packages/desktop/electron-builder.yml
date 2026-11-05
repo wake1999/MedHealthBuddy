@@ -80,6 +80,10 @@ extraResources:
   # the desktop and both web deployments never download Python/pdf2zh.
   - from: "translation-runtime"
     to: "translation-runtime"
+  # Built-in LaTeX engine. The server resolves this before PATH, so a clean
+  # Windows machine can compile without a global MiKTeX/TeX Live install.
+  - from: "resources/tex"
+    to: "tex"
 
 asarUnpack:
   - "**/*.node"

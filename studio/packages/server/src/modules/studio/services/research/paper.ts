@@ -69,6 +69,7 @@ export interface OutlineNode {
 
 export interface CompileEnvironment {
   engine: 'latexmk' | 'tectonic' | 'xelatex' | ''
+  bin: string
   available: boolean
   detail: string
 }
@@ -318,19 +319,64 @@ const ENGINE_CANDIDATES: Array<{ name: CompileEnvironment['engine']; bin: string
   { name: 'xelatex', bin: 'xelatex' },
 ]
 
-export async function detectCompileEnvironment(): Promise<CompileEnvironment> {
-  for (const candidate of ENGINE_CANDIDATES) {
-    try {
-      const { stdout } = await run('which', [candidate.bin], { timeout: 4000 })
-      const found = stdout.trim()
-      if (found) {
-        return { engine: candidate.name, available: true, detail: found }
-      }
-    } catch {
-      // Try the next engine.
+function commonEngineDirs(): string[] {
+  const dirs: string[] = []
+  // A packaged desktop build carries its own engine; this is the first place
+  // to look so a clean machine never needs a global TeX installation.
+  const bundled: string[] = []
+  if (process.env.MHB_TEX_DIR) bundled.push(path.resolve(process.env.MHB_TEX_DIR))
+  const resourcesPath = (process as { resourcesPath?: string }).resourcesPath
+  if (resourcesPath) bundled.push(path.join(resourcesPath, 'tex'))
+  bundled.push(path.resolve(process.cwd(), 'packages', 'desktop', 'resources', 'tex'))
+  bundled.push(path.resolve(process.cwd(), 'resources', 'tex'))
+  for (const dir of bundled) {
+    if (!dirs.includes(dir)) dirs.push(dir)
+  }
+
+  if (process.platform === 'win32') {
+    if (process.env.LOCALAPPDATA) {
+      dirs.push(path.join(process.env.LOCALAPPDATA, 'Programs', 'MiKTeX', 'miktex', 'bin', 'x64'))
+    }
+    if (process.env.ProgramFiles) {
+      dirs.push(path.join(process.env.ProgramFiles, 'MiKTeX', 'miktex', 'bin', 'x64'))
+    }
+    if (process.env['ProgramFiles(x86)']) {
+      dirs.push(path.join(process.env['ProgramFiles(x86)'], 'MiKTeX', 'miktex', 'bin', 'x64'))
     }
   }
-  return { engine: '', available: false, detail: '未找到 latexmk / tectonic / xelatex' }
+  return dirs
+}
+
+async function resolveEngineBin(name: string): Promise<{ bin: string; detail: string } | null> {
+  const candidates: string[] = [name]
+  for (const dir of commonEngineDirs()) {
+    candidates.push(path.join(dir, process.platform === 'win32' ? `${name}.exe` : name))
+  }
+  for (const candidate of candidates) {
+    try {
+      const { stdout, stderr } = await run(candidate, ['--version'], { timeout: 4000 })
+      const detail = `${stdout || stderr}`.trim().split('\n')[0] || candidate
+      return { bin: candidate, detail: `${candidate} · ${detail}` }
+    } catch {
+      // Try the next location.
+    }
+  }
+  return null
+}
+
+export async function detectCompileEnvironment(): Promise<CompileEnvironment> {
+  for (const candidate of ENGINE_CANDIDATES) {
+    const resolved = await resolveEngineBin(candidate.bin)
+    if (resolved) {
+      return {
+        engine: candidate.name,
+        bin: resolved.bin,
+        available: true,
+        detail: resolved.detail,
+      }
+    }
+  }
+  return { engine: '', bin: '', available: false, detail: '未找到 latexmk / tectonic / xelatex' }
 }
 
 export interface CompileStatus {

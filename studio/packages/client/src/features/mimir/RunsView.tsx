@@ -502,6 +502,7 @@ export function RunsView({
   const [mergeDiff, setMergeDiff] = useState<Array<{ field: string; left: string; right: string }> | null>(null)
   const [artifactBusy, setArtifactBusy] = useState(false)
   const [flowBusy, setFlowBusy] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
   const [autoBusy, setAutoBusy] = useState(false)
   const [activeFlow, setActiveFlow] = useState<ResearchFlow | null>(null)
   const [resultsPrimary, setResultsPrimary] = useState(false)
@@ -693,6 +694,7 @@ export function RunsView({
       setQuestion('')
       setTitle('')
       setPaperIds([])
+      setCreateOpen(false)
       await loadRuns(body.run.id)
     } catch (err) {
       setError((err as Error).message)
@@ -1788,18 +1790,26 @@ export function RunsView({
           <p>{t('runs.subtitle')}</p>
         </div>
         <div className={css.runsHeaderActions}>
-          <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('dry-run')}>
-            {t('runs.flowDryRun')}
-          </button>
-          <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('fixture')}>
-            {t('runs.flowFixture')}
+          <button type="button" className={css.btnPrimary} onClick={() => setCreateOpen(current => !current)}>
+            {createOpen ? t('runs.closeCreate') : t('runs.newRun')}
           </button>
           <button type="button" className={css.btnPrimary} disabled={flowBusy} onClick={() => void startFlow('fixture', true)}>
             {t('runs.flowAuto')}
           </button>
-          <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('ssh')}>
-            {t('runs.flowSsh')}
-          </button>
+          <details className={css.runsAutomationMenu}>
+            <summary className={css.btn}>{t('runs.automationTools')}</summary>
+            <div className={css.runsAutomationPanel}>
+              <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('dry-run')}>
+                {t('runs.flowDryRun')}
+              </button>
+              <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('fixture')}>
+                {t('runs.flowFixture')}
+              </button>
+              <button type="button" className={css.btn} disabled={flowBusy} onClick={() => void startFlow('ssh')}>
+                {t('runs.flowSsh')}
+              </button>
+            </div>
+          </details>
           <button type="button" className={css.btn} onClick={() => void loadRuns(selectedId)} disabled={loading}>
             {t('runs.refresh')}
           </button>
@@ -1843,13 +1853,18 @@ export function RunsView({
       {error !== '' && <p className={css.failure} role="alert">{error}</p>}
       {notice !== '' && <p className={css.hint} role="status">{notice}</p>}
 
-      <div className={css.runsCreate}>
-        <input
-          className={css.runsInput}
-          value={title}
-          onChange={event => setTitle(event.target.value)}
-          placeholder={t('runs.titlePlaceholder')}
-        />
+      {createOpen && (
+        <div className={css.runsCreate}>
+          <div className={css.runsCreateHead}>
+            <strong>{t('runs.newRun')}</strong>
+            <span>{t('runs.createHint')}</span>
+          </div>
+          <input
+            className={css.runsInput}
+            value={title}
+            onChange={event => setTitle(event.target.value)}
+            placeholder={t('runs.titlePlaceholder')}
+          />
         <textarea
           className={css.runsTextarea}
           value={question}
@@ -1876,15 +1891,16 @@ export function RunsView({
             )
           })}
         </div>
-        <button
-          type="button"
-          className={css.btnPrimary}
-          onClick={() => void createRun()}
-          disabled={loading || question.trim() === ''}
-        >
-          {t('runs.create')}
-        </button>
-      </div>
+          <button
+            type="button"
+            className={css.btnPrimary}
+            onClick={() => void createRun()}
+            disabled={loading || question.trim() === ''}
+          >
+            {t('runs.create')}
+          </button>
+        </div>
+      )}
 
       {runs.length === 0 && !loading && <p className={css.hint}>{t('runs.empty')}</p>}
 
@@ -2003,6 +2019,9 @@ export function RunsView({
                 >
                   {autoBusy ? t('runs.autoRealBusy') : t('runs.autoReal')}
                 </button>
+                <details className={css.runsMoreMenu}>
+                  <summary className={css.btn}>{t('runs.moreAnalysis')}</summary>
+                  <div className={css.runsMorePanel}>
                 <button
                   type="button"
                   className={css.btn}
@@ -2047,6 +2066,8 @@ export function RunsView({
                 >
                   {t('runs.generatePrimaryResults')}
                 </button>
+                  </div>
+                </details>
                 <small>{t('runs.updated')}: {formatDate(selected.updatedAt)}</small>
               </div>
 

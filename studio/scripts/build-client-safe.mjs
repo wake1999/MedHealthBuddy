@@ -5,10 +5,10 @@ import { join, resolve } from 'node:path'
 const studioRoot = resolve(import.meta.dirname, '..')
 const dist = join(studioRoot, 'dist')
 const target = join(dist, 'client')
-const staging = join(dist, 'client.next')
+const staging = join(dist, `client.next-${Date.now()}`)
 const viteBin = join(studioRoot, 'node_modules', 'vite', 'bin', 'vite.js')
 
-const built = spawnSync(process.execPath, [viteBin, 'build', '--outDir', '../../dist/client.next', '--emptyOutDir'], {
+const built = spawnSync(process.execPath, [viteBin, 'build', '--outDir', `../../dist/${staging.split(/[\\/]/).pop()}`], {
   cwd: studioRoot,
   stdio: 'inherit',
   env: process.env,
@@ -59,6 +59,6 @@ try {
 } catch {
   // A guarded delete may refuse a large staging tree. It is safe to leave it:
   // the next Vite build clears this directory before writing.
-  console.warn('[build-client-safe] staging retained; next build will clear it')
+  console.warn('[build-client-safe] staging retained; safe to remove when the app is closed')
 }
 console.log('[build-client-safe] dist/client updated without removing index.html')

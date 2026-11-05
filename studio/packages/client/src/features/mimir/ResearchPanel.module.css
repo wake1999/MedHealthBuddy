@@ -10377,7 +10377,83 @@ button.paperNoteBlockMeta:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  max-width: 520px;
+}
+
+.runsAutomationMenu,
+.runsMoreMenu {
+  position: relative;
+}
+
+.runsAutomationMenu summary,
+.runsMoreMenu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.runsAutomationMenu summary::-webkit-details-marker,
+.runsMoreMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.runsAutomationMenu[open] > summary,
+.runsMoreMenu[open] > summary {
+  border-color: var(--mimir-accent, #9a6a2f);
+  color: var(--mimir-accent, #9a6a2f);
+}
+
+.runsAutomationPanel,
+.runsMorePanel {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  min-width: 170px;
+  padding: 7px;
+  border: 1px solid var(--mimir-line, rgb(120 92 32 / 18%));
+  border-radius: 9px;
+  background: var(--mimir-sheet, #fffdf8);
+  box-shadow: 0 10px 28px rgb(60 45 25 / 14%);
+}
+
+.runsAutomationPanel {
+  top: calc(100% + 6px);
+  right: 0;
+}
+
+.runsMorePanel {
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+}
+
+.runsAutomationPanel .btn,
+.runsMorePanel .btn {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.runsCreateHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.runsCreateHead strong {
+  color: var(--mimir-ink, #211e19);
+  font-size: 12px;
+}
+
+.runsCreateHead span {
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 10.5px;
+  text-align: right;
 }
 
 .runsFlowPanel {
@@ -10439,11 +10515,63 @@ button.paperNoteBlockMeta:hover {
 .runsEvidenceForm {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px;
+  gap: 7px;
+  padding: 12px 14px;
   border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 12%));
   border-radius: 12px;
   background: var(--mimir-paper, #fffaf0);
+}
+
+.runsPaperPicker {
+  max-height: 108px;
+}
+
+.runsListItem:hover {
+  border-color: rgb(154 106 47 / 28%);
+  background: rgb(154 106 47 / 4%);
+}
+
+.runsListItem[data-active] {
+  box-shadow: inset 3px 0 0 var(--mimir-accent, #9a6a2f);
+}
+
+.runsActions .btn,
+.runsActions .btnPrimary {
+  padding: 5px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.runsEvidenceTable {
+  table-layout: fixed;
+  min-width: 760px;
+}
+
+.runsEvidenceTable th:nth-child(1) { width: 22%; }
+.runsEvidenceTable th:nth-child(2) { width: 30%; }
+.runsEvidenceTable th:nth-child(3) { width: 20%; }
+.runsEvidenceTable th:nth-child(4) { width: 10%; }
+.runsEvidenceTable th:nth-child(5) { width: 8%; }
+.runsEvidenceTable th:nth-child(6) { width: 10%; }
+
+@media (max-width: 1100px) {
+  .runsLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .runsList {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .runsHeader {
+    flex-direction: column;
+  }
+
+  .runsHeaderActions {
+    justify-content: flex-start;
+    max-width: none;
+  }
 }
 
 .runsInput,
@@ -10469,7 +10597,7 @@ button.paperNoteBlockMeta:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 14px;
-  max-height: 150px;
+  max-height: 108px;
   overflow: auto;
   padding: 8px;
   border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 10%));

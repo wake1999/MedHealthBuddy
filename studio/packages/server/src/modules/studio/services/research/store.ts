@@ -496,6 +496,11 @@ export interface ResearchRunMerge {
   metricRows: ResearchRunMergeMetric[]
   status: 'created' | 'validated' | 'stale' | 'executed'
   executedAt: number
+  version: number
+  previousMergeId: string
+  rollbackOf: string
+  snapshotHash: string
+  metricRowsHash: string
 }
 
 export interface ResearchRunResult {

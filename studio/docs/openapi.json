@@ -23350,6 +23350,50 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/merges/{mergeId}/rollback": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create rollback",
+        "description": "POST /api/studio/research/runs/:id/merges/:mergeId/rollback",
+        "operationId": "rollbackMergeHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mergeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/merges/{mergeId}/validate": {
       "get": {
         "tags": [

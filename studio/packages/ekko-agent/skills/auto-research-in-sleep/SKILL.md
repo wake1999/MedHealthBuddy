@@ -83,6 +83,7 @@ POST  /api/studio/research/runs/:id/merges
 GET   /api/studio/research/runs/:id/merges/compare
 GET   /api/studio/research/runs/:id/merges/:mergeId/validate
 POST  /api/studio/research/runs/:id/merges/:mergeId/execute
+POST  /api/studio/research/runs/:id/merges/:mergeId/rollback
 POST  /api/studio/research/runs/:id/branches/:branchId/freeze
 GET   /api/studio/research/projects/:id/family-analysis
 POST  /api/studio/research/runs/:id/create-experiment
@@ -114,11 +115,12 @@ the table from primary metric rows, but requires a consolidation approval after
 all participating branches are frozen. `branches/consistency` reports dataset,
 baseline, family, and missing-metric conflicts; `consolidation/approve` requires
 one acknowledgement per conflict key and stores a snapshot of branch scope and
-primary mapping. `merges` creates an immutable merge record with selected metric rows and a
-snapshot; `validate` checks the current frozen scope, `execute` only succeeds
-while that snapshot is valid, and `compare` diffs two records. It never edits
-source branches. Its narrative still comes from one branch. Never pool raw
-branch observations. See `docs/branch-merge-policy.md`.
+primary mapping. `merges` creates an immutable merge record with selected metric rows, a scope
+snapshot, and snapshot/metric-row hashes; `validate` checks all of them,
+`execute` only succeeds while valid, `rollback` creates a new version linked to
+the old one, and `compare` diffs two records. It never edits source branches.
+Its narrative still comes from one branch. Never pool raw branch observations.
+See `docs/branch-merge-policy.md` and `docs/raw-data-merge-schema.md`.
 `family-analysis` applies Holm correction to confirmed Run result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
 plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. Never approve evidence or claims

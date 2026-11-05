@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
   newId,
   readStore,
@@ -7,6 +8,34 @@ import {
   type ResearchRunMerge,
   type ResearchRunMergeMetric,
 } from './store'
+
+function stableHash(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+}
+
+function snapshotHash(snapshot: ResearchRunConsolidationSnapshot): string {
+  return stableHash({
+    branchIds: snapshot.branchIds,
+    branches: snapshot.branches,
+    primaryMetricBranches: snapshot.primaryMetricBranches,
+    warnings: snapshot.warnings,
+  })
+}
+
+function metricRowsHash(rows: ResearchRunMergeMetric[]): string {
+  return stableHash(rows.map(row => ({
+    metric: row.metric,
+    branchId: row.branchId,
+    n: row.n,
+    mean: row.mean,
+    std: row.std,
+    ciLow: row.ciLow,
+    ciHigh: row.ciHigh,
+    pAdjusted: row.pAdjusted,
+    effectSize: row.effectSize,
+    effectSizeType: row.effectSizeType,
+  })))
+}
 
 export interface BranchConflict {
   key: string
@@ -181,6 +210,8 @@ export async function createMergeRecord(
     if (approval.branchIds.slice().sort().join(',') !== consistency.branchIds.slice().sort().join(',')) {
       throw new Error('research_consolidation_approval_stale')
     }
+    const metricRows = mergeMetricRows(run)
+    const previous = run.merges[run.merges.length - 1]
     const merge = {
       id: newId('merge'),
       at: Date.now(),
@@ -189,9 +220,14 @@ export async function createMergeRecord(
       acknowledgedConflicts: [...approval.acknowledgedConflicts],
       note: approval.note,
       snapshot: approval.snapshot,
-      metricRows: mergeMetricRows(run),
+      metricRows,
       status: 'created' as const,
       executedAt: 0,
+      version: run.merges.length + 1,
+      previousMergeId: previous?.id || '',
+      rollbackOf: '',
+      snapshotHash: snapshotHash(approval.snapshot),
+      metricRowsHash: metricRowsHash(metricRows),
     }
     run.merges.push(merge)
     run.updatedAt = Date.now()
@@ -209,6 +245,9 @@ function snapshotChanges(run: ResearchRun, merge: ResearchRunMerge): string[] {
   if (JSON.stringify(run.primaryMetricBranches) !== JSON.stringify(merge.primaryMetricBranches)) {
     changes.push('primary_mapping_changed')
   }
+  const currentSnapshotHash = snapshotHash(consistencyOf(run).snapshot!)
+  if (currentSnapshotHash !== merge.snapshotHash) changes.push('snapshot_hash_changed')
+  if (metricRowsHash(mergeMetricRows(run)) !== merge.metricRowsHash) changes.push('metric_rows_hash_changed')
   for (const saved of merge.snapshot.branches) {
     const branch = run.branches.find(row => row.id === saved.id)
     if (!branch) {
@@ -260,6 +299,33 @@ export async function executeMergeRecord(
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.merge.executed' })
 }
 
+export async function rollbackMergeRecord(
+  profile: string,
+  runId: string,
+  mergeId: string,
+): Promise<{ run: ResearchRun; merge: ResearchRunMerge }> {
+  return updateStore(profile, 'run.merge.rolled-back', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const old = run.merges.find(row => row.id === mergeId)
+    if (!old) throw new Error('research_merge_not_found')
+    const previous = run.merges[run.merges.length - 1]
+    const merge: ResearchRunMerge = {
+      ...old,
+      id: newId('merge'),
+      at: Date.now(),
+      version: Math.max(0, ...run.merges.map(row => row.version || 0)) + 1,
+      previousMergeId: previous?.id || '',
+      rollbackOf: old.id,
+      status: 'created',
+      executedAt: 0,
+    }
+    run.merges.push(merge)
+    run.updatedAt = Date.now()
+    return { run, merge }
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.merge.rolled-back' })
+}
+
 export function compareMergeRecords(
   left: ResearchRunMerge,
   right: ResearchRunMerge,
@@ -274,6 +340,9 @@ export function compareMergeRecords(
   diff('primaryMetricBranches', left.primaryMetricBranches, right.primaryMetricBranches)
   diff('acknowledgedConflicts', left.acknowledgedConflicts, right.acknowledgedConflicts)
   diff('metricMeans', left.metricRows.map(row => [row.metric, row.branchId, row.mean]), right.metricRows.map(row => [row.metric, row.branchId, row.mean]))
+  diff('snapshotHash', left.snapshotHash, right.snapshotHash)
+  diff('metricRowsHash', left.metricRowsHash, right.metricRowsHash)
+  diff('version', left.version, right.version)
   diff('status', left.status, right.status)
   return rows
 }

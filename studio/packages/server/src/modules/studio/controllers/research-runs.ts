@@ -37,6 +37,7 @@ import {
   createMergeRecord,
   executeMergeRecord,
   getBranchConsistency,
+  rollbackMergeRecord,
   validateMergeRecord,
 } from '../services/research/run-branch-consistency'
 import { generateResultsDraft } from '../services/research/run-results-draft'
@@ -457,6 +458,21 @@ export async function approveConsolidationHandler(ctx: any) {
         String(ctx.params.id || ''),
         String(body.note || ''),
         Array.isArray(body.acknowledgedConflicts) ? body.acknowledgedConflicts.map(String) : [],
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function rollbackMergeHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await rollbackMergeRecord(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.mergeId || ''),
       )),
     }
   } catch (error) {

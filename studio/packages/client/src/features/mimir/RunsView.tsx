@@ -173,6 +173,11 @@ interface ResearchRunMerge {
   metricRows: Array<{ metric: string; branchId: string; n: number; mean: number }>
   status: string
   executedAt: number
+  version: number
+  previousMergeId: string
+  rollbackOf: string
+  snapshotHash: string
+  metricRowsHash: string
 }
 
 interface BranchPairComparison {
@@ -986,6 +991,25 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setConsistencyBusy(false)
+    }
+  }
+
+  async function rollbackLatestMerge() {
+    if (!selected || !(selected.merges || []).length) return
+    const latest = selected.merges![selected.merges!.length - 1]
+    setMergeBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun; merge: ResearchRunMerge }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/rollback`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.mergeRolledBack', { version: body.merge.version }))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMergeBusy(false)
     }
   }
 
@@ -2152,6 +2176,8 @@ export function RunsView({
                                 {t('runs.mergeLatest', {
                                   id: selected.merges![selected.merges!.length - 1].id,
                                   status: selected.merges![selected.merges!.length - 1].status,
+                                  version: selected.merges![selected.merges!.length - 1].version,
+                                  hash: (selected.merges![selected.merges!.length - 1].metricRowsHash || '').slice(0, 10),
                                 })}
                               </p>
                               <div className={css.runsBranchActions}>
@@ -2160,6 +2186,9 @@ export function RunsView({
                                 </button>
                                 <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void executeLatestMerge()}>
                                   {t('runs.executeMerge')}
+                                </button>
+                                <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void rollbackLatestMerge()}>
+                                  {t('runs.rollbackMerge')}
                                 </button>
                               </div>
                               {(selected.merges || []).length > 1 && (

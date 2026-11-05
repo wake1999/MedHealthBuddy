@@ -25,7 +25,10 @@ what may be combined and what must remain separate.
 6. **Narrative still needs human selection.** A primary-branch Results draft
    combines selected metric rows, but the narrative is taken from one branch and
    must be checked for consistency.
-7. **No automatic merge operation.** A true branch merge requires an explicitly
+7. **Approval gate.** All participating branches must be frozen, consistency
+   warnings must be reviewed, and a written consolidation note is required
+   before `usePrimaryBranches:true` is accepted.
+8. **No automatic merge operation.** A true branch merge requires an explicitly
    designed schema (which experiment, result, claims, and approvals survive).
    Until that exists, use the frozen comparison table plus primary-branch Results
    draft.

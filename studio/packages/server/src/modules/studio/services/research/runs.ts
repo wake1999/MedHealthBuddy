@@ -193,6 +193,7 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     branches: [],
     activeBranchId: '',
     primaryMetricBranches: {},
+    consolidationApproval: null,
     approvals: [],
     createdAt: now,
     updatedAt: now,

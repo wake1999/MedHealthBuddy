@@ -88,7 +88,15 @@ export async function generateResultsDraft(
   const source = store.runs.find(row => row.id === runId)
   if (!source) throw new Error('research_run_not_found')
   let run = selectRunBranch(source, branchId)
-  if (usePrimaryBranches && source.branches.length > 1) {
+  if (usePrimaryBranches && source.branches.filter(branch => branch.archivedAt === 0 && branch.result).length > 1) {
+    const consent = source.consolidationApproval
+    const currentBranches = source.branches
+      .filter(branch => branch.archivedAt === 0 && branch.result)
+      .map(branch => branch.id)
+      .sort()
+    if (!consent || consent.branchIds.slice().sort().join(',') !== currentBranches.join(',')) {
+      throw new Error('research_consolidation_approval_required')
+    }
     const primaryStats: ResearchMetricStats[] = []
     const counts = new Map<string, number>()
     for (const branch of source.branches.filter(row => row.archivedAt === 0 && row.result)) {

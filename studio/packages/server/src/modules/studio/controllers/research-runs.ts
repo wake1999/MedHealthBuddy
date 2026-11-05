@@ -31,6 +31,7 @@ import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
 import { generateBranchResultsTable, setPrimaryBranch } from '../services/research/run-branch-results'
+import { approveBranchConsolidation, getBranchConsistency } from '../services/research/run-branch-consistency'
 import { generateResultsDraft } from '../services/research/run-results-draft'
 import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
@@ -74,6 +75,10 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_hypothesis_claim_required'
     || message === 'research_branch_last'
     || message === 'research_branch_frozen'
+    || message === 'research_consolidation_approval_required'
+    || message === 'research_consolidation_freeze_required'
+    || message === 'research_consolidation_branches_required'
+    || message === 'research_consolidation_note_required'
     || message.startsWith('research_result_missing_metrics')
   ) {
     return fail(ctx, 422, message, message)
@@ -413,6 +418,33 @@ export async function insertResultsHandler(ctx: any) {
         String(body.figureId || ''),
         String(body.branchId || ''),
         body.usePrimaryBranches === true,
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function branchConsistencyHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      consistency: await getBranchConsistency(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function approveConsolidationHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await approveBranchConsolidation(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(body.note || ''),
       )),
     }
   } catch (error) {

@@ -75,8 +75,10 @@ POST  /api/studio/research/runs/:id/hypothesis
 POST  /api/studio/research/runs/:id/experiment-plan
 GET   /api/studio/research/runs/:id/claim-graph
 GET   /api/studio/research/runs/:id/branches/compare
+GET   /api/studio/research/runs/:id/branches/consistency
 GET   /api/studio/research/runs/:id/branches/results-table
 POST  /api/studio/research/runs/:id/primary-branch
+POST  /api/studio/research/runs/:id/consolidation/approve
 POST  /api/studio/research/runs/:id/branches/:branchId/freeze
 GET   /api/studio/research/projects/:id/family-analysis
 POST  /api/studio/research/runs/:id/create-experiment
@@ -104,8 +106,11 @@ tests over persisted means/SDs/n, Holm-adjusted across branch pairs.
 `primary-branch` chooses the preferred branch per metric. `freeze` with
 `frozen:true` locks hypothesis, plan, experiment, and result edits; exports and
 activation still work. `results-draft` accepts `usePrimaryBranches:true` to build
-the table from primary metric rows, but its narrative still comes from one
-branch. Never pool raw branch observations. See `docs/branch-merge-policy.md`.
+the table from primary metric rows, but requires a consolidation approval after
+all participating branches are frozen. `branches/consistency` reports dataset,
+baseline, family, and missing-metric conflicts; `consolidation/approve` records
+the human reason. Its narrative still comes from one branch. Never pool raw
+branch observations. See `docs/branch-merge-policy.md`.
 `family-analysis` applies Holm correction to confirmed Run result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
 plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. Never approve evidence or claims

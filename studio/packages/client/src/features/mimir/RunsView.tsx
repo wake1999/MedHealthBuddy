@@ -146,6 +146,22 @@ interface FamilyAnalysis {
   rows: FamilyMetricRow[]
 }
 
+interface BranchConsistency {
+  runId: string
+  branchCount: number
+  allFrozen: boolean
+  datasetValues: string[]
+  baselineValues: string[]
+  familyValues: string[]
+  datasetConflict: boolean
+  baselineConflict: boolean
+  familyConflict: boolean
+  missingMetrics: string[]
+  warnings: string[]
+  canApprove: boolean
+  approval: { at: number; note: string; branchIds: string[] } | null
+}
+
 interface BranchPairComparison {
   metric: string
   branchALabel: string
@@ -431,6 +447,8 @@ export function RunsView({
   const [showBranchCompare, setShowBranchCompare] = useState(false)
   const [branchStats, setBranchStats] = useState<BranchPairComparison[] | null>(null)
   const [branchStatsBusy, setBranchStatsBusy] = useState(false)
+  const [consistency, setConsistency] = useState<BranchConsistency | null>(null)
+  const [consistencyBusy, setConsistencyBusy] = useState(false)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
@@ -910,6 +928,43 @@ export function RunsView({
       setNotice(t('runs.primaryBranchSaved'))
     } catch (err) {
       setError((err as Error).message)
+    }
+  }
+
+  async function checkBranchConsistency() {
+    if (!selected) return
+    setConsistencyBusy(true)
+    setError('')
+    try {
+      const body = await request<{ consistency: BranchConsistency }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/consistency`,
+      )
+      setConsistency(body.consistency)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setConsistencyBusy(false)
+    }
+  }
+
+  async function approveConsolidation() {
+    if (!selected) return
+    const note = window.prompt(t('runs.consolidationNote'), '')
+    if (note === null) return
+    setConsistencyBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun; consistency: BranchConsistency }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/consolidation/approve`,
+        { method: 'POST', body: JSON.stringify({ note }) },
+      )
+      replaceRun(body.run)
+      setConsistency(body.consistency)
+      setNotice(t('runs.consolidationApproved'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setConsistencyBusy(false)
     }
   }
 
@@ -1831,6 +1886,9 @@ export function RunsView({
                     <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void downloadBranchResultsTable()}>
                       {t('runs.branchTable')}
                     </button>
+                    <button type="button" className={css.btn} disabled={consistencyBusy} onClick={() => void checkBranchConsistency()}>
+                      {consistencyBusy ? t('runs.consistencyBusy') : t('runs.consistency')}
+                    </button>
                     <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void toggleBranchFreeze()}>
                       {branchFrozen ? t('runs.branchUnfreeze') : t('runs.branchFreeze')}
                     </button>
@@ -1948,6 +2006,38 @@ export function RunsView({
                             ))}
                           </tbody>
                         </table>
+                      )}
+                    </div>
+                  )}
+                  {consistency && (
+                    <div className={css.runsConsistency}>
+                      <h4>{t('runs.consistencyTitle')}</h4>
+                      <p className={css.hint}>
+                        {t('runs.consistencySummary', {
+                          branches: consistency.branchCount,
+                          frozen: consistency.allFrozen ? t('runs.yes') : t('runs.no'),
+                        })}
+                      </p>
+                      {consistency.warnings.length > 0 && (
+                        <ul>
+                          {consistency.warnings.map(warning => <li key={warning}>{warning}</li>)}
+                        </ul>
+                      )}
+                      {consistency.approval ? (
+                        <p className={css.runsLinked}>
+                          {t('runs.consolidationApprovedAt', { at: formatDate(consistency.approval.at) })}
+                          {' · '}
+                          {consistency.approval.note}
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          className={css.btn}
+                          disabled={!consistency.canApprove || consistencyBusy}
+                          onClick={() => void approveConsolidation()}
+                        >
+                          {t('runs.approveConsolidation')}
+                        </button>
                       )}
                     </div>
                   )}

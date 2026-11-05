@@ -533,6 +533,8 @@ export interface ResearchRun {
   activeBranchId: string
   /** Optional preferred branch per metric for manuscript tables. */
   primaryMetricBranches: Record<string, string>
+  /** Human approval for consolidating primary metrics across branches. */
+  consolidationApproval: { at: number; note: string; branchIds: string[] } | null
   approvals: ResearchRunApproval[]
   createdAt: number
   updatedAt: number
@@ -721,6 +723,7 @@ function normalizeStore(input: unknown): ResearchStore {
     })),
     activeBranchId: typeof run.activeBranchId === 'string' ? run.activeBranchId : '',
     primaryMetricBranches: run.primaryMetricBranches || {},
+    consolidationApproval: run.consolidationApproval || null,
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
   })).map(run => {
     if (run.branches.length > 0) {

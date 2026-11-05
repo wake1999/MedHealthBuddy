@@ -22362,6 +22362,42 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/branches/consistency": {
+      "get": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Get consistency",
+        "description": "GET /api/studio/research/runs/:id/branches/consistency",
+        "operationId": "branchConsistencyHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/branches/results-table": {
       "get": {
         "tags": [
@@ -22758,6 +22794,42 @@
           },
           {
             "name": "claimId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/consolidation/approve": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create approve",
+        "description": "POST /api/studio/research/runs/:id/consolidation/approve",
+        "operationId": "approveConsolidationHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {

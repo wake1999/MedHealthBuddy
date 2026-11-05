@@ -162,6 +162,8 @@ interface ResearchFlow {
   retryAt: number
   leaseOwner: string
   leaseUntil: number
+  remoteArtifactPath: string
+  remoteArtifact: { at: number; path: string; sha256: string; size: number } | null
   checkpoint: string
   steps: Array<{ key: string; status: string; note: string; at: number }>
   error: string
@@ -1026,6 +1028,8 @@ export function RunsView({
     if (!projectId) return
     const serverId = mode === 'ssh' ? window.prompt(t('runs.flowServerPrompt'), servers[0]?.id || '') : ''
     if (mode === 'ssh' && serverId === null) return
+    const artifactPath = mode === 'ssh' ? window.prompt(t('runs.flowArtifactPrompt'), '') : ''
+    if (mode === 'ssh' && artifactPath === null) return
     setFlowBusy(true)
     setError('')
     try {
@@ -1039,6 +1043,7 @@ export function RunsView({
             title: mode === 'fixture' ? 'UI fixture flow' : mode === 'ssh' ? 'UI SSH flow' : 'UI dry-run flow',
             idempotencyKey: `${mode}-${Date.now()}`,
             serverId: serverId || undefined,
+            artifactPath: artifactPath || undefined,
             maxAttempts: 2,
           }),
         },
@@ -1816,6 +1821,7 @@ export function RunsView({
             <p className={css.hint}>
               {activeFlow.mode} · {activeFlow.status} · {activeFlow.stage}
               {activeFlow.gate ? ` · ${t('runs.flowGate')}: ${activeFlow.gate}` : ''}
+              {activeFlow.remoteArtifact ? ` · artifact ${activeFlow.remoteArtifact.sha256.slice(0, 8)}` : ''}
             </p>
           </div>
           {activeFlow.mode === 'ssh' && activeFlow.status === 'running' && (

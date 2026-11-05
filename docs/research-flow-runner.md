@@ -93,7 +93,10 @@ error
 
 `tick` acquires a 30-second flow lease (`leaseOwner`, `leaseUntil`); a second
 concurrent tick gets `409 research_flow_lease_busy`. The lease is released in a
-`finally` block.
+`finally` block. The authoritative lease is also a filesystem lock at
+`.research/.locks/flows/<flowId>.lock`, created with `open(..., 'wx')`, so
+separate processes on the same host cannot both tick one flow. Expired lock
+files are reclaimed.
 
 A failed job is retried only while `attempt < maxAttempts`. Retry delay is
 exponential (`1s`, `2s`, `4s`, capped at `60s`) and stored in `retryAt`; a tick
@@ -107,6 +110,17 @@ marks the flow `cancelled` with a checkpoint. `POST /flows/:flowId/resume`
 either continues polling a running SSH job or, for a cancelled flow, submits a
 new job while attempts remain.
 
+Both accept an optional `key`. Repeating the same key returns the current flow
+without sending a second kill or submitting a second job.
+
+## Remote artifact
+
+The create body accepts `artifactPath`. After the SSH job succeeds, `tick`
+downloads that path with base64, writes it under
+`projects/<projectId>/flow-artifacts/<flowId>/`, and stores its SHA-256 and size
+on the flow. A failed download is recorded in `flow.error` but does not fabricate
+a result.
+
 ## Current boundary
 
 - Fixture data is synthetic.
@@ -116,3 +130,9 @@ new job while attempts remain.
 - A completed fixture flow proves the state machine, not the scientific result.
 - SSH result recording remains an operator action; the runner does not infer
   metric samples from logs.
+- Remote artifact download was not exercised against a live host; only the
+  validation and fixture paths are covered locally.
+- The remote path is operator-supplied; it is shell-quoted but not restricted to
+  a fixed directory.
+- Download is buffered and capped by the SSH command buffer (64 MiB base64
+  output).

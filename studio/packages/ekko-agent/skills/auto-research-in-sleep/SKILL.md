@@ -144,8 +144,10 @@ See `docs/branch-merge-policy.md` and `docs/raw-data-merge-schema.md`.
 plan has that family; without it the project is one family. This is not a
 replacement for a pre-registered analysis plan. `projects/:id/package` exports a
 portable project zip; `projects/package/import` verifies file hashes and refuses
-project-id collisions. `flows` is a fixture/dry-run runner; fixture mode stops at
-claim, plan, and result human gates. See `docs/project-package.md` and
+project-id collisions. `flows` is a fixture/dry-run/SSH runner; fixture mode stops at
+claim, plan, and result human gates. SSH mode supports `tick`, `resume`, and
+`cancel` with optional idempotency `key`; `artifactPath` downloads a remote
+artifact after success. See `docs/project-package.md` and
 `docs/research-flow-runner.md`. Never approve evidence or
 claims yourself.
 

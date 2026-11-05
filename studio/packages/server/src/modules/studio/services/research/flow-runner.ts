@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto'
+import { promises as fs } from 'node:fs'
+import path from 'node:path'
 import { generateResultsDraft } from './run-results-draft'
 import { generateRunReport } from './run-report'
 import {
@@ -11,8 +14,8 @@ import {
   saveHypothesis,
   submitExperimentJob,
 } from './runs'
-import { newId, readStore, updateStore, type ResearchFlow, type ResearchRun } from './store'
-import { cancelJob } from './ssh'
+import { newId, readStore, researchRoot, updateStore, type ResearchFlow, type ResearchRun } from './store'
+import { cancelJob, downloadRemoteFile } from './ssh'
 
 export const FLOW_FIXTURE = {
   id: 'fixture-milcaf1-v1',
@@ -40,6 +43,7 @@ export interface CreateFlowInput {
   title?: string
   serverId?: string
   maxAttempts?: number
+  artifactPath?: string
 }
 
 function flowSteps(): ResearchFlow['steps'] {
@@ -165,6 +169,10 @@ export async function createFlow(
     retryAt: 0,
     leaseOwner: '',
     leaseUntil: 0,
+    cancelKey: '',
+    resumeKey: '',
+    remoteArtifactPath: String(input.artifactPath || '').trim().slice(0, 2000),
+    remoteArtifact: null,
     checkpoint: '',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -380,6 +388,32 @@ export async function approveFlowGate(
   throw new Error('research_flow_unknown_gate')
 }
 
+async function collectRemoteArtifact(
+  profile: string,
+  flow: ResearchFlow,
+  projectId: string,
+): Promise<{ at: number; path: string; sha256: string; size: number } | null> {
+  if (flow.remoteArtifactPath === '') return null
+  const store = await readStore(profile)
+  const server = store.servers.find(row => row.id === flow.serverId)
+  if (!server) throw new Error('research_server_not_found')
+  const downloaded = await downloadRemoteFile(
+    { host: server.host, user: server.user, port: server.port },
+    flow.remoteArtifactPath,
+  )
+  if (!downloaded.ok) throw new Error(downloaded.detail || 'remote_artifact_download_failed')
+  const dir = path.join(researchRoot(profile), 'projects', projectId, 'flow-artifacts', flow.id)
+  await fs.mkdir(dir, { recursive: true })
+  const file = path.join(dir, path.basename(flow.remoteArtifactPath) || 'artifact.bin')
+  await fs.writeFile(file, downloaded.data)
+  return {
+    at: Date.now(),
+    path: file,
+    sha256: createHash('sha256').update(downloaded.data).digest('hex'),
+    size: downloaded.data.length,
+  }
+}
+
 async function tickFlowUnlocked(
   profile: string,
   flowId: string,
@@ -415,13 +449,24 @@ async function tickFlowUnlocked(
   }
 
   if (state === 'succeeded') {
+    let artifact = flow.remoteArtifact
+    let artifactError = ''
+    if (!artifact && flow.remoteArtifactPath !== '') {
+      try {
+        artifact = await collectRemoteArtifact(profile, flow, refreshed.run?.projectId || '')
+      } catch (error) {
+        artifactError = error instanceof Error ? error.message : 'remote_artifact_download_failed'
+      }
+    }
     const updated = await updateFlow(profile, flowId, current => {
       current.stage = 'result'
       current.gate = 'result'
       current.status = 'waiting_approval'
-      current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state, at: Date.now() })
+      current.remoteArtifact = artifact
+      current.error = artifactError
+      current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state, artifact: artifact?.path || '', at: Date.now() })
       markStep(current, 'experiment', 'done', `SSH job ${current.jobId} succeeded`)
-      markStep(current, 'result', 'waiting', 'Record result, then approve result gate')
+      markStep(current, 'result', 'waiting', artifactError ? `Artifact failed: ${artifactError}` : 'Record result, then approve result gate')
     })
     return { flow: updated, run: refreshed.run, state, detail, exitCode }
   }
@@ -478,29 +523,79 @@ async function tickFlowUnlocked(
 
 const LEASE_MS = 30_000
 
+function leaseFilePath(profile: string, flowId: string): string {
+  return path.join(researchRoot(profile), '.locks', 'flows', `${flowId}.lock`)
+}
+
+async function acquireFileLease(profile: string, flowId: string, owner: string): Promise<void> {
+  const file = leaseFilePath(profile, flowId)
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const handle = await fs.open(file, 'wx')
+      try {
+        await handle.writeFile(JSON.stringify({ owner, until: Date.now() + LEASE_MS }))
+      } finally {
+        await handle.close()
+      }
+      return
+    } catch (error: any) {
+      if (error?.code !== 'EEXIST') throw error
+      try {
+        const raw = JSON.parse(await fs.readFile(file, 'utf-8')) as { until?: number }
+        if (Number(raw.until) > Date.now()) throw new Error('research_flow_lease_busy')
+      } catch (readError: any) {
+        if (readError?.message === 'research_flow_lease_busy') throw readError
+      }
+      await fs.unlink(file).catch(() => undefined)
+    }
+  }
+  throw new Error('research_flow_lease_busy')
+}
+
+async function releaseFileLease(profile: string, flowId: string, owner: string): Promise<void> {
+  const file = leaseFilePath(profile, flowId)
+  try {
+    const raw = JSON.parse(await fs.readFile(file, 'utf-8')) as { owner?: string }
+    if (raw.owner === owner) await fs.unlink(file)
+  } catch {
+    // Already released or stale; no action.
+  }
+}
+
 async function acquireFlowLease(profile: string, flowId: string, owner: string): Promise<ResearchFlow> {
-  return updateStore(profile, 'flow.lease.acquired', draft => {
-    const flow = draft.flows.find(row => row.id === flowId)
-    if (!flow) throw new Error('research_flow_not_found')
-    const now = Date.now()
-    if (flow.leaseUntil > now && flow.leaseOwner !== owner) throw new Error('research_flow_lease_busy')
-    flow.leaseOwner = owner
-    flow.leaseUntil = now + LEASE_MS
-    flow.updatedAt = now
-    return flow
-  }, { actor: { kind: 'system', id: 'flow-runner' }, action: 'flow.lease.acquired' })
+  await acquireFileLease(profile, flowId, owner)
+  try {
+    return await updateStore(profile, 'flow.lease.acquired', draft => {
+      const flow = draft.flows.find(row => row.id === flowId)
+      if (!flow) throw new Error('research_flow_not_found')
+      const now = Date.now()
+      if (flow.leaseUntil > now && flow.leaseOwner !== owner) throw new Error('research_flow_lease_busy')
+      flow.leaseOwner = owner
+      flow.leaseUntil = now + LEASE_MS
+      flow.updatedAt = now
+      return flow
+    }, { actor: { kind: 'system', id: 'flow-runner' }, action: 'flow.lease.acquired' })
+  } catch (error) {
+    await releaseFileLease(profile, flowId, owner)
+    throw error
+  }
 }
 
 async function releaseFlowLease(profile: string, flowId: string, owner: string): Promise<void> {
-  await updateStore(profile, 'flow.lease.released', draft => {
-    const flow = draft.flows.find(row => row.id === flowId)
-    if (flow && flow.leaseOwner === owner) {
-      flow.leaseOwner = ''
-      flow.leaseUntil = 0
-      flow.updatedAt = Date.now()
-    }
-    return null
-  }, { actor: { kind: 'system', id: 'flow-runner' }, action: 'flow.lease.released' })
+  try {
+    await updateStore(profile, 'flow.lease.released', draft => {
+      const flow = draft.flows.find(row => row.id === flowId)
+      if (flow && flow.leaseOwner === owner) {
+        flow.leaseOwner = ''
+        flow.leaseUntil = 0
+        flow.updatedAt = Date.now()
+      }
+      return null
+    }, { actor: { kind: 'system', id: 'flow-runner' }, action: 'flow.lease.released' })
+  } finally {
+    await releaseFileLease(profile, flowId, owner)
+  }
 }
 
 export async function tickFlow(
@@ -516,9 +611,11 @@ export async function tickFlow(
   }
 }
 
-export async function cancelFlow(profile: string, flowId: string): Promise<{ flow: ResearchFlow; detail: string }> {
+export async function cancelFlow(profile: string, flowId: string, key = ''): Promise<{ flow: ResearchFlow; detail: string }> {
   const { flow } = await getFlow(profile, flowId)
   if (flow.mode !== 'ssh') throw new Error('research_flow_not_ssh')
+  if (flow.status === 'cancelled') return { flow, detail: 'already cancelled' }
+  if (key !== '' && flow.cancelKey === key) return { flow, detail: 'idempotent cancel' }
   if (!flow.jobId) throw new Error('research_flow_no_running_job')
   const store = await readStore(profile)
   const job = store.jobs.find(row => row.id === flow.jobId)
@@ -542,6 +639,7 @@ export async function cancelFlow(profile: string, flowId: string): Promise<{ flo
     current.gate = ''
     current.leaseOwner = ''
     current.leaseUntil = 0
+    current.cancelKey = key
     current.checkpoint = JSON.stringify({ jobId: current.jobId, attempt: current.attempt, state: 'cancelled', at: Date.now() })
     markStep(current, 'experiment', 'cancelled', current.error)
     return current
@@ -549,9 +647,15 @@ export async function cancelFlow(profile: string, flowId: string): Promise<{ flo
   return { flow: updated, detail: cancelled.detail }
 }
 
-export async function resumeFlow(profile: string, flowId: string): Promise<{ flow: ResearchFlow; run: ResearchRun | null }> {
+export async function resumeFlow(profile: string, flowId: string, key = ''): Promise<{ flow: ResearchFlow; run: ResearchRun | null }> {
   const current = await getFlow(profile, flowId)
+  if (key !== '' && current.flow.resumeKey === key) return { flow: current.flow, run: current.run }
   if (current.flow.mode === 'ssh' && current.flow.status === 'running' && current.flow.gate === '' && current.flow.jobId) {
+    if (key !== '') {
+      await updateFlow(profile, flowId, flow => {
+        flow.resumeKey = key
+      })
+    }
     const ticked = await tickFlow(profile, flowId)
     return { flow: ticked.flow, run: ticked.run }
   }
@@ -571,6 +675,7 @@ export async function resumeFlow(profile: string, flowId: string): Promise<{ flo
         row.retryAt = 0
         row.leaseOwner = ''
         row.leaseUntil = 0
+        row.resumeKey = key
         row.checkpoint = JSON.stringify({ jobId, attempt: row.attempt, state: 'resumed', at: Date.now() })
         markStep(row, 'experiment', 'running', `Resumed with job ${jobId}`)
       })

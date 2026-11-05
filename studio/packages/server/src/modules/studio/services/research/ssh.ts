@@ -61,10 +61,10 @@ function describeError(error: any): string {
   return message.split('\n').slice(-3).join(' | ')
 }
 
-async function exec(target: SshTarget, command: string, timeout = COMMAND_TIMEOUT) {
+async function exec(target: SshTarget, command: string, timeout = COMMAND_TIMEOUT, maxBuffer = 4 * 1024 * 1024) {
   return run('ssh', [...sshArgs(target), command], {
     timeout,
-    maxBuffer: 4 * 1024 * 1024,
+    maxBuffer,
   })
 }
 
@@ -115,6 +115,21 @@ export async function submitJob(target: SshTarget, name: string, command: string
     return { ok: Boolean(pid), pid, detail: pid ? `pid ${pid}` : '未拿到 pid', logPath }
   } catch (error: any) {
     return { ok: false, pid: '', detail: describeError(error), logPath }
+  }
+}
+
+export async function downloadRemoteFile(
+  target: SshTarget,
+  remotePath: string,
+): Promise<{ ok: boolean; data: Buffer; detail: string }> {
+  if (!target.host) return { ok: false, data: Buffer.alloc(0), detail: '缺少主机' }
+  if (!remotePath || remotePath.includes('\0')) return { ok: false, data: Buffer.alloc(0), detail: '远程路径无效' }
+  const quoted = `'${remotePath.replaceAll("'", `'\\''`)}'`
+  try {
+    const { stdout } = await exec(target, `base64 ${quoted} | tr -d '\\n'`, 60_000, 64 * 1024 * 1024)
+    return { ok: true, data: Buffer.from(stdout.trim(), 'base64'), detail: `downloaded ${remotePath}` }
+  } catch (error: any) {
+    return { ok: false, data: Buffer.alloc(0), detail: describeError(error) }
   }
 }
 

@@ -753,6 +753,7 @@ export async function createFlowHandler(ctx: any) {
         title: String(body.title || ''),
         serverId: String(body.serverId || ''),
         maxAttempts: Number(body.maxAttempts || 2),
+        artifactPath: String(body.artifactPath || ''),
       })),
     }
   } catch (error) {
@@ -820,6 +821,7 @@ export async function cancelFlowHandler(ctx: any) {
       ...(await cancelFlow(
         profileOf(ctx) || 'default',
         String(ctx.params.flowId || ''),
+        String(readBody(ctx)?.key || ''),
       )),
     }
   } catch (error) {
@@ -834,6 +836,7 @@ export async function resumeFlowHandler(ctx: any) {
       ...(await resumeFlow(
         profileOf(ctx) || 'default',
         String(ctx.params.flowId || ''),
+        String(readBody(ctx)?.key || ''),
       )),
     }
   } catch (error) {

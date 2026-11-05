@@ -659,6 +659,10 @@ export interface ResearchFlow {
   retryAt: number
   leaseOwner: string
   leaseUntil: number
+  cancelKey: string
+  resumeKey: string
+  remoteArtifactPath: string
+  remoteArtifact: { at: number; path: string; sha256: string; size: number } | null
   checkpoint: string
   createdAt: number
   updatedAt: number
@@ -787,6 +791,10 @@ function normalizeStore(input: unknown): ResearchStore {
       retryAt: Number((flow as ResearchFlow).retryAt) || 0,
       leaseOwner: (flow as ResearchFlow).leaseOwner || '',
       leaseUntil: Number((flow as ResearchFlow).leaseUntil) || 0,
+      cancelKey: (flow as ResearchFlow).cancelKey || '',
+      resumeKey: (flow as ResearchFlow).resumeKey || '',
+      remoteArtifactPath: (flow as ResearchFlow).remoteArtifactPath || '',
+      remoteArtifact: (flow as ResearchFlow).remoteArtifact || null,
       checkpoint: (flow as ResearchFlow).checkpoint || '',
     })),
   }

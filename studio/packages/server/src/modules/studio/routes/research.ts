@@ -24,6 +24,7 @@ researchRoutes.get('/api/studio/research/runs/:id/branches/compare', runCtrl.bra
 researchRoutes.get('/api/studio/research/runs/:id/branches/consistency', runCtrl.branchConsistencyHandler)
 researchRoutes.get('/api/studio/research/runs/:id/branches/results-table', runCtrl.branchResultsTableHandler)
 researchRoutes.post('/api/studio/research/runs/:id/consolidation/approve', runCtrl.approveConsolidationHandler)
+researchRoutes.post('/api/studio/research/runs/:id/merges', runCtrl.createMergeHandler)
 researchRoutes.post('/api/studio/research/runs/:id/primary-branch', runCtrl.primaryBranchHandler)
 researchRoutes.post('/api/studio/research/runs/:id/branches/:branchId/freeze', runCtrl.freezeBranchHandler)
 researchRoutes.get('/api/studio/research/projects/:id/family-analysis', runCtrl.familyAnalysisHandler)

@@ -25,13 +25,16 @@ what may be combined and what must remain separate.
 6. **Narrative still needs human selection.** A primary-branch Results draft
    combines selected metric rows, but the narrative is taken from one branch and
    must be checked for consistency.
-7. **Approval gate.** All participating branches must be frozen, consistency
-   warnings must be reviewed, and a written consolidation note is required
-   before `usePrimaryBranches:true` is accepted.
-8. **No automatic merge operation.** A true branch merge requires an explicitly
-   designed schema (which experiment, result, claims, and approvals survive).
-   Until that exists, use the frozen comparison table plus primary-branch Results
-   draft.
+7. **Approval gate.** All participating branches must be frozen, every
+   consistency conflict must be acknowledged by key, and a written consolidation
+   note is required before `usePrimaryBranches:true` is accepted.
+8. **Merge records are immutable.** `POST /runs/:id/merges` creates a merge
+   record with source branch ids, primary mapping, conflict acknowledgements,
+   note, and a scope snapshot. It does not mutate source branches, pool samples,
+   or create a synthetic experiment.
+9. **No automatic data merge.** A true data merge requires an explicitly designed
+   schema (which experiment, result, claims, and approvals survive). Until that
+   exists, use the frozen comparison table plus primary-branch Results draft.
 
 ## Current workflow
 

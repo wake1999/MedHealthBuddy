@@ -158,8 +158,9 @@ interface BranchConsistency {
   familyConflict: boolean
   missingMetrics: string[]
   warnings: string[]
+  conflicts: Array<{ key: string; message: string }>
   canApprove: boolean
-  approval: { at: number; note: string; branchIds: string[] } | null
+  approval: { at: number; note: string; branchIds: string[]; acknowledgedConflicts?: string[] } | null
 }
 
 interface BranchPairComparison {
@@ -234,6 +235,8 @@ interface ResearchRun {
   branches?: ResearchRunBranch[]
   activeBranchId?: string
   primaryMetricBranches?: Record<string, string>
+  consolidationApproval?: { at: number; note: string; branchIds: string[] } | null
+  merges?: Array<{ id: string; at: number; branchIds: string[]; note: string }>
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
   updatedAt: number
@@ -449,6 +452,8 @@ export function RunsView({
   const [branchStatsBusy, setBranchStatsBusy] = useState(false)
   const [consistency, setConsistency] = useState<BranchConsistency | null>(null)
   const [consistencyBusy, setConsistencyBusy] = useState(false)
+  const [ackedConflicts, setAckedConflicts] = useState<string[]>([])
+  const [mergeBusy, setMergeBusy] = useState(false)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
@@ -940,6 +945,7 @@ export function RunsView({
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/consistency`,
       )
       setConsistency(body.consistency)
+      setAckedConflicts(body.consistency.approval?.acknowledgedConflicts || [])
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -956,7 +962,7 @@ export function RunsView({
     try {
       const body = await request<{ run: ResearchRun; consistency: BranchConsistency }>(
         `/api/studio/research/runs/${encodeURIComponent(selected.id)}/consolidation/approve`,
-        { method: 'POST', body: JSON.stringify({ note }) },
+        { method: 'POST', body: JSON.stringify({ note, acknowledgedConflicts: ackedConflicts }) },
       )
       replaceRun(body.run)
       setConsistency(body.consistency)
@@ -965,6 +971,24 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setConsistencyBusy(false)
+    }
+  }
+
+  async function createMergeRecord() {
+    if (!selected) return
+    setMergeBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun; mergeId: string }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.mergeCreated'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMergeBusy(false)
     }
   }
 
@@ -2023,17 +2047,46 @@ export function RunsView({
                           {consistency.warnings.map(warning => <li key={warning}>{warning}</li>)}
                         </ul>
                       )}
+                      {consistency.conflicts.length > 0 && (
+                        <div className={css.runsConflictAcks}>
+                          <span>{t('runs.acknowledgeConflicts')}</span>
+                          {consistency.conflicts.map(conflict => (
+                            <label key={conflict.key}>
+                              <input
+                                type="checkbox"
+                                checked={ackedConflicts.includes(conflict.key)}
+                                onChange={event => setAckedConflicts(current => (
+                                  event.target.checked
+                                    ? [...current, conflict.key]
+                                    : current.filter(key => key !== conflict.key)
+                                ))}
+                              />
+                              {conflict.message}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                       {consistency.approval ? (
-                        <p className={css.runsLinked}>
-                          {t('runs.consolidationApprovedAt', { at: formatDate(consistency.approval.at) })}
-                          {' · '}
-                          {consistency.approval.note}
-                        </p>
+                        <>
+                          <p className={css.runsLinked}>
+                            {t('runs.consolidationApprovedAt', { at: formatDate(consistency.approval.at) })}
+                            {' · '}
+                            {consistency.approval.note}
+                          </p>
+                          <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void createMergeRecord()}>
+                            {mergeBusy ? t('runs.mergeBusy') : t('runs.createMerge')}
+                          </button>
+                          {(selected.merges || []).length > 0 && (
+                            <p className={css.hint}>
+                              {t('runs.mergeCount', { count: (selected.merges || []).length })}
+                            </p>
+                          )}
+                        </>
                       ) : (
                         <button
                           type="button"
                           className={css.btn}
-                          disabled={!consistency.canApprove || consistencyBusy}
+                          disabled={!consistency.canApprove || consistencyBusy || consistency.conflicts.some(conflict => !ackedConflicts.includes(conflict.key))}
                           onClick={() => void approveConsolidation()}
                         >
                           {t('runs.approveConsolidation')}

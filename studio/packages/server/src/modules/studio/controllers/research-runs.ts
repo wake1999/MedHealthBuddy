@@ -31,7 +31,7 @@ import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
 import { generateBranchResultsTable, setPrimaryBranch } from '../services/research/run-branch-results'
-import { approveBranchConsolidation, getBranchConsistency } from '../services/research/run-branch-consistency'
+import { approveBranchConsolidation, createMergeRecord, getBranchConsistency } from '../services/research/run-branch-consistency'
 import { generateResultsDraft } from '../services/research/run-results-draft'
 import { insertResultsIntoPaper } from '../services/research/run-results-insert'
 import {
@@ -79,6 +79,8 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_consolidation_freeze_required'
     || message === 'research_consolidation_branches_required'
     || message === 'research_consolidation_note_required'
+    || message === 'research_consolidation_approval_stale'
+    || message.startsWith('research_consolidation_acknowledgements_required')
     || message.startsWith('research_result_missing_metrics')
   ) {
     return fail(ctx, 422, message, message)
@@ -445,7 +447,19 @@ export async function approveConsolidationHandler(ctx: any) {
         profileOf(ctx) || 'default',
         String(ctx.params.id || ''),
         String(body.note || ''),
+        Array.isArray(body.acknowledgedConflicts) ? body.acknowledgedConflicts.map(String) : [],
       )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function createMergeHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await createMergeRecord(profileOf(ctx) || 'default', String(ctx.params.id || ''))),
     }
   } catch (error) {
     failRun(ctx, error)

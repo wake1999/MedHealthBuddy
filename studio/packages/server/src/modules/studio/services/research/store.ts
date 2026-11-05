@@ -457,6 +457,31 @@ export interface ResearchRunExperimentPlan {
   at: number
 }
 
+export interface ResearchRunConsolidationSnapshot {
+  at: number
+  branchIds: string[]
+  branches: Array<{
+    id: string
+    frozenAt: number
+    dataset: string
+    baselines: string
+    family: string
+    metrics: string[]
+  }>
+  primaryMetricBranches: Record<string, string>
+  warnings: string[]
+}
+
+export interface ResearchRunMerge {
+  id: string
+  at: number
+  branchIds: string[]
+  primaryMetricBranches: Record<string, string>
+  acknowledgedConflicts: string[]
+  note: string
+  snapshot: ResearchRunConsolidationSnapshot
+}
+
 export interface ResearchRunResult {
   outcome: 'supported' | 'contradicted' | 'mixed' | 'inconclusive'
   summary: string
@@ -534,7 +559,14 @@ export interface ResearchRun {
   /** Optional preferred branch per metric for manuscript tables. */
   primaryMetricBranches: Record<string, string>
   /** Human approval for consolidating primary metrics across branches. */
-  consolidationApproval: { at: number; note: string; branchIds: string[] } | null
+  consolidationApproval: {
+    at: number
+    note: string
+    branchIds: string[]
+    acknowledgedConflicts: string[]
+    snapshot: ResearchRunConsolidationSnapshot
+  } | null
+  merges: ResearchRunMerge[]
   approvals: ResearchRunApproval[]
   createdAt: number
   updatedAt: number
@@ -724,6 +756,7 @@ function normalizeStore(input: unknown): ResearchStore {
     activeBranchId: typeof run.activeBranchId === 'string' ? run.activeBranchId : '',
     primaryMetricBranches: run.primaryMetricBranches || {},
     consolidationApproval: run.consolidationApproval || null,
+    merges: Array.isArray(run.merges) ? run.merges : [],
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
   })).map(run => {
     if (run.branches.length > 0) {

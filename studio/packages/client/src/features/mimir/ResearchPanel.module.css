@@ -3158,6 +3158,17 @@ li.dropIndicator {
   gap: 8px;
 }
 
+.paperPdfMissing {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px dashed rgb(154 106 47 / 24%);
+  border-radius: 7px;
+  background: rgb(154 106 47 / 5%);
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
 .paperPdfActions {
   display: flex;
   gap: 8px;

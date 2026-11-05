@@ -216,6 +216,10 @@ function paperKey(paper: PaperRecord): string {
   return id !== '' ? id : paper.arxivId
 }
 
+function hasPaperPdf(paper: PaperRecord): boolean {
+  return typeof paper.pdfPath === 'string' && paper.pdfPath.trim() !== ''
+}
+
 /**
  * Library header filter: the needle matches the title, any author or any tag
  * (case-insensitive). Empty needle callers skip this — everything passes.
@@ -319,6 +323,7 @@ function PaperCardFront({ paper, busy, selecting, selected, t, translating, summ
   const remembered = paperCoverCache.get(paper.arxivId)
   const [cover, setCover] = useState(remembered?.src ?? '')
   const hostRef = useRef<HTMLDivElement | null>(null)
+  const hasPdf = typeof paper.pdfPath === 'string' && paper.pdfPath.trim() !== ''
 
   useEffect(() => {
     const cached = paperCoverCache.get(paperKey(paper))
@@ -326,7 +331,7 @@ function PaperCardFront({ paper, busy, selecting, selected, t, translating, summ
       setCover(cached.src)
       return undefined
     }
-    if (paper.pdfPath === undefined) return undefined
+    if (!hasPdf) return undefined
     let cancelled = false
     const load = (): void => {
       void loadPaperCover(paper).then((result) => {
@@ -363,15 +368,15 @@ function PaperCardFront({ paper, busy, selecting, selected, t, translating, summ
           <img src={cover} alt="" draggable={false} />
         ) : (
           <div className={css.paperCoverFallback} aria-hidden="true">
-            <span>PDF</span>
-            <p>{paper.title}</p>
+            <span>{hasPdf ? 'PDF' : 'FIXTURE'}</span>
+            <p>{hasPdf ? paper.title : t('papers.fixtureNoPdfShort')}</p>
           </div>
         )}
         {busy && <span className={css.paperCoverStatus}>{t('papers.openingPdf')}</span>}
       </div>
       <h3 className={css.paperCardTitle}>{paper.title}</h3>
       <p className={css.paperCardMeta}>
-        <span>PDF</span>
+        <span>{hasPdf ? 'PDF' : t('papers.fixtureLabel')}</span>
         <span>{relativePaperTime(paper.addedAt, t)}</span>
       </p>
       {/*
@@ -3758,6 +3763,7 @@ function PaperPdfSection({ paper, fetchPaperPdf, updatePaper, requestProjectSess
   readonly onClose?: (() => void) | undefined
   readonly t: ResearchT
 }) {
+  const hasPdf = hasPaperPdf(paper)
   const [fetching, setFetching] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -3816,8 +3822,10 @@ function PaperPdfSection({ paper, fetchPaperPdf, updatePaper, requestProjectSess
   // 卡片是阅读器入口：已有 PDF 直接打开，没有则走原抓取流程后打开。
   useEffect(() => {
     if (!openOnMount) return
-    if (paper.pdfPath !== undefined) setFullscreen(true)
-    else fetchPdf()
+    if (hasPdf) setFullscreen(true)
+    else if (paper.arxivId.trim() !== '') fetchPdf()
+    // Fixture papers have neither a local PDF nor an arXiv id; expanding them
+    // shows the explanatory notice instead of repeatedly failing to fetch.
   }, [])
 
   const pickFile = (event: { target: HTMLInputElement }): void => {
@@ -3841,6 +3849,11 @@ function PaperPdfSection({ paper, fetchPaperPdf, updatePaper, requestProjectSess
 
   return (
     <div className={css.paperPdf}>
+      {!hasPdf && paper.arxivId.trim() === '' && (
+        <p className={css.paperPdfMissing} role="status">
+          {t('papers.fixtureNoPdf')}
+        </p>
+      )}
       {fullscreen && createPortal(
         <div
           className={css.paperPdfOverlay}
@@ -4570,7 +4583,7 @@ export function PapersView({
   const visibleBase = filterPapers(papers.list, null, selectedProjectId)
     .filter(paper => pdfFilter === 'all'
       || (pdfFilter === 'favorite' ? paper.favorite === true
-        : pdfFilter === 'ready' ? paper.pdfPath !== undefined : paper.pdfPath === undefined))
+        : pdfFilter === 'ready' ? hasPaperPdf(paper) : !hasPaperPdf(paper)))
     // 文件夹筛选：全部 / 未分类 / 指定文件夹。
     .filter(paper => activeFolder === 'all'
       || (activeFolder === 'none'
@@ -5889,6 +5902,9 @@ export function PapersView({
                     toggleSelected(paperKey(paper))
                     return
                   }
+                  // Fixture records are synthetic and never have a real PDF.
+                  // Keep the card closed instead of mounting an empty reader.
+                  if (!hasPaperPdf(paper) && (paper.tags || []).includes('fixture')) return
                   setExpanded(prev => ({ ...prev, [paperKey(paper)]: true }))
                 }
                 return (
@@ -5905,7 +5921,7 @@ export function PapersView({
                       tabIndex={0}
                       title={(() => {
                         const authors = paper.authors.length > 0 ? `${paper.authors.join('，')}\n` : ''
-                        const status = t(paper.pdfPath === undefined ? 'papers.filterMissing' : 'papers.filterReady')
+                        const status = t(hasPaperPdf(paper) ? 'papers.filterReady' : 'papers.filterMissing')
                         return `${paper.title}\n${authors}${status} · ${relativePaperTime(paper.addedAt, t)}`
                       })()}
                       aria-pressed={selectMode ? selected : undefined}
@@ -5921,7 +5937,7 @@ export function PapersView({
                     >
                       <PaperCardFront
                         paper={paper}
-                        busy={!selectMode && open}
+                        busy={!selectMode && open && hasPaperPdf(paper)}
                         selecting={selectMode}
                         selected={selected}
                         t={t}

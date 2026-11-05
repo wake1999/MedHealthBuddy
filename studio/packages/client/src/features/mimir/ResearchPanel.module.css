@@ -10328,6 +10328,27 @@ button.paperNoteBlockMeta:hover {
   gap: 16px;
 }
 
+.runsDetailActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btnDanger {
+  padding: 5px 9px;
+  border: 1px solid rgb(180 55 45 / 28%);
+  border-radius: 6px;
+  background: rgb(180 55 45 / 6%);
+  color: #9c3b32;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: rgb(180 55 45 / 12%);
+}
+
 .runsHeaderActions {
   display: flex;
   flex-wrap: wrap;

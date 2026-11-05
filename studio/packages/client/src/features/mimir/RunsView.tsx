@@ -729,6 +729,22 @@ export function RunsView({
     }
   }
 
+  async function deleteSelectedRun() {
+    if (!selected) return
+    if (!window.confirm(t('runs.deleteRunConfirm'))) return
+    setLoading(true)
+    setError('')
+    try {
+      await request(`/api/studio/research/runs/${encodeURIComponent(selected.id)}`, { method: 'DELETE' })
+      setNotice(t('runs.runDeleted'))
+      await loadRuns()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function removeEvidence(evidenceId: string) {
     if (!selected) return
     setLoading(true)
@@ -1921,7 +1937,12 @@ export function RunsView({
                   <h3>{selected.title}</h3>
                   <p>{selected.question}</p>
                 </div>
-                <span className={css.runsStatus}>{t(`runs.status.${selected.status}`)}</span>
+                <div className={css.runsDetailActions}>
+                  <span className={css.runsStatus}>{t(`runs.status.${selected.status}`)}</span>
+                  <button type="button" className={css.btnDanger} disabled={loading} onClick={() => void deleteSelectedRun()}>
+                    {t('runs.deleteRun')}
+                  </button>
+                </div>
               </div>
 
               {extracting && extractionProgress && (

@@ -1,8 +1,10 @@
 import {
   addEvidence,
   advanceRun,
+  activateHypothesisBranch,
   approveEvidence,
   createExperimentRecord,
+  createHypothesisBranch,
   createRun,
   getClaimCoverage,
   getRun,
@@ -221,6 +223,32 @@ export async function extractEvidenceStatusHandler(ctx: any) {
   const key = runExtractionKey(profileOf(ctx) || 'default', String(ctx.params.id || ''))
   ctx.set('Cache-Control', 'no-store')
   ctx.body = { ok: true, job: getRunExtraction(key) }
+}
+
+export async function createBranchHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      run: await createHypothesisBranch(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function activateBranchHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      run: await activateHypothesisBranch(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.branchId || ''),
+      ),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
 }
 
 export async function saveHypothesisHandler(ctx: any) {

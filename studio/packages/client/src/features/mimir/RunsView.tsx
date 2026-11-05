@@ -125,6 +125,7 @@ interface RunJobInsight {
 
 interface FamilyMetricRow {
   runId: string
+  branchId: string
   runTitle: string
   metric: string
   n: number
@@ -167,6 +168,18 @@ interface RunCompileResult {
   durationMs?: number
 }
 
+interface ResearchRunBranch {
+  id: string
+  hypothesis: RunHypothesis | null
+  experimentPlan: RunExperimentPlan | null
+  experimentId: string
+  experimentJobId: string
+  jobInsight: RunJobInsight | null
+  result: RunResult | null
+  createdAt: number
+  updatedAt: number
+}
+
 interface ResearchRun {
   id: string
   projectId: string
@@ -183,6 +196,8 @@ interface ResearchRun {
   experimentJobId: string
   jobInsight: RunJobInsight | null
   result: RunResult | null
+  branches?: ResearchRunBranch[]
+  activeBranchId?: string
   approvals: Array<{ stage: Stage; at: number; note: string }>
   createdAt: number
   updatedAt: number
@@ -382,6 +397,7 @@ export function RunsView({
   const [graphBusy, setGraphBusy] = useState(false)
   const [familyBusy, setFamilyBusy] = useState(false)
   const [familyAnalysis, setFamilyAnalysis] = useState<FamilyAnalysis | null>(null)
+  const [branchBusy, setBranchBusy] = useState(false)
   const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
   const [coverage, setCoverage] = useState<ClaimCoverage | null>(null)
@@ -785,6 +801,42 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setGraphBusy(false)
+    }
+  }
+
+  async function createBranch() {
+    if (!selected) return
+    setBranchBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.branchCreated'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  async function activateBranch(branchId: string) {
+    if (!selected || branchId === '' || branchId === selected.activeBranchId) return
+    setBranchBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/${encodeURIComponent(branchId)}/activate`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
     }
   }
 
@@ -1508,6 +1560,28 @@ export function RunsView({
 
               {stageIndex >= 3 && (
                 <div className={css.runsExperimentPanel}>
+                  <div className={css.runsBranchBar}>
+                    <span>{t('runs.branchTitle')}</span>
+                    <select
+                      className={css.runsInput}
+                      value={selected.activeBranchId || ''}
+                      disabled={branchBusy || (selected.branches || []).length === 0}
+                      onChange={event => void activateBranch(event.target.value)}
+                    >
+                      {(selected.branches || []).length === 0 && <option value="">{t('runs.branchDefault')}</option>}
+                      {(selected.branches || []).map((branch, index) => (
+                        <option key={branch.id} value={branch.id}>
+                          {t('runs.branchOption', {
+                            index: index + 1,
+                            text: branch.hypothesis?.text?.slice(0, 32) || t('runs.branchUntitled'),
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void createBranch()}>
+                      {branchBusy ? t('runs.branchBusy') : t('runs.branchNew')}
+                    </button>
+                  </div>
                   <h4>{t('runs.hypothesisTitle')}</h4>
                   <div className={css.runsHypothesisClaims}>
                     <span>{t('runs.hypothesisClaims')}</span>
@@ -1759,7 +1833,7 @@ export function RunsView({
                         </thead>
                         <tbody>
                           {familyAnalysis.rows.map(row => (
-                            <tr key={`${row.runId}:${row.metric}`}>
+                            <tr key={`${row.runId}:${row.branchId}:${row.metric}`}>
                               <td>{row.runTitle}</td>
                               <td>{row.metric}</td>
                               <td>{row.n}</td>

@@ -469,6 +469,19 @@ export interface ResearchRunResult {
   at: number
 }
 
+/** One independent hypothesis branch within a Research Run. */
+export interface ResearchRunBranch {
+  id: string
+  hypothesis: ResearchRunHypothesis | null
+  experimentPlan: ResearchRunExperimentPlan | null
+  experimentId: string
+  experimentJobId: string
+  jobInsight: ResearchRunJobInsight | null
+  result: ResearchRunResult | null
+  createdAt: number
+  updatedAt: number
+}
+
 export interface ResearchRunJobInsight {
   metrics: Array<{ name: string; value: number; raw: string }>
   failureClass: string
@@ -502,6 +515,9 @@ export interface ResearchRun {
   experimentJobId: string
   jobInsight: ResearchRunJobInsight | null
   result: ResearchRunResult | null
+  /** Persistent branches; the top-level fields mirror the active branch. */
+  branches: ResearchRunBranch[]
+  activeBranchId: string
   approvals: ResearchRunApproval[]
   createdAt: number
   updatedAt: number
@@ -665,8 +681,57 @@ function normalizeStore(input: unknown): ResearchStore {
     experimentJobId: typeof run.experimentJobId === 'string' ? run.experimentJobId : '',
     jobInsight: run.jobInsight || null,
     result: run.result || null,
+    branches: (Array.isArray(run.branches) ? run.branches : []).map(branch => ({
+      ...branch,
+      hypothesis: branch.hypothesis
+        ? { ...branch.hypothesis, claimIds: Array.isArray(branch.hypothesis.claimIds) ? branch.hypothesis.claimIds : [] }
+        : null,
+      experimentPlan: branch.experimentPlan
+        ? {
+          ...branch.experimentPlan,
+          metricSchema: Array.isArray(branch.experimentPlan.metricSchema) ? branch.experimentPlan.metricSchema : [],
+          family: typeof branch.experimentPlan.family === 'string' ? branch.experimentPlan.family : '',
+        }
+        : null,
+      experimentId: typeof branch.experimentId === 'string' ? branch.experimentId : '',
+      experimentJobId: typeof branch.experimentJobId === 'string' ? branch.experimentJobId : '',
+      jobInsight: branch.jobInsight || null,
+      result: branch.result || null,
+      createdAt: typeof branch.createdAt === 'number' ? branch.createdAt : run.createdAt,
+      updatedAt: typeof branch.updatedAt === 'number' ? branch.updatedAt : run.updatedAt,
+    })),
+    activeBranchId: typeof run.activeBranchId === 'string' ? run.activeBranchId : '',
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
-  }))
+  })).map(run => {
+    if (run.branches.length > 0) {
+      if (!run.branches.some(branch => branch.id === run.activeBranchId)) {
+        run.activeBranchId = run.branches[0].id
+      }
+      const active = run.branches.find(branch => branch.id === run.activeBranchId) || run.branches[0]
+      run.hypothesis = active.hypothesis
+      run.experimentPlan = active.experimentPlan
+      run.experimentId = active.experimentId
+      run.experimentJobId = active.experimentJobId
+      run.jobInsight = active.jobInsight
+      run.result = active.result
+      return run
+    }
+    if (!run.hypothesis && !run.experimentPlan && run.experimentId === '' && run.result === null) return run
+    const legacy = {
+      id: `branch_legacy_${run.id}`,
+      hypothesis: run.hypothesis,
+      experimentPlan: run.experimentPlan,
+      experimentId: run.experimentId,
+      experimentJobId: run.experimentJobId,
+      jobInsight: run.jobInsight,
+      result: run.result,
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+    }
+    run.branches = [legacy]
+    run.activeBranchId = legacy.id
+    return run
+  })
   const asRef = (value: unknown): ResearchMainlineRef | null => {
     if (!value || typeof value !== 'object') return null
     const row = value as Record<string, unknown>

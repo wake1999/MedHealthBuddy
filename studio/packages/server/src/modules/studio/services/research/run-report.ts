@@ -146,6 +146,22 @@ export async function generateRunReport(profile: string, runId: string): Promise
     }
   }
 
+  if (run.branches.length > 0) {
+    lines.push('## Hypothesis branches', '')
+    for (const branch of run.branches) {
+      lines.push(`### ${branch.hypothesis?.text || branch.id}`, '')
+      lines.push(`- Branch: \`${branch.id}\``)
+      if (branch.experimentPlan?.family) lines.push(`- Family: ${branch.experimentPlan.family}`)
+      lines.push(`- Experiment: \`${branch.experimentId || '—'}\``)
+      if (branch.result) {
+        lines.push(`- Outcome: ${branch.result.outcome}`, `- Result: ${branch.result.summary}`)
+      } else {
+        lines.push('- Result: _not recorded_')
+      }
+      lines.push('')
+    }
+  }
+
   lines.push('## Approvals', '')
   if (run.approvals.length === 0) {
     lines.push('_No human approvals recorded._', '')

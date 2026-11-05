@@ -9,6 +9,7 @@ import {
   type ResearchRunEvidence,
   type ResearchJob,
   type ResearchRunExperimentPlan,
+  type ResearchRunBranch,
   type ResearchRunHypothesis,
   type ResearchRunResult,
   type ResearchRunStage,
@@ -42,6 +43,42 @@ export interface ClaimInput {
   evidenceIds?: string[]
   confidence?: number
   note?: string
+}
+
+function emptyBranch(now = Date.now()): ResearchRunBranch {
+  return {
+    id: newId('branch'),
+    hypothesis: null,
+    experimentPlan: null,
+    experimentId: '',
+    experimentJobId: '',
+    jobInsight: null,
+    result: null,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+function ensureActiveBranch(run: ResearchRun): ResearchRunBranch {
+  let branch = run.branches.find(row => row.id === run.activeBranchId)
+  if (!branch) {
+    branch = emptyBranch()
+    run.branches.push(branch)
+    run.activeBranchId = branch.id
+  }
+  return branch
+}
+
+function mirrorActiveBranch(run: ResearchRun): ResearchRunBranch {
+  const branch = ensureActiveBranch(run)
+  branch.hypothesis = run.hypothesis
+  branch.experimentPlan = run.experimentPlan
+  branch.experimentId = run.experimentId
+  branch.experimentJobId = run.experimentJobId
+  branch.jobInsight = run.jobInsight
+  branch.result = run.result
+  branch.updatedAt = Date.now()
+  return branch
 }
 
 export interface HypothesisInput {
@@ -142,6 +179,8 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     experimentJobId: '',
     jobInsight: null,
     result: null,
+    branches: [],
+    activeBranchId: '',
     approvals: [],
     createdAt: now,
     updatedAt: now,
@@ -351,6 +390,46 @@ export async function importWorkbenchEvidence(
   return { imported, skipped, run: await getRun(profile, runId) }
 }
 
+export async function createHypothesisBranch(profile: string, runId: string): Promise<ResearchRun> {
+  return updateStore(profile, 'run.branch.created', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const branch = emptyBranch()
+    run.branches.push(branch)
+    run.activeBranchId = branch.id
+    run.hypothesis = null
+    run.experimentPlan = null
+    run.experimentId = ''
+    run.experimentJobId = ''
+    run.jobInsight = null
+    run.result = null
+    run.stage = 'hypothesis'
+    run.status = 'running'
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.created' })
+}
+
+export async function activateHypothesisBranch(profile: string, runId: string, branchId: string): Promise<ResearchRun> {
+  return updateStore(profile, 'run.branch.activated', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const branch = run.branches.find(row => row.id === branchId)
+    if (!branch) throw new Error('research_branch_not_found')
+    run.activeBranchId = branch.id
+    run.hypothesis = branch.hypothesis
+    run.experimentPlan = branch.experimentPlan
+    run.experimentId = branch.experimentId
+    run.experimentJobId = branch.experimentJobId
+    run.jobInsight = branch.jobInsight
+    run.result = branch.result
+    run.stage = branch.result ? 'analysis' : branch.experimentId !== '' ? 'experiment' : 'hypothesis'
+    run.status = 'running'
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.activated' })
+}
+
 export async function saveHypothesis(profile: string, runId: string, input: HypothesisInput): Promise<ResearchRun> {
   return updateStore(profile, 'run.hypothesis.saved', draft => {
     const run = draft.runs.find(row => row.id === runId)
@@ -374,6 +453,7 @@ export async function saveHypothesis(profile: string, runId: string, input: Hypo
       at: Date.now(),
     }
     run.hypothesis = hypothesis
+    mirrorActiveBranch(run)
     run.updatedAt = Date.now()
     return run
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.hypothesis.saved' })
@@ -398,6 +478,7 @@ export async function saveExperimentPlan(profile: string, runId: string, input: 
     }
     if (plan.dataset === '' || plan.metrics === '') throw new Error('research_experiment_plan_incomplete')
     run.experimentPlan = plan
+    mirrorActiveBranch(run)
     run.updatedAt = Date.now()
     return run
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.experiment-plan.saved' })
@@ -446,6 +527,7 @@ export async function createExperimentRecord(profile: string, runId: string): Pr
     draft.experiments.push(experiment)
     run.experimentId = experiment.id
     run.stage = 'experiment'
+    mirrorActiveBranch(run)
     run.updatedAt = Date.now()
     return run
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.experiment.created' })
@@ -497,6 +579,7 @@ export async function submitExperimentJob(
     }
     current.experimentJobId = job.id
     current.jobInsight = null
+    mirrorActiveBranch(current)
     current.updatedAt = Date.now()
     return { run: current, job }
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.experiment.submitted' })
@@ -542,6 +625,7 @@ export async function refreshExperimentJob(
     const exp = draft.experiments.find(row => row.id === current.experimentId)
     if (exp && state.state !== 'running') exp.status = state.state === 'succeeded' ? 'done' : 'failed'
     current.jobInsight = insight
+    mirrorActiveBranch(current)
     current.updatedAt = Date.now()
     return { run: current, job: target || null, state, insight }
   }, { actor: { kind: 'system', id: 'research-job' }, action: 'run.experiment.refreshed' })
@@ -638,6 +722,7 @@ export async function recordExperimentResult(profile: string, runId: string, inp
       at: now,
     }
     run.stage = 'analysis'
+    mirrorActiveBranch(run)
     run.updatedAt = now
     const experiment = draft.experiments.find(row => row.id === run.experimentId)
     if (experiment) {

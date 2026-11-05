@@ -10629,6 +10629,26 @@ button.paperNoteBlockMeta:hover {
   background: rgb(80 130 90 / 4%);
 }
 
+.runsBranchBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgb(80 130 90 / 20%);
+}
+
+.runsBranchBar > span {
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 10.5px;
+}
+
+.runsBranchBar select {
+  flex: 1 1 220px;
+  min-width: 160px;
+  width: auto;
+}
+
 .runsExperimentPanel h4 {
   margin: 4px 0 0;
   color: var(--mimir-ink, #211e19);

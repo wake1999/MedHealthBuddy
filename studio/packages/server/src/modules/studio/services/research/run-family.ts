@@ -2,6 +2,7 @@ import { readStore, type ResearchRunResult } from './store'
 
 export interface FamilyMetricRow {
   runId: string
+  branchId: string
   runTitle: string
   metric: string
   n: number
@@ -58,32 +59,48 @@ export async function analyzeRunFamily(
     throw new Error('research_project_not_found')
   }
   const selectedFamily = family.trim()
-  const runs = store.runs.filter(run =>
-    run.projectId === projectId
-    && run.result?.confirmedFinal
-    && (selectedFamily === '' || run.experimentPlan?.family === selectedFamily),
-  )
-  const rows = runs.flatMap(run => {
-    const result = run.result
-    if (!hasMetricStats(result)) return []
-    return result.metricStats
-      .filter(stat => stat.pValue !== null && Number.isFinite(stat.pValue))
-      .map(stat => ({
-        runId: run.id,
-        runTitle: run.title,
-        metric: stat.name,
-        n: stat.n,
-        mean: stat.mean,
-        pValue: Number(stat.pValue),
-        effectSize: stat.effectSize ?? null,
-        effectSizeType: stat.effectSizeType || 'd',
-      }))
-  })
+  const runIds = new Set<string>()
+  const rows = store.runs
+    .filter(run => run.projectId === projectId)
+    .flatMap(run => {
+      const branches = run.branches.length > 0
+        ? run.branches
+        : [{
+          id: '',
+          hypothesis: run.hypothesis,
+          experimentPlan: run.experimentPlan,
+          experimentId: run.experimentId,
+          experimentJobId: run.experimentJobId,
+          jobInsight: run.jobInsight,
+          result: run.result,
+          createdAt: run.createdAt,
+          updatedAt: run.updatedAt,
+        }]
+      return branches.flatMap(branch => {
+        if (!branch.result?.confirmedFinal) return []
+        if (selectedFamily !== '' && branch.experimentPlan?.family !== selectedFamily) return []
+        if (!hasMetricStats(branch.result)) return []
+        runIds.add(run.id)
+        return branch.result.metricStats
+          .filter(stat => stat.pValue !== null && Number.isFinite(stat.pValue))
+          .map(stat => ({
+            runId: run.id,
+            branchId: branch.id,
+            runTitle: branch.id === '' ? run.title : `${run.title} · ${branch.id.slice(-6)}`,
+            metric: stat.name,
+            n: stat.n,
+            mean: stat.mean,
+            pValue: Number(stat.pValue),
+            effectSize: stat.effectSize ?? null,
+            effectSizeType: stat.effectSizeType || 'd',
+          }))
+      })
+    })
   return {
     projectId,
     family: selectedFamily || 'all_confirmed_runs',
     alpha: 0.05,
-    runCount: runs.length,
+    runCount: runIds.size,
     testedMetricCount: rows.length,
     rows: holmAdjust(rows),
   }

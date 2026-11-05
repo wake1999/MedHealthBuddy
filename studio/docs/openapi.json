@@ -22290,6 +22290,86 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/branches": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create branches",
+        "description": "POST /api/studio/research/runs/:id/branches",
+        "operationId": "createBranchHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/branches/{branchId}/activate": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create activate",
+        "description": "POST /api/studio/research/runs/:id/branches/:branchId/activate",
+        "operationId": "activateBranchHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/claim-coverage": {
       "get": {
         "tags": [

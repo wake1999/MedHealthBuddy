@@ -478,6 +478,10 @@ export interface ResearchRunBranch {
   experimentJobId: string
   jobInsight: ResearchRunJobInsight | null
   result: ResearchRunResult | null
+  /** Per-branch stage; the active branch mirrors its stage to the run. */
+  stage: ResearchRunStage
+  /** 0 means active/visible; a timestamp means archived. */
+  archivedAt: number
   createdAt: number
   updatedAt: number
 }
@@ -697,6 +701,8 @@ function normalizeStore(input: unknown): ResearchStore {
       experimentJobId: typeof branch.experimentJobId === 'string' ? branch.experimentJobId : '',
       jobInsight: branch.jobInsight || null,
       result: branch.result || null,
+      stage: (branch.stage || (branch.result ? 'analysis' : branch.experimentId !== '' ? 'experiment' : 'hypothesis')) as ResearchRunStage,
+      archivedAt: typeof branch.archivedAt === 'number' ? branch.archivedAt : 0,
       createdAt: typeof branch.createdAt === 'number' ? branch.createdAt : run.createdAt,
       updatedAt: typeof branch.updatedAt === 'number' ? branch.updatedAt : run.updatedAt,
     })),
@@ -704,10 +710,16 @@ function normalizeStore(input: unknown): ResearchStore {
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
   })).map(run => {
     if (run.branches.length > 0) {
-      if (!run.branches.some(branch => branch.id === run.activeBranchId)) {
-        run.activeBranchId = run.branches[0].id
+      const visible = run.branches.filter(branch => branch.archivedAt === 0)
+      if (visible.length === 0) {
+        run.branches[0].archivedAt = 0
+        visible.push(run.branches[0])
       }
-      const active = run.branches.find(branch => branch.id === run.activeBranchId) || run.branches[0]
+      if (!visible.some(branch => branch.id === run.activeBranchId)) {
+        run.activeBranchId = visible[0].id
+      }
+      const active = visible.find(branch => branch.id === run.activeBranchId) || visible[0]
+      run.stage = active.stage
       run.hypothesis = active.hypothesis
       run.experimentPlan = active.experimentPlan
       run.experimentId = active.experimentId
@@ -725,6 +737,8 @@ function normalizeStore(input: unknown): ResearchStore {
       experimentJobId: run.experimentJobId,
       jobInsight: run.jobInsight,
       result: run.result,
+      stage: (run.result ? 'analysis' : run.experimentId !== '' ? 'experiment' : 'hypothesis') as ResearchRunStage,
+      archivedAt: 0,
       createdAt: run.createdAt,
       updatedAt: run.updatedAt,
     }

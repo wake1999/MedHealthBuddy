@@ -22411,6 +22411,94 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/branches/{branchId}/archive": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create archive",
+        "description": "POST /api/studio/research/runs/:id/branches/:branchId/archive",
+        "operationId": "archiveBranchHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/branches/{branchId}/restore": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create restore",
+        "description": "POST /api/studio/research/runs/:id/branches/:branchId/restore",
+        "operationId": "restoreBranchHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/claim-coverage": {
       "get": {
         "tags": [

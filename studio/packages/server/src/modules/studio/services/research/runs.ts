@@ -54,6 +54,8 @@ function emptyBranch(now = Date.now()): ResearchRunBranch {
     experimentJobId: '',
     jobInsight: null,
     result: null,
+    stage: 'hypothesis',
+    archivedAt: 0,
     createdAt: now,
     updatedAt: now,
   }
@@ -77,6 +79,8 @@ function mirrorActiveBranch(run: ResearchRun): ResearchRunBranch {
   branch.experimentJobId = run.experimentJobId
   branch.jobInsight = run.jobInsight
   branch.result = run.result
+  branch.stage = run.stage
+  branch.archivedAt = 0
   branch.updatedAt = Date.now()
   return branch
 }
@@ -410,16 +414,57 @@ export async function createHypothesisBranch(profile: string, runId: string): Pr
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.created' })
 }
 
+export async function archiveHypothesisBranch(profile: string, runId: string, branchId: string): Promise<ResearchRun> {
+  return updateStore(profile, 'run.branch.archived', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const branch = run.branches.find(row => row.id === branchId)
+    if (!branch) throw new Error('research_branch_not_found')
+    const visible = run.branches.filter(row => row.archivedAt === 0)
+    if (visible.length <= 1) throw new Error('research_branch_last')
+    branch.archivedAt = Date.now()
+    branch.updatedAt = branch.archivedAt
+    if (run.activeBranchId === branchId) {
+      const next = run.branches.find(row => row.archivedAt === 0)!
+      run.activeBranchId = next.id
+      run.stage = next.stage
+      run.hypothesis = next.hypothesis
+      run.experimentPlan = next.experimentPlan
+      run.experimentId = next.experimentId
+      run.experimentJobId = next.experimentJobId
+      run.jobInsight = next.jobInsight
+      run.result = next.result
+    }
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.archived' })
+}
+
+export async function restoreHypothesisBranch(profile: string, runId: string, branchId: string): Promise<ResearchRun> {
+  return updateStore(profile, 'run.branch.restored', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const branch = run.branches.find(row => row.id === branchId)
+    if (!branch) throw new Error('research_branch_not_found')
+    branch.archivedAt = 0
+    branch.updatedAt = Date.now()
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.branch.restored' })
+}
+
 export async function removeHypothesisBranch(profile: string, runId: string, branchId: string): Promise<ResearchRun> {
   return updateStore(profile, 'run.branch.removed', draft => {
     const run = draft.runs.find(row => row.id === runId)
     if (!run) throw new Error('research_run_not_found')
     const branch = run.branches.find(row => row.id === branchId)
     if (!branch) throw new Error('research_branch_not_found')
-    if (run.branches.length <= 1) throw new Error('research_branch_last')
+    if (branch.archivedAt === 0 && run.branches.filter(row => row.archivedAt === 0).length <= 1) {
+      throw new Error('research_branch_last')
+    }
     run.branches = run.branches.filter(row => row.id !== branchId)
     if (run.activeBranchId === branchId) {
-      const next = run.branches[0]
+      const next = run.branches.find(row => row.archivedAt === 0) || run.branches[0]
       run.activeBranchId = next.id
       run.hypothesis = next.hypothesis
       run.experimentPlan = next.experimentPlan
@@ -427,8 +472,14 @@ export async function removeHypothesisBranch(profile: string, runId: string, bra
       run.experimentJobId = next.experimentJobId
       run.jobInsight = next.jobInsight
       run.result = next.result
-      run.stage = next.result ? 'analysis' : next.experimentId !== '' ? 'experiment' : 'hypothesis'
+      run.stage = next.stage
       run.status = 'running'
+      run.hypothesis = next.hypothesis
+      run.experimentPlan = next.experimentPlan
+      run.experimentId = next.experimentId
+      run.experimentJobId = next.experimentJobId
+      run.jobInsight = next.jobInsight
+      run.result = next.result
     }
     run.updatedAt = Date.now()
     return run
@@ -448,7 +499,7 @@ export async function activateHypothesisBranch(profile: string, runId: string, b
     run.experimentJobId = branch.experimentJobId
     run.jobInsight = branch.jobInsight
     run.result = branch.result
-    run.stage = branch.result ? 'analysis' : branch.experimentId !== '' ? 'experiment' : 'hypothesis'
+    run.stage = branch.stage
     run.status = 'running'
     run.updatedAt = Date.now()
     return run
@@ -478,6 +529,7 @@ export async function saveHypothesis(profile: string, runId: string, input: Hypo
       at: Date.now(),
     }
     run.hypothesis = hypothesis
+    if (run.stage === 'evidence') run.stage = 'hypothesis'
     mirrorActiveBranch(run)
     run.updatedAt = Date.now()
     return run
@@ -934,6 +986,7 @@ export async function advanceRun(profile: string, runId: string): Promise<Resear
         run.status = 'running'
       }
     }
+    if (run.branches.length > 0) mirrorActiveBranch(run)
     run.updatedAt = Date.now()
     return run
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.advanced' })

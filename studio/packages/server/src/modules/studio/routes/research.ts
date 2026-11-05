@@ -17,6 +17,8 @@ researchRoutes.get('/api/studio/research/runs/:id/report', runCtrl.runReportHand
 researchRoutes.get('/api/studio/research/runs/:id/claim-graph', runCtrl.claimGraphHandler)
 researchRoutes.post('/api/studio/research/runs/:id/branches', runCtrl.createBranchHandler)
 researchRoutes.post('/api/studio/research/runs/:id/branches/:branchId/activate', runCtrl.activateBranchHandler)
+researchRoutes.post('/api/studio/research/runs/:id/branches/:branchId/archive', runCtrl.archiveBranchHandler)
+researchRoutes.post('/api/studio/research/runs/:id/branches/:branchId/restore', runCtrl.restoreBranchHandler)
 researchRoutes.delete('/api/studio/research/runs/:id/branches/:branchId', runCtrl.removeBranchHandler)
 researchRoutes.get('/api/studio/research/projects/:id/family-analysis', runCtrl.familyAnalysisHandler)
 researchRoutes.post('/api/studio/research/runs/:id/results-draft', runCtrl.runResultsDraftHandler)

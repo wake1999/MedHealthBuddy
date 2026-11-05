@@ -3,6 +3,8 @@ import {
   advanceRun,
   activateHypothesisBranch,
   approveEvidence,
+  archiveHypothesisBranch,
+  restoreHypothesisBranch,
   createExperimentRecord,
   createHypothesisBranch,
   createRun,
@@ -232,6 +234,36 @@ export async function createBranchHandler(ctx: any) {
     ctx.body = {
       ok: true,
       run: await createHypothesisBranch(profileOf(ctx) || 'default', String(ctx.params.id || '')),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function archiveBranchHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      run: await archiveHypothesisBranch(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.branchId || ''),
+      ),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function restoreBranchHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      run: await restoreHypothesisBranch(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.branchId || ''),
+      ),
     }
   } catch (error) {
     failRun(ctx, error)

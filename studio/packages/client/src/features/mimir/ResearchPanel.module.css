@@ -10660,6 +10660,10 @@ button.paperNoteBlockMeta:hover {
   font-weight: 600;
 }
 
+.runsBranchCompare tr[data-archived] td {
+  opacity: 0.55;
+}
+
 .runsExperimentPanel h4 {
   margin: 4px 0 0;
   color: var(--mimir-ink, #211e19);

@@ -73,10 +73,13 @@ export async function analyzeRunFamily(
           experimentJobId: run.experimentJobId,
           jobInsight: run.jobInsight,
           result: run.result,
+          stage: run.stage,
+          archivedAt: 0,
           createdAt: run.createdAt,
           updatedAt: run.updatedAt,
         }]
       return branches.flatMap(branch => {
+        if (branch.archivedAt !== 0) return []
         if (!branch.result?.confirmedFinal) return []
         if (selectedFamily !== '' && branch.experimentPlan?.family !== selectedFamily) return []
         if (!hasMetricStats(branch.result)) return []

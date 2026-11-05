@@ -176,6 +176,8 @@ interface ResearchRunBranch {
   experimentJobId: string
   jobInsight: RunJobInsight | null
   result: RunResult | null
+  stage: Stage
+  archivedAt: number
   createdAt: number
   updatedAt: number
 }
@@ -399,6 +401,7 @@ export function RunsView({
   const [familyAnalysis, setFamilyAnalysis] = useState<FamilyAnalysis | null>(null)
   const [branchBusy, setBranchBusy] = useState(false)
   const [showBranchCompare, setShowBranchCompare] = useState(false)
+  const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const [claimFilter, setClaimFilter] = useState<'all' | ClaimReviewStatus | 'contradictions'>('all')
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({})
   const [coverage, setCoverage] = useState<ClaimCoverage | null>(null)
@@ -817,6 +820,43 @@ export function RunsView({
       )
       replaceRun(body.run)
       setNotice(t('runs.branchCreated'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  async function archiveBranch() {
+    if (!selected || !selected.activeBranchId) return
+    if (visibleBranches.length <= 1) return
+    setBranchBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/${encodeURIComponent(selected.activeBranchId)}/archive`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.branchArchived'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBranchBusy(false)
+    }
+  }
+
+  async function restoreBranch(branchId: string) {
+    if (!selected) return
+    setBranchBusy(true)
+    setError('')
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/${encodeURIComponent(branchId)}/restore`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.branchRestored'))
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -1587,11 +1627,11 @@ export function RunsView({
                     <select
                       className={css.runsInput}
                       value={selected.activeBranchId || ''}
-                      disabled={branchBusy || (selected.branches || []).length === 0}
+                      disabled={branchBusy || visibleBranches.length === 0}
                       onChange={event => void activateBranch(event.target.value)}
                     >
-                      {(selected.branches || []).length === 0 && <option value="">{t('runs.branchDefault')}</option>}
-                      {(selected.branches || []).map((branch, index) => (
+                      {visibleBranches.length === 0 && <option value="">{t('runs.branchDefault')}</option>}
+                      {visibleBranches.map((branch, index) => (
                         <option key={branch.id} value={branch.id}>
                           {t('runs.branchOption', {
                             index: index + 1,
@@ -1602,6 +1642,14 @@ export function RunsView({
                     </select>
                     <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void createBranch()}>
                       {branchBusy ? t('runs.branchBusy') : t('runs.branchNew')}
+                    </button>
+                    <button
+                      type="button"
+                      className={css.btn}
+                      disabled={visibleBranches.length <= 1 || branchBusy}
+                      onClick={() => void archiveBranch()}
+                    >
+                      {t('runs.branchArchive')}
                     </button>
                     <button
                       type="button"
@@ -1622,19 +1670,44 @@ export function RunsView({
                           <tr>
                             <th>{t('runs.branchTitle')}</th>
                             <th>{t('runs.hypothesisTitle')}</th>
+                            <th>{t('runs.branchStage')}</th>
                             <th>{t('runs.dataset')}</th>
+                            <th>{t('runs.branchMetrics')}</th>
                             <th>{t('runs.branchOutcome')}</th>
+                            <th>{t('runs.branchAction')}</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(selected.branches || []).map((branch, index) => (
-                            <tr key={branch.id} data-active={branch.id === selected.activeBranchId || undefined}>
-                              <td>{index + 1}</td>
-                              <td>{branch.hypothesis?.text || t('runs.branchUntitled')}</td>
-                              <td>{branch.experimentPlan?.dataset || '—'}</td>
-                              <td>{branch.result ? t(`runs.outcome.${branch.result.outcome}`) : '—'}</td>
-                            </tr>
-                          ))}
+                          {(selected.branches || []).map((branch, index) => {
+                            const metricText = branch.result?.metricStats
+                              ?.map(stat => `${stat.name}=${stat.mean.toFixed(4)}`)
+                              .join(', ')
+                            return (
+                              <tr
+                                key={branch.id}
+                                data-active={branch.id === selected.activeBranchId || undefined}
+                                data-archived={branch.archivedAt ? true : undefined}
+                              >
+                                <td>{index + 1}</td>
+                                <td>{branch.hypothesis?.text || t('runs.branchUntitled')}</td>
+                                <td>{t(`runs.stage.${branch.stage}`)}</td>
+                                <td>{branch.experimentPlan?.dataset || '—'}</td>
+                                <td>{metricText || branch.result?.metrics || '—'}</td>
+                                <td>{branch.result ? t(`runs.outcome.${branch.result.outcome}`) : '—'}</td>
+                                <td>
+                                  {branch.archivedAt
+                                    ? (
+                                      <button type="button" className={css.btn} disabled={branchBusy} onClick={() => void restoreBranch(branch.id)}>
+                                        {t('runs.branchRestore')}
+                                      </button>
+                                    )
+                                    : branch.id === selected.activeBranchId
+                                      ? t('runs.branchCurrent')
+                                      : '—'}
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>

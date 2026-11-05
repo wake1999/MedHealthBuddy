@@ -150,7 +150,8 @@ export async function generateRunReport(profile: string, runId: string): Promise
     lines.push('## Hypothesis branches', '')
     for (const branch of run.branches) {
       lines.push(`### ${branch.hypothesis?.text || branch.id}`, '')
-      lines.push(`- Branch: \`${branch.id}\``)
+      lines.push(`- Branch: \`${branch.id}\``, `- Stage: ${branch.stage}`)
+      if (branch.archivedAt) lines.push('- Archived: yes')
       if (branch.experimentPlan?.family) lines.push(`- Family: ${branch.experimentPlan.family}`)
       lines.push(`- Experiment: \`${branch.experimentId || '—'}\``)
       if (branch.result) {

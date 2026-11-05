@@ -10594,24 +10594,105 @@ button.paperNoteBlockMeta:hover {
 
 .runsPaperPicker {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-  max-height: 108px;
-  overflow: auto;
-  padding: 8px;
-  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 10%));
-  border-radius: 8px;
+  flex-direction: column;
+  gap: 6px;
+  max-height: none;
+  overflow: visible;
   color: var(--mimir-muted, #6b6b66);
   font-size: 11px;
 }
 
-.runsPaperPicker label {
+.runsPaperPickerHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  max-width: 100%;
+  gap: 6px 10px;
+}
+
+.runsPaperPickerHead strong {
   color: var(--mimir-ink, #211e19);
+  font-size: 11.5px;
+}
+
+.runsPaperPickerHead > span {
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 10.5px;
+}
+
+.runsPaperPickerActions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.runsPaperPickerActions button {
+  padding: 3px 7px;
+  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 16%));
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mimir-accent, #9a6a2f);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.runsPaperPickerActions button:disabled {
+  color: var(--mimir-muted, #6b6b66);
+  cursor: default;
+  opacity: 0.55;
+}
+
+.runsPaperList {
+  display: flex;
+  flex-direction: column;
+  max-height: 148px;
+  overflow: auto;
+  border: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 10%));
+  border-radius: 8px;
+  background: var(--mimir-sheet, #fffdf8);
+}
+
+.runsPaperItem {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--mimir-line-soft, rgb(120 92 32 / 8%));
+  color: var(--mimir-ink, #211e19);
+  cursor: pointer;
+}
+
+.runsPaperItem:last-child {
+  border-bottom: 0;
+}
+
+.runsPaperItem:hover {
+  background: rgb(154 106 47 / 4%);
+}
+
+.runsPaperItem[data-selected] {
+  background: rgb(154 106 47 / 8%);
+}
+
+.runsPaperItem input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.runsPaperTitle {
+  min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.runsPaperItem small {
+  flex: none;
+  margin-left: auto;
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 9.5px;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 .runsLayout {

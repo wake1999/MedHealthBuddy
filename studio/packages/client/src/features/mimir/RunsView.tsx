@@ -580,6 +580,18 @@ export function RunsView({
 
   const stageIndex = selected ? STAGES.indexOf(selected.stage) : 0
   const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
+  const paperGroups = useMemo(() => {
+    const groups = new Map<string, { title: string; ids: string[]; paper: RunPaper }>()
+    for (const paper of availablePapers) {
+      const id = paperIdOf(paper)
+      const key = (paper.title || '').trim().toLowerCase() || id
+      const current = groups.get(key)
+      if (current) current.ids.push(id)
+      else groups.set(key, { title: paper.title || id, ids: [id], paper })
+    }
+    return [...groups.values()]
+  }, [availablePapers])
+  const selectedPaperGroups = paperGroups.filter(group => group.ids.some(id => paperIds.includes(id)))
   const resultSchema = selected?.experimentPlan?.metricSchema || []
   const resultSamples = parseMetricSamplesClient(resultDraft.metrics)
   const baselineSamples = parseMetricSamplesClient(baselineSamplesText)
@@ -1873,23 +1885,52 @@ export function RunsView({
           rows={3}
         />
         <div className={css.runsPaperPicker}>
-          <span>{t('runs.papers')}</span>
-          {availablePapers.length === 0 && <small>{t('runs.noPapers')}</small>}
-          {availablePapers.map(paper => {
-            const id = paperIdOf(paper)
-            return (
-              <label key={id}>
-                <input
-                  type="checkbox"
-                  checked={paperIds.includes(id)}
-                  onChange={() => setPaperIds(current => current.includes(id)
-                    ? current.filter(value => value !== id)
-                    : [...current, id])}
-                />
-                {paper.title}
-              </label>
-            )
-          })}
+          <div className={css.runsPaperPickerHead}>
+            <strong>{t('runs.papers')}</strong>
+            <span>{t('runs.papersSelected', { selected: selectedPaperGroups.length, total: paperGroups.length })}</span>
+            <div className={css.runsPaperPickerActions}>
+              <button
+                type="button"
+                onClick={() => setPaperIds(paperGroups.map(group => group.ids[0]))}
+                disabled={paperGroups.length === 0}
+              >
+                {t('runs.selectAllPapers')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaperIds([])}
+                disabled={paperIds.length === 0}
+              >
+                {t('runs.clearPapers')}
+              </button>
+            </div>
+          </div>
+          {availablePapers.length === 0 && <small className={css.hint}>{t('runs.noPapers')}</small>}
+          <div className={css.runsPaperList}>
+            {paperGroups.map(group => {
+              const checked = group.ids.some(id => paperIds.includes(id))
+              return (
+                <label key={group.ids[0]} className={css.runsPaperItem} data-selected={checked || undefined}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const primary = group.ids[0]
+                      setPaperIds(current => checked
+                        ? current.filter(id => !group.ids.includes(id))
+                        : [...current.filter(id => !group.ids.includes(id)), primary])
+                    }}
+                  />
+                  <span className={css.runsPaperTitle}>{group.title}</span>
+                  <small>
+                    {group.ids.length > 1
+                      ? t('runs.paperDuplicates', { count: group.ids.length })
+                      : group.paper.arxivId || group.ids[0].slice(-8)}
+                  </small>
+                </label>
+              )
+            })}
+          </div>
         </div>
           <button
             type="button"

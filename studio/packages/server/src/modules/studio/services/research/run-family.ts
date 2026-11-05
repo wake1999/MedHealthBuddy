@@ -48,12 +48,21 @@ function hasMetricStats(result: ResearchRunResult | null): result is ResearchRun
  * testing family. This is deliberately conservative and does not merge
  * unconfirmed/intermediate results.
  */
-export async function analyzeRunFamily(profile: string, projectId: string): Promise<FamilyAnalysis> {
+export async function analyzeRunFamily(
+  profile: string,
+  projectId: string,
+  family = '',
+): Promise<FamilyAnalysis> {
   const store = await readStore(profile)
   if (!store.projects.some(project => project.id === projectId)) {
     throw new Error('research_project_not_found')
   }
-  const runs = store.runs.filter(run => run.projectId === projectId && run.result?.confirmedFinal)
+  const selectedFamily = family.trim()
+  const runs = store.runs.filter(run =>
+    run.projectId === projectId
+    && run.result?.confirmedFinal
+    && (selectedFamily === '' || run.experimentPlan?.family === selectedFamily),
+  )
   const rows = runs.flatMap(run => {
     const result = run.result
     if (!hasMetricStats(result)) return []
@@ -72,7 +81,7 @@ export async function analyzeRunFamily(profile: string, projectId: string): Prom
   })
   return {
     projectId,
-    family: 'all_confirmed_runs',
+    family: selectedFamily || 'all_confirmed_runs',
     alpha: 0.05,
     runCount: runs.length,
     testedMetricCount: rows.length,

@@ -97,6 +97,7 @@ interface RunExperimentPlan {
   baselines: string
   metrics: string
   metricSchema?: RunMetricSpec[]
+  family?: string
   seeds: string
   command: string
   resources: string
@@ -403,6 +404,7 @@ export function RunsView({
     dataset: '',
     baselines: '',
     metrics: '',
+    family: '',
     seeds: '',
     command: '',
     resources: '',
@@ -494,7 +496,7 @@ export function RunsView({
         text: '', independentVariable: '', dependentVariable: '', baselines: '', metric: '', expected: '', falsification: '', claimIds: [],
       })
     setPlan(selected.experimentPlan || {
-      dataset: '', baselines: '', metrics: '', seeds: '', command: '', resources: '', stopCondition: '', successCriteria: '',
+      dataset: '', baselines: '', metrics: '', family: '', seeds: '', command: '', resources: '', stopCondition: '', successCriteria: '',
     })
     setMetricSchemaText((selected.experimentPlan?.metricSchema || [])
       .map(spec => [
@@ -748,8 +750,10 @@ export function RunsView({
     setError('')
     setNotice('')
     try {
+      const family = selected?.experimentPlan?.family || ''
+      const query = family === '' ? '' : `?family=${encodeURIComponent(family)}`
       const body = await request<{ analysis: FamilyAnalysis }>(
-        `/api/studio/research/projects/${encodeURIComponent(projectId)}/family-analysis`,
+        `/api/studio/research/projects/${encodeURIComponent(projectId)}/family-analysis${query}`,
       )
       setFamilyAnalysis(body.analysis)
       setNotice(t('runs.familyAnalyzed', { count: body.analysis.testedMetricCount }))
@@ -1554,6 +1558,7 @@ export function RunsView({
                   <h4>{t('runs.planTitle')}</h4>
                   <div className={css.runsFormGrid}>
                     <input className={css.runsInput} value={plan.dataset} onChange={event => setPlan({ ...plan, dataset: event.target.value })} placeholder={t('runs.dataset')} />
+                    <input className={css.runsInput} value={plan.family || ''} onChange={event => setPlan({ ...plan, family: event.target.value })} placeholder={t('runs.family')} />
                     <input className={css.runsInput} value={plan.metrics} onChange={event => setPlan({ ...plan, metrics: event.target.value })} placeholder={t('runs.metrics')} />
                     <input className={css.runsInput} value={plan.baselines} onChange={event => setPlan({ ...plan, baselines: event.target.value })} placeholder={t('runs.baselines')} />
                     <input className={css.runsInput} value={plan.seeds} onChange={event => setPlan({ ...plan, seeds: event.target.value })} placeholder={t('runs.seeds')} />
@@ -1732,6 +1737,7 @@ export function RunsView({
                   </div>
                   <p className={css.hint}>
                     {t('runs.familySummary', {
+                      family: familyAnalysis.family,
                       runs: familyAnalysis.runCount,
                       metrics: familyAnalysis.testedMetricCount,
                     })}

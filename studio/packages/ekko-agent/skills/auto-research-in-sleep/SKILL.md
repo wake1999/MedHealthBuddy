@@ -84,10 +84,11 @@ POST  /api/studio/research/runs/:id/insert-results
 approved claim, no `needs_evidence` claim, and a review note for an approved
 contradictory claim. A hypothesis must send `claimIds` containing only approved
 claim ids. `claim-graph` exports a deterministic Mermaid Claim–Evidence graph
-and Markdown table. `family-analysis` applies Holm correction to every
-confirmed Run result p-value in the project; it is a project-level family, not a
-replacement for a pre-registered analysis plan. Never approve evidence or
-claims yourself.
+and Markdown table. `family-analysis` applies Holm correction to confirmed Run
+result p-values. Pass `?family=<name>` to restrict it to runs whose experiment
+plan has that family; without it the project is one family. This is not a
+replacement for a pre-registered analysis plan. Never approve evidence or claims
+yourself.
 
 `report` is a deterministic Markdown export of persisted evidence, claims,
 hypothesis, plan, job insight, and statistics. `results-draft` returns a Results

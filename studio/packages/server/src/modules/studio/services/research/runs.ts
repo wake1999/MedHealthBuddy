@@ -60,6 +60,7 @@ export interface ExperimentPlanInput {
   baselines?: string
   metrics?: string
   metricSchema?: string
+  family?: string
   seeds?: string
   command?: string
   resources?: string
@@ -387,6 +388,7 @@ export async function saveExperimentPlan(profile: string, runId: string, input: 
       baselines: clean(input.baselines, 2000),
       metrics: clean(input.metrics, 2000),
       metricSchema: parseMetricSchema(clean(input.metricSchema, 2000)),
+      family: clean(input.family, 200),
       seeds: clean(input.seeds, 1000),
       command: clean(input.command, 4000),
       resources: clean(input.resources, 2000),
@@ -421,6 +423,7 @@ export async function createExperimentRecord(profile: string, runId: string): Pr
       config: [
         `Hypothesis: ${hypothesis.text}`,
         `Linked claims:\n${linkedClaims || '(none)'}`,
+        `Experiment family: ${plan.family || '(none)'}`,
         `Independent variable: ${hypothesis.independentVariable}`,
         `Dependent variable: ${hypothesis.dependentVariable}`,
         `Expected: ${hypothesis.expected}`,

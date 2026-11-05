@@ -337,6 +337,7 @@ export async function familyAnalysisHandler(ctx: any) {
       analysis: await analyzeRunFamily(
         profileOf(ctx) || 'default',
         String(ctx.params.id || ''),
+        String(ctx.query?.family || ''),
       ),
     }
   } catch (error) {

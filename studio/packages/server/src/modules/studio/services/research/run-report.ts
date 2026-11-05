@@ -103,7 +103,7 @@ export async function generateRunReport(profile: string, runId: string): Promise
     lines.push('_Not recorded._', '')
   } else {
     const p = run.experimentPlan
-    lines.push(`- Dataset: ${list(p.dataset)}`, `- Baselines: ${list(p.baselines)}`, `- Metrics: ${list(p.metrics)}`, `- Seeds: ${list(p.seeds)}`, `- Resources: ${list(p.resources)}`, `- Stop condition: ${list(p.stopCondition)}`, `- Success criteria: ${list(p.successCriteria)}`, '')
+    lines.push(`- Dataset: ${list(p.dataset)}`, `- Experiment family: ${list(p.family)}`, `- Baselines: ${list(p.baselines)}`, `- Metrics: ${list(p.metrics)}`, `- Seeds: ${list(p.seeds)}`, `- Resources: ${list(p.resources)}`, `- Stop condition: ${list(p.stopCondition)}`, `- Success criteria: ${list(p.successCriteria)}`, '')
     if (p.metricSchema.length > 0) {
       lines.push('| Metric | Direction | Required | Target | Baseline | Min delta |', '|---|---|---:|---:|---:|---:|')
       for (const spec of p.metricSchema) {

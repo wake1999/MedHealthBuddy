@@ -447,6 +447,8 @@ export interface ResearchRunExperimentPlan {
   baselines: string
   metrics: string
   metricSchema: ResearchMetricSpec[]
+  /** Optional experiment family used for multiple-comparison correction. */
+  family: string
   seeds: string
   command: string
   resources: string
@@ -653,7 +655,11 @@ function normalizeStore(input: unknown): ResearchStore {
       ? { ...run.hypothesis, claimIds: Array.isArray(run.hypothesis.claimIds) ? run.hypothesis.claimIds : [] }
       : null,
     experimentPlan: run.experimentPlan
-      ? { ...run.experimentPlan, metricSchema: Array.isArray(run.experimentPlan.metricSchema) ? run.experimentPlan.metricSchema : [] }
+      ? {
+        ...run.experimentPlan,
+        metricSchema: Array.isArray(run.experimentPlan.metricSchema) ? run.experimentPlan.metricSchema : [],
+        family: typeof run.experimentPlan.family === 'string' ? run.experimentPlan.family : '',
+      }
       : null,
     experimentId: typeof run.experimentId === 'string' ? run.experimentId : '',
     experimentJobId: typeof run.experimentJobId === 'string' ? run.experimentJobId : '',

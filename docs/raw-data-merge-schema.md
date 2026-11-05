@@ -72,6 +72,25 @@ rows; they never pool raw observations.
 7. Execution is append-only: rolling back creates a new job/version; history is
    never deleted.
 
+## Implemented slice
+
+The current implementation supports `mhb.raw-observations.v1` artifacts:
+
+```json
+{
+  "schema": "mhb.raw-observations.v1",
+  "metric": "F1",
+  "dataset": "MHLCP",
+  "split": "test",
+  "rows": [{ "seed": 1, "value": 0.86 }]
+}
+```
+
+Artifacts are written outside `state.json`, SHA-256 verified, and merged only
+after the merge record is validated. A rollback requires a separate approval
+note. This is still an artifact-level merge, not a database-level observation
+merge.
+
 ## Explicit non-goals
 
 - No imputation of missing seeds.

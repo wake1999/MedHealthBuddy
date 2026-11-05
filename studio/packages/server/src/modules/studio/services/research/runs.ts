@@ -195,6 +195,7 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     primaryMetricBranches: {},
     consolidationApproval: null,
     merges: [],
+    artifacts: [],
     approvals: [],
     createdAt: now,
     updatedAt: now,

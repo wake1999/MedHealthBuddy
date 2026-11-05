@@ -22563,6 +22563,50 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/branches/{branchId}/artifacts": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create artifacts",
+        "description": "POST /api/studio/research/runs/:id/branches/:branchId/artifacts",
+        "operationId": "uploadArtifactHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/branches/{branchId}/freeze": {
       "post": {
         "tags": [
@@ -23350,6 +23394,50 @@
         ]
       }
     },
+    "/api/studio/research/runs/{id}/merges/{mergeId}/execute-raw": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create execute-raw",
+        "description": "POST /api/studio/research/runs/:id/merges/:mergeId/execute-raw",
+        "operationId": "executeRawMergeHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mergeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/studio/research/runs/{id}/merges/{mergeId}/rollback": {
       "post": {
         "tags": [
@@ -23358,6 +23446,50 @@
         "summary": "Create rollback",
         "description": "POST /api/studio/research/runs/:id/merges/:mergeId/rollback",
         "operationId": "rollbackMergeHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mergeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/studio/research/runs/{id}/merges/{mergeId}/rollback/approve": {
+      "post": {
+        "tags": [
+          "Research"
+        ],
+        "summary": "Create approve",
+        "description": "POST /api/studio/research/runs/:id/merges/:mergeId/rollback/approve",
+        "operationId": "approveRollbackHandler",
         "security": [
           {
             "BearerAuth": []

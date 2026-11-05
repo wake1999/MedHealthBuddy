@@ -4,7 +4,7 @@
  * The UI owns no hidden state: every mutation goes through the workbench API,
  * and the evidence table is the human approval gate.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import css from './ResearchPanel.module.css'
 
 type Support = 'supports' | 'contradicts' | 'mixed' | 'context'
@@ -178,6 +178,8 @@ interface ResearchRunMerge {
   rollbackOf: string
   snapshotHash: string
   metricRowsHash: string
+  rollbackApproval: { at: number; note: string } | null
+  rawMerge: { at: number; file: string; sha256: string; rowCount: number; metrics: string[] } | null
 }
 
 interface BranchPairComparison {
@@ -474,6 +476,7 @@ export function RunsView({
   const [mergeLeft, setMergeLeft] = useState('')
   const [mergeRight, setMergeRight] = useState('')
   const [mergeDiff, setMergeDiff] = useState<Array<{ field: string; left: string; right: string }> | null>(null)
+  const [artifactBusy, setArtifactBusy] = useState(false)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
@@ -991,6 +994,65 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setConsistencyBusy(false)
+    }
+  }
+
+  async function uploadArtifactFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !selected || !activeBranch) return
+    setArtifactBusy(true)
+    setError('')
+    try {
+      const content = await file.text()
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/branches/${encodeURIComponent(activeBranch.id)}/artifacts`,
+        { method: 'POST', body: JSON.stringify({ name: file.name, content }) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.artifactUploaded'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setArtifactBusy(false)
+    }
+  }
+
+  async function approveRollbackLatest() {
+    if (!selected || !(selected.merges || []).length) return
+    const latest = selected.merges![selected.merges!.length - 1]
+    const note = window.prompt(t('runs.rollbackNote'), '')
+    if (note === null) return
+    setMergeBusy(true)
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/rollback/approve`,
+        { method: 'POST', body: JSON.stringify({ note }) },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.rollbackApproved'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMergeBusy(false)
+    }
+  }
+
+  async function executeRawMergeLatest() {
+    if (!selected || !(selected.merges || []).length) return
+    const latest = selected.merges![selected.merges!.length - 1]
+    setMergeBusy(true)
+    try {
+      const body = await request<{ run: ResearchRun }>(
+        `/api/studio/research/runs/${encodeURIComponent(selected.id)}/merges/${encodeURIComponent(latest.id)}/execute-raw`,
+        { method: 'POST' },
+      )
+      replaceRun(body.run)
+      setNotice(t('runs.rawMergeExecuted'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setMergeBusy(false)
     }
   }
 
@@ -2008,6 +2070,10 @@ export function RunsView({
                       {branchFrozen ? t('runs.branchUnfreeze') : t('runs.branchFreeze')}
                     </button>
                     {branchFrozen && <span className={css.runsFrozenBadge}>{t('runs.branchFrozenBadge')}</span>}
+                    <label className={css.runsArtifactUpload}>
+                      {artifactBusy ? t('runs.artifactBusy') : t('runs.artifactUpload')}
+                      <input type="file" accept=".json,application/json" onChange={event => void uploadArtifactFile(event)} />
+                    </label>
                   </div>
                   {showBranchCompare && (selected.branches || []).length > 0 && (
                     <div className={css.runsBranchCompare}>
@@ -2186,6 +2252,12 @@ export function RunsView({
                                 </button>
                                 <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void executeLatestMerge()}>
                                   {t('runs.executeMerge')}
+                                </button>
+                                <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void executeRawMergeLatest()}>
+                                  {t('runs.executeRawMerge')}
+                                </button>
+                                <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void approveRollbackLatest()}>
+                                  {t('runs.approveRollback')}
                                 </button>
                                 <button type="button" className={css.btn} disabled={mergeBusy} onClick={() => void rollbackLatestMerge()}>
                                   {t('runs.rollbackMerge')}

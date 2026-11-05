@@ -10749,6 +10749,24 @@ button.paperNoteBlockMeta:hover {
   border-top: 1px dashed rgb(156 59 50 / 16%);
 }
 
+.runsArtifactUpload {
+  position: relative;
+  overflow: hidden;
+  padding: 4px 7px;
+  border: 1px dashed rgb(80 130 90 / 30%);
+  border-radius: 6px;
+  color: #3f7049;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.runsArtifactUpload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .runsMergeCompare {
   display: flex;
   flex-wrap: wrap;

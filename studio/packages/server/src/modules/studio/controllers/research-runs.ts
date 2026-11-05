@@ -31,6 +31,7 @@ import { generateClaimGraph } from '../services/research/run-claim-graph'
 import { analyzeRunFamily } from '../services/research/run-family'
 import { compareRunBranches } from '../services/research/run-branch-compare'
 import { generateBranchResultsTable, setPrimaryBranch } from '../services/research/run-branch-results'
+import { approveRollback, executeRawMerge, uploadRawArtifact } from '../services/research/run-merge-artifacts'
 import {
   approveBranchConsolidation,
   compareMergeRecords,
@@ -89,7 +90,12 @@ function failRun(ctx: any, error: unknown) {
     || message === 'research_consolidation_note_required'
     || message === 'research_consolidation_approval_stale'
     || message === 'research_merge_already_executed'
+    || message === 'research_merge_validate_first'
+    || message === 'research_rollback_approval_required'
+    || message === 'research_rollback_note_required'
+    || message === 'research_artifact_hash_mismatch'
     || message.startsWith('research_merge_snapshot_stale')
+    || message.startsWith('research_raw_artifact_')
     || message.startsWith('research_consolidation_acknowledgements_required')
     || message.startsWith('research_result_missing_metrics')
   ) {
@@ -458,6 +464,59 @@ export async function approveConsolidationHandler(ctx: any) {
         String(ctx.params.id || ''),
         String(body.note || ''),
         Array.isArray(body.acknowledgedConflicts) ? body.acknowledgedConflicts.map(String) : [],
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function uploadArtifactHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await uploadRawArtifact(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.branchId || ''),
+        {
+          name: body.name ? String(body.name) : '',
+          content: body.content ? String(body.content) : '',
+          sha256: body.sha256 ? String(body.sha256) : '',
+        },
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function executeRawMergeHandler(ctx: any) {
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await executeRawMerge(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.mergeId || ''),
+      )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function approveRollbackHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  try {
+    ctx.body = {
+      ok: true,
+      ...(await approveRollback(
+        profileOf(ctx) || 'default',
+        String(ctx.params.id || ''),
+        String(ctx.params.mergeId || ''),
+        String(body.note || ''),
       )),
     }
   } catch (error) {

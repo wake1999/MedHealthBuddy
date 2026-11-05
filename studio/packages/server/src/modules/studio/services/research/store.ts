@@ -485,6 +485,28 @@ export interface ResearchRunMergeMetric {
   effectSizeType: string
 }
 
+export interface ResearchRunArtifact {
+  id: string
+  branchId: string
+  name: string
+  kind: 'raw-observations'
+  metric: string
+  dataset: string
+  split: string
+  sha256: string
+  size: number
+  file: string
+  createdAt: number
+}
+
+export interface ResearchRunRawMerge {
+  at: number
+  file: string
+  sha256: string
+  rowCount: number
+  metrics: string[]
+}
+
 export interface ResearchRunMerge {
   id: string
   at: number
@@ -501,6 +523,8 @@ export interface ResearchRunMerge {
   rollbackOf: string
   snapshotHash: string
   metricRowsHash: string
+  rollbackApproval: { at: number; note: string } | null
+  rawMerge: ResearchRunRawMerge | null
 }
 
 export interface ResearchRunResult {
@@ -588,6 +612,7 @@ export interface ResearchRun {
     snapshot: ResearchRunConsolidationSnapshot
   } | null
   merges: ResearchRunMerge[]
+  artifacts: ResearchRunArtifact[]
   approvals: ResearchRunApproval[]
   createdAt: number
   updatedAt: number
@@ -777,7 +802,12 @@ function normalizeStore(input: unknown): ResearchStore {
     activeBranchId: typeof run.activeBranchId === 'string' ? run.activeBranchId : '',
     primaryMetricBranches: run.primaryMetricBranches || {},
     consolidationApproval: run.consolidationApproval || null,
-    merges: Array.isArray(run.merges) ? run.merges : [],
+    merges: (Array.isArray(run.merges) ? run.merges : []).map(merge => ({
+      ...merge,
+      rollbackApproval: merge.rollbackApproval || null,
+      rawMerge: merge.rawMerge || null,
+    })),
+    artifacts: Array.isArray(run.artifacts) ? run.artifacts : [],
     approvals: Array.isArray(run.approvals) ? run.approvals : [],
   })).map(run => {
     if (run.branches.length > 0) {

@@ -228,6 +228,8 @@ export async function createMergeRecord(
       rollbackOf: '',
       snapshotHash: snapshotHash(approval.snapshot),
       metricRowsHash: metricRowsHash(metricRows),
+      rollbackApproval: null,
+      rawMerge: null,
     }
     run.merges.push(merge)
     run.updatedAt = Date.now()
@@ -309,6 +311,7 @@ export async function rollbackMergeRecord(
     if (!run) throw new Error('research_run_not_found')
     const old = run.merges.find(row => row.id === mergeId)
     if (!old) throw new Error('research_merge_not_found')
+    if (!old.rollbackApproval) throw new Error('research_rollback_approval_required')
     const previous = run.merges[run.merges.length - 1]
     const merge: ResearchRunMerge = {
       ...old,

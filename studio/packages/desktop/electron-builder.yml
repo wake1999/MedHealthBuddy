@@ -51,6 +51,13 @@ extraResources:
       - "package.json"
       - "bin/**"
       - "dist/**"
+      # build-client-safe keeps staging directories when a guarded delete is
+      # blocked. They are build artifacts, not runtime content.
+      - "!dist/client.next"
+      - "!dist/client.next/**"
+      - "!dist/client.next-*/**"
+      - "!dist/client.backup"
+      - "!dist/client.backup/**"
       - "!packages/desktop/**"
       # Exclude repository-root development files without dropping nested
       # runtime assets such as dist/ekko-skills/*/scripts/**.
@@ -76,10 +83,31 @@ extraResources:
       - "!node-pty/build/**"
       - "node-pty/build/Release/pty.node"
       - "!**/*.md"
+      - "!**/*.d.ts"
+      - "!**/*.map"
+      - "!**/test/**"
+      - "!**/tests/**"
+      - "!**/__tests__/**"
+      - "!**/docs/**"
+      # Build/type-check/editor packages: the client is already bundled and the
+      # server has no runtime imports for these.
+      - "!typescript/**"
+      - "!@tsoa/**"
+      - "!@rolldown/**"
+      - "!monaco-editor/**"
+      - "!mermaid/**"
+      - "!echarts/**"
+      - "!naive-ui/**"
+      - "!pdfjs-dist/**"
   # Fully offline translation runtimes. Both platform archives are bundled so
   # the desktop and both web deployments never download Python/pdf2zh.
   - from: "translation-runtime"
     to: "translation-runtime"
+    filter:
+      - "**/*"
+      # The Windows installer must not carry the Linux runtime. The Linux/mac
+      # packaging pipeline supplies its own platform archive.
+      - "!translation-runtime-linux-*"
   # Built-in LaTeX engine. The server resolves this before PATH, so a clean
   # Windows machine can compile without a global MiKTeX/TeX Live install.
   - from: "resources/tex"

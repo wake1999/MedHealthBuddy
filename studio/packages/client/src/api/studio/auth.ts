@@ -153,9 +153,15 @@ export interface ManagedUser {
   last_login_at: number | null
 }
 
+export interface ProfileOption {
+  name: string
+  displayName: string
+}
+
 export interface ManagedUsersResponse {
   users: ManagedUser[]
   profiles: string[]
+  profileOptions: ProfileOption[]
   roles: RoleSummary[]
   permissions: PermissionRecord[]
 }

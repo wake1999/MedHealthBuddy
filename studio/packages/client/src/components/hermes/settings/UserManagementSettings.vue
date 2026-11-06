@@ -6,10 +6,10 @@ import {
   createManagedUser,
   deleteManagedUser,
   fetchManagedUsers,
-  fetchRoles,
   updateManagedUser,
   updateManagedUserRoles,
   type ManagedUser,
+  type ProfileOption,
   type RoleSummary,
   type UserStatus,
 } from '@/api/studio/auth'
@@ -21,6 +21,7 @@ const loading = ref(false)
 const saving = ref(false)
 const users = ref<ManagedUser[]>([])
 const profiles = ref<string[]>([])
+const profileDetails = ref<ProfileOption[]>([])
 const roles = ref<RoleSummary[]>([])
 const showModal = ref(false)
 const editingUser = ref<ManagedUser | null>(null)
@@ -58,11 +59,24 @@ const statusOptions = computed(() => [
   { label: t('users.status.disabled'), value: 'disabled' },
 ])
 
-const profileOptions = computed(() => profiles.value.map(profile => ({ label: profile, value: profile })))
+const profileOptions = computed(() => {
+  const details = profileDetails.value
+  if (details.length > 0) {
+    return details.map(profile => ({ label: profile.displayName || profile.name, value: profile.name }))
+  }
+  return profiles.value.map(profile => ({ label: profile, value: profile }))
+})
+
+function profileLabel(name: string): string {
+  return profileDetails.value.find(profile => profile.name === name)?.displayName || name
+}
 
 async function refreshRoles() {
   try {
-    const res = await fetchRoles()
+    const res = await fetchManagedUsers()
+    users.value = res.users
+    profiles.value = res.profiles
+    profileDetails.value = res.profileOptions || []
     roles.value = res.roles
   } catch {
     // Keep the last known list; the save path will surface an actionable error.
@@ -97,6 +111,7 @@ async function saveRoles() {
     const res = await updateManagedUserRoles(roleTarget.value.id, [selected.id])
     users.value = res.users
     profiles.value = res.profiles
+    profileDetails.value = res.profileOptions || profileDetails.value
     roles.value = res.roles
     roleModal.value = false
     message.success(t('users.rolesSaved'))
@@ -122,6 +137,7 @@ async function loadUsers() {
     const res = await fetchManagedUsers()
     users.value = res.users
     profiles.value = res.profiles
+    profileDetails.value = res.profileOptions || []
     roles.value = res.roles || []
   } catch (err: any) {
     message.error(err.message || t('users.loadFailed'))
@@ -193,6 +209,7 @@ async function submit() {
     }
     users.value = res.users
     profiles.value = res.profiles
+    profileDetails.value = res.profileOptions || profileDetails.value
     roles.value = res.roles
     showModal.value = false
     resetForm()
@@ -275,7 +292,7 @@ const columns = computed<DataTableColumns<ManagedUser>>(() => [
       ? h('span', { class: 'muted' }, t('users.allProfiles'))
       : h(NSpace, { size: 4 }, {
         default: () => row.profiles.length
-          ? row.profiles.map(profile => h(NTag, { size: 'small', bordered: false }, { default: () => profile }))
+          ? row.profiles.map(profile => h(NTag, { size: 'small', bordered: false }, { default: () => profileLabel(profile) }))
           : h('span', { class: 'muted' }, t('users.noProfiles')),
       }),
   },

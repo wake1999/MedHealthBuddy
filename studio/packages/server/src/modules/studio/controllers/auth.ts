@@ -42,6 +42,7 @@ import { startOutboundRelayClient, stopOutboundRelayClient } from '../public/glo
 import { getLanEndpointKind } from '../services/network/lan-discovery'
 import { getPublicSystemInfo } from '../public/system-info'
 import { config } from '../public/config'
+import { listProfilesFromDisk } from '../../hermes/services/profiles/catalog'
 
 /**
  * GET /api/auth/status
@@ -625,9 +626,14 @@ function validateProfiles(profiles: string[]): string | null {
  * Super admin user management list.
  */
 export async function listManagedUsers(ctx: Context) {
+  const profiles = listProfileNamesFromDisk()
   ctx.body = {
     users: listUsers(),
-    profiles: listProfileNamesFromDisk(),
+    profiles,
+    profileOptions: listProfilesFromDisk().map(profile => ({
+      name: profile.name,
+      displayName: profile.displayName || profile.name,
+    })),
     roles: listRoles(),
     permissions: listPermissions(),
   }

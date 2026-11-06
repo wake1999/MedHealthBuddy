@@ -114,10 +114,6 @@ function handleEditConfig() {
       <div class="profile-title">
         <ProfileAvatar :name="profile.name" :avatar="profile.avatar" :size="28" />
         <h3 class="profile-name">{{ profile.displayName || profile.name }}</h3>
-        <span
-          v-if="profile.displayName && profile.displayName !== profile.name"
-          class="profile-id"
-        >{{ profile.name }}</span>
       </div>
       <NTag v-if="profile.active" size="tiny" type="primary" :bordered="false">
         {{ t('profiles.active') }}

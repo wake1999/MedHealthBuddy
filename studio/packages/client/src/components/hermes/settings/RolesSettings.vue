@@ -136,7 +136,6 @@ async function remove(role: RoleSummary) {
 
 const columns = computed<DataTableColumns<RoleSummary>>(() => [
   { title: t('roles.name'), key: 'name', minWidth: 160 },
-  { title: t('roles.key'), key: 'key', minWidth: 150 },
   {
     title: t('roles.permissions'),
     key: 'permissions',
@@ -217,9 +216,6 @@ onMounted(loadRoles)
         <div class="role-form-row">
           <NFormItem :label="t('roles.name')">
             <NInput v-model:value="form.name" :placeholder="t('roles.namePlaceholder')" />
-          </NFormItem>
-          <NFormItem :label="t('roles.key')">
-            <NInput :value="editing?.key || t('roles.keyAuto')" disabled />
           </NFormItem>
         </div>
         <NFormItem :label="t('roles.descriptionLabel')">

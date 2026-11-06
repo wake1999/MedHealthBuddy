@@ -602,7 +602,7 @@ export async function removePassword(ctx: Context) {
 }
 
 function normalizeRole(value: unknown): UserRole | null {
-  return value === 'super_admin' || value === 'admin' ? value : null
+  return value === 'super_admin' || value === 'admin' || value === 'viewer' ? value : null
 }
 
 function normalizeStatus(value: unknown): UserStatus | null {

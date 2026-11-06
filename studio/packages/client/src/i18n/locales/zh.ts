@@ -377,6 +377,7 @@ export default {
     roles: {
       superAdmin: '超级管理员',
       admin: '普通管理员',
+      viewer: '只读用户',
     },
     status: {
       active: '启用',

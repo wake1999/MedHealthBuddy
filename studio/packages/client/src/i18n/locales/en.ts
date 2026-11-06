@@ -377,6 +377,7 @@ export default {
     roles: {
       superAdmin: 'Super Admin',
       admin: 'Admin',
+      viewer: 'Read-only user',
     },
     status: {
       active: 'Active',

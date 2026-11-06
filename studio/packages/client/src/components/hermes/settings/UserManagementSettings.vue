@@ -39,6 +39,7 @@ const form = reactive({
 
 const roleOptions = computed(() => [
   { label: t('users.roles.admin'), value: 'admin' },
+  { label: t('users.roles.viewer'), value: 'viewer' },
   { label: t('users.roles.superAdmin'), value: 'super_admin' },
 ])
 
@@ -202,7 +203,11 @@ const columns = computed<DataTableColumns<ManagedUser>>(() => [
     key: 'role',
     width: 130,
     render: (row) => h(NTag, { size: 'small', type: row.role === 'super_admin' ? 'warning' : 'default' }, {
-      default: () => row.role === 'super_admin' ? t('users.roles.superAdmin') : t('users.roles.admin'),
+      default: () => row.role === 'super_admin'
+        ? t('users.roles.superAdmin')
+        : row.role === 'viewer'
+          ? t('users.roles.viewer')
+          : t('users.roles.admin'),
     }),
   },
   {

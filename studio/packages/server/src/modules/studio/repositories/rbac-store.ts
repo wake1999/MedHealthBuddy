@@ -208,7 +208,7 @@ export function assignBuiltInRole(userId: number, legacyRole: string): void {
   ensureRbac()
   const db = getDb()
   if (!db) return
-  const key = legacyRole === 'super_admin' ? 'super_admin' : 'admin'
+  const key = legacyRole === 'super_admin' ? 'super_admin' : legacyRole === 'viewer' ? 'viewer' : 'admin'
   const role = db.prepare(`SELECT id FROM ${ROLES_TABLE} WHERE key = ?`).get(key) as { id: number } | undefined
   if (role) replaceUserRoles(userId, [role.id])
 }
@@ -338,7 +338,7 @@ export function initRbac(): void {
     for (const user of users) {
       const assigned = db.prepare(`SELECT COUNT(*) AS count FROM ${USER_ROLES_TABLE} WHERE user_id = ?`).get(user.id) as { count?: number } | undefined
       if (Number(assigned?.count || 0) > 0) continue
-      const roleId = user.role === 'super_admin' ? superId : adminId
+      const roleId = user.role === 'super_admin' ? superId : user.role === 'viewer' ? viewerId : adminId
       db.prepare(`INSERT OR IGNORE INTO ${USER_ROLES_TABLE} (user_id, role_id, created_at) VALUES (?, ?, ?)`)
         .run(user.id, roleId, now())
     }

@@ -9,7 +9,7 @@ import {
   type RoleSummary,
 } from './rbac-store'
 
-export type UserRole = 'super_admin' | 'admin'
+export type UserRole = 'super_admin' | 'admin' | 'viewer'
 export type UserStatus = 'active' | 'disabled'
 export type UserId = number | string
 

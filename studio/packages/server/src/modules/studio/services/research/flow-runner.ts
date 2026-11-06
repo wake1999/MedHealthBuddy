@@ -45,6 +45,7 @@ export interface CreateFlowInput {
   maxAttempts?: number
   artifactPath?: string
   auto?: boolean
+  ownerUserId?: number
 }
 
 function flowSteps(): ResearchFlow['steps'] {
@@ -70,12 +71,18 @@ function markStep(flow: ResearchFlow, key: string, status: string, note: string)
   flow.updatedAt = Date.now()
 }
 
-async function createFixtureProject(profile: string, title: string): Promise<{ projectId: string; paperId: string }> {
+async function createFixtureProject(profile: string, title: string, ownerUserId?: number): Promise<{ projectId: string; paperId: string }> {
   return updateStore(profile, 'flow.fixture.project', draft => {
     const projectId = newId('proj')
     const paperId = newId('paper')
     const now = Date.now()
-    draft.projects.push({ id: projectId, title, createdAt: now, updatedAt: now })
+    draft.projects.push({
+      id: projectId,
+      title,
+      createdAt: now,
+      updatedAt: now,
+      ...(ownerUserId ? { fixtureOwnerUserId: ownerUserId } : {}),
+    })
     draft.papers.push({
       id: paperId,
       projectId,
@@ -90,6 +97,7 @@ async function createFixtureProject(profile: string, title: string): Promise<{ p
       status: 'read',
       notes: 'Fixture paper created by ResearchFlowRunner',
       tags: ['fixture'],
+      ...(ownerUserId ? { fixtureOwnerUserId: ownerUserId } : {}),
       addedAt: now,
     } as never)
     return { projectId, paperId }
@@ -175,6 +183,7 @@ export async function createFlow(
     remoteArtifactPath: String(input.artifactPath || '').trim().slice(0, 2000),
     remoteArtifact: null,
     checkpoint: '',
+    ...(mode === 'fixture' && input.ownerUserId ? { fixtureOwnerUserId: input.ownerUserId } : {}),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
@@ -193,7 +202,7 @@ export async function createFlow(
   let projectId = String(input.projectId || '').trim()
   let paperId = ''
   if (projectId === '') {
-    const created = await createFixtureProject(profile, `${title} fixture`)
+    const created = await createFixtureProject(profile, `${title} fixture`, input.ownerUserId)
     projectId = created.projectId
     paperId = created.paperId
   } else {
@@ -216,6 +225,7 @@ export async function createFlow(
         status: 'read' as const,
         notes: 'Fixture paper created by ResearchFlowRunner',
         tags: ['fixture'],
+        ...(input.ownerUserId ? { fixtureOwnerUserId: input.ownerUserId } : {}),
         addedAt: Date.now(),
       }
       draft.papers.push(currentPaper as never)
@@ -229,6 +239,8 @@ export async function createFlow(
     title,
     question: FLOW_FIXTURE.question,
     paperIds: [paperId],
+    allowFixture: true,
+    ...(input.ownerUserId ? { fixtureOwnerUserId: input.ownerUserId } : {}),
   })
   flow.projectId = projectId
   flow.runId = run.id

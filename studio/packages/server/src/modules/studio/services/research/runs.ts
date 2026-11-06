@@ -23,6 +23,8 @@ export interface CreateRunInput {
   title?: string
   question: string
   paperIds?: string[]
+  allowFixture?: boolean
+  fixtureOwnerUserId?: number
 }
 
 export interface EvidenceInput {
@@ -172,7 +174,12 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
   const store = await readStore(profile)
   if (!store.projects.some(project => project.id === projectId)) throw new Error('research_project_not_found')
   const requested = normalizePaperIds(input.paperIds)
-  const paperIds = requested.filter(id => store.papers.some(paper => paper.id === id))
+  const paperIds = requested.filter(id => {
+    const paper = store.papers.find(row => row.id === id)
+    if (!paper) return false
+    // Fixture papers must never enter a normal Run through the public API.
+    return input.allowFixture === true || !(paper.tags || []).includes('fixture')
+  })
   const now = Date.now()
   const run: ResearchRun = {
     id: newId('run'),
@@ -197,6 +204,7 @@ export async function createRun(profile: string, input: CreateRunInput): Promise
     merges: [],
     artifacts: [],
     approvals: [],
+    ...(input.fixtureOwnerUserId ? { fixtureOwnerUserId: input.fixtureOwnerUserId } : {}),
     createdAt: now,
     updatedAt: now,
   }

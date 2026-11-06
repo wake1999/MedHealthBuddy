@@ -124,6 +124,45 @@ function collectionOf(ctx: any): ResearchCollection | null {
   return isResearchCollection(value) ? value : null
 }
 
+function isFixturePaper(paper: { tags?: string[]; fixtureOwnerUserId?: number }): boolean {
+  return (paper.tags || []).includes('fixture') || paper.fixtureOwnerUserId !== undefined
+}
+
+function isFixtureProject(project: { title?: string; fixtureOwnerUserId?: number }): boolean {
+  return project.fixtureOwnerUserId !== undefined || / fixture$/i.test(project.title || '')
+}
+
+function isFixtureRun(run: { title?: string; paperIds?: string[]; fixtureOwnerUserId?: number }, fixturePaperIds: Set<string>): boolean {
+  return run.fixtureOwnerUserId !== undefined
+    || /fixture/i.test(run.title || '')
+    || (run.paperIds || []).some(id => fixturePaperIds.has(id))
+}
+
+/**
+ * Fixture data is test scaffolding. Keep it out of the normal state for other
+ * accounts, while allowing the owner (and legacy super-admin fixtures) to see
+ * their own test data. Real research data remains shared at profile scope.
+ */
+function filterFixtureState(store: Awaited<ReturnType<typeof readStore>>, ctx: any) {
+  const userId = Number(ctx.state?.user?.id) || 0
+  const isSuperAdmin = ctx.state?.user?.role === 'super_admin'
+  const ownerVisible = (owner?: number) => owner === undefined ? isSuperAdmin : owner === userId
+  const fixturePapers = store.papers.filter(paper => isFixturePaper(paper))
+  const fixturePaperIds = new Set(fixturePapers.map(paper => paper.id))
+
+  const projects = store.projects.filter(project => !isFixtureProject(project) || ownerVisible(project.fixtureOwnerUserId))
+  const visibleProjectIds = new Set(projects.map(project => project.id))
+  const papers = store.papers.filter(paper => visibleProjectIds.has(paper.projectId)
+    && (!isFixturePaper(paper) || ownerVisible(paper.fixtureOwnerUserId)))
+  const runs = store.runs.filter(run => visibleProjectIds.has(run.projectId)
+    && (!isFixtureRun(run, fixturePaperIds) || ownerVisible(run.fixtureOwnerUserId)))
+  const visibleRunIds = new Set(runs.map(run => run.id))
+  const flows = store.flows.filter(flow => (flow.projectId === '' || visibleProjectIds.has(flow.projectId))
+    && (flow.runId === '' || visibleRunIds.has(flow.runId))
+    && (flow.mode !== 'fixture' || ownerVisible(flow.fixtureOwnerUserId)))
+  return { ...store, projects, papers, runs, flows }
+}
+
 // GET /api/studio/research/state
 export async function getState(ctx: any) {
   const profile = profileOf(ctx)
@@ -133,7 +172,7 @@ export async function getState(ctx: any) {
   const store = await readStore(profile)
   // `root` 让面板能拼出工程的绝对目录：会话里的 agent 跑在别的 cwd 上，
   // 相对路径 `projects/<id>` 到它手里会指空（见 mimir 的 prompt builder）。
-  ctx.body = { store, changes: await readChangeLog(profile, 50), root: researchRoot(profile) }
+  ctx.body = { store: filterFixtureState(store, ctx), changes: await readChangeLog(profile, 50), root: researchRoot(profile) }
 }
 
 // POST /api/studio/research/projects  body: { title }

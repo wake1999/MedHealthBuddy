@@ -756,6 +756,7 @@ export async function createFlowHandler(ctx: any) {
         maxAttempts: Number(body.maxAttempts || 2),
         artifactPath: String(body.artifactPath || ''),
         auto: body.auto === true,
+        ownerUserId: Number(ctx.state.user?.id) || undefined,
       })),
     }
   } catch (error) {

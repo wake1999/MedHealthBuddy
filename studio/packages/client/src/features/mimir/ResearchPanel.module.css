@@ -2291,6 +2291,18 @@ li.dropIndicator {
 }
 
 
+.papersTestHeader {
+  grid-column: 1 / -1;
+  margin: 8px 0 -8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
+  color: var(--mimir-muted, #6b6b66);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .papersGrid {
   display: grid;
   /*

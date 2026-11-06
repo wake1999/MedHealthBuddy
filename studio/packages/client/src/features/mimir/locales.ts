@@ -289,6 +289,7 @@ export const zh = {
   // 文库首页（reader-redesign）：筛选、排序、视图、批量与收录。
   'papers.libFilter': '筛选题名、作者、期刊…',
   'papers.batch': '批量',
+  'papers.testData': '测试数据',
   'papers.filter': '筛选',
   'papers.sort': '排序',
   'papers.sortAdded': '按添加时间',
@@ -1744,6 +1745,7 @@ export const en = {
   // Library home (reader-redesign): filter, sort, view, batch and collect.
   'papers.libFilter': 'Filter by title, author, venue…',
   'papers.batch': 'Batch',
+  'papers.testData': 'Test data',
   'papers.filter': 'Filter',
   'papers.sort': 'Sort',
   'papers.sortAdded': 'By date added',

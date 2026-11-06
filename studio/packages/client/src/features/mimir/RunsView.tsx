@@ -289,6 +289,7 @@ interface RunPaper {
   id?: string
   arxivId?: string
   title: string
+  tags?: string[]
 }
 
 const STAGES: Stage[] = ['scope', 'literature', 'evidence', 'hypothesis', 'experiment', 'analysis']
@@ -579,7 +580,8 @@ export function RunsView({
   })
 
   const stageIndex = selected ? STAGES.indexOf(selected.stage) : 0
-  const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''), [papers])
+  const availablePapers = useMemo(() => papers.filter(paper => paperIdOf(paper) !== ''
+    && !(paper.tags || []).includes('fixture')), [papers])
   const paperGroups = useMemo(() => {
     const groups = new Map<string, { title: string; ids: string[]; paper: RunPaper }>()
     for (const paper of availablePapers) {

@@ -51,6 +51,8 @@ export interface ResearchProject {
   createdAt: number
   updatedAt: number
   venue?: ResearchVenueRef | null
+  /** Only set for synthetic projects created by a fixture flow. */
+  fixtureOwnerUserId?: number
 }
 
 /** 文献库里的一个文件夹（用户自建的分类，论文通过 folderId 归属）。 */
@@ -80,6 +82,8 @@ export interface ResearchPaper {
   notes: string
   /** Labels edited from the panel; absent on records that never had them. */
   tags?: string[]
+  /** Only set for synthetic fixture papers; real papers never carry this. */
+  fixtureOwnerUserId?: number
   addedAt: number
   /** Absolute path of the downloaded PDF, absent until it is fetched. */
   pdfPath?: string
@@ -616,6 +620,8 @@ export interface ResearchRun {
   merges: ResearchRunMerge[]
   artifacts: ResearchRunArtifact[]
   approvals: ResearchRunApproval[]
+  /** Only set for fixture-created runs; used to isolate test data by account. */
+  fixtureOwnerUserId?: number
   createdAt: number
   updatedAt: number
 }
@@ -664,6 +670,8 @@ export interface ResearchFlow {
   remoteArtifactPath: string
   remoteArtifact: { at: number; path: string; sha256: string; size: number } | null
   checkpoint: string
+  /** Owner of a fixture flow; real flows leave this undefined. */
+  fixtureOwnerUserId?: number
   createdAt: number
   updatedAt: number
 }

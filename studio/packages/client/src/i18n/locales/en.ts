@@ -342,6 +342,8 @@ export default {
     edit: 'Edit User',
     username: 'Username',
     role: 'Role',
+    rolePlaceholder: 'Select a role',
+    roleRequired: 'Please select a role',
     statusLabel: 'Status',
     profiles: 'Accessible Profiles',
     profilesPlaceholder: 'Select accessible profiles',

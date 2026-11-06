@@ -10,7 +10,6 @@ import {
   updateManagedUserRoles,
   type ManagedUser,
   type RoleSummary,
-  type UserRole,
   type UserStatus,
 } from '@/api/studio/auth'
 
@@ -32,16 +31,23 @@ const roleSaving = ref(false)
 const form = reactive({
   username: '',
   password: '',
-  role: 'admin' as UserRole,
+  roleId: null as number | null,
   status: 'active' as UserStatus,
   profiles: [] as string[],
 })
 
-const roleOptions = computed(() => [
-  { label: t('users.roles.admin'), value: 'admin' },
-  { label: t('users.roles.viewer'), value: 'viewer' },
-  { label: t('users.roles.superAdmin'), value: 'super_admin' },
-])
+const roleOptions = computed(() => roles.value.map(role => ({ label: role.name, value: role.id })))
+const selectedRole = computed(() => roles.value.find(role => role.id === form.roleId) || null)
+
+function defaultRoleId(): number | null {
+  return roles.value.find(role => role.key === 'admin')?.id ?? roles.value[0]?.id ?? null
+}
+
+function legacyRoleFor(role: RoleSummary | null): 'super_admin' | 'admin' | 'viewer' {
+  if (role?.key === 'super_admin') return 'super_admin'
+  if (role?.key === 'viewer') return 'viewer'
+  return 'admin'
+}
 
 const statusOptions = computed(() => [
   { label: t('users.status.active'), value: 'active' },
@@ -82,7 +88,7 @@ function resetForm() {
   editingUser.value = null
   form.username = ''
   form.password = ''
-  form.role = 'admin'
+  form.roleId = defaultRoleId()
   form.status = 'active'
   form.profiles = []
 }
@@ -110,7 +116,7 @@ function openEdit(user: ManagedUser) {
   editingUser.value = user
   form.username = user.username
   form.password = ''
-  form.role = user.role
+  form.roleId = user.roles?.[0]?.id ?? roles.value.find(role => role.key === user.role)?.id ?? defaultRoleId()
   form.status = user.status
   form.profiles = [...user.profiles]
   showModal.value = true
@@ -132,23 +138,37 @@ async function submit() {
 
   saving.value = true
   try {
+    const selected = selectedRole.value
+    if (!selected) {
+      message.error(t('users.roleRequired'))
+      return
+    }
+    const legacyRole = legacyRoleFor(selected)
     const base = {
       username: form.username.trim(),
       status: form.status,
-      profiles: form.role === 'super_admin' ? [] : form.profiles,
+      profiles: selected.key === 'super_admin' ? [] : form.profiles,
       defaultProfile: form.profiles[0] || null,
     }
-    const res = editingUser.value
-      ? await updateManagedUser(editingUser.value.id, {
+    let res
+    if (editingUser.value) {
+      const updated = await updateManagedUser(editingUser.value.id, {
         ...base,
         password: form.password || undefined,
-        // Do not resend an unchanged legacy role: updateUser would reset the
-        // user's custom role assignments to the built-in admin role.
-        role: editingUser.value.role === form.role ? undefined : form.role,
+        role: legacyRole,
       })
-      : await createManagedUser({ ...base, role: form.role, password: form.password })
+      res = await updateManagedUserRoles(editingUser.value.id, [selected.id])
+      if (!res.users.length) res = updated
+    } else {
+      const created = await createManagedUser({ ...base, role: legacyRole, password: form.password })
+      const newUser = created.users.find(user => user.username === base.username)
+      res = newUser
+        ? await updateManagedUserRoles(newUser.id, [selected.id])
+        : created
+    }
     users.value = res.users
     profiles.value = res.profiles
+    roles.value = res.roles
     showModal.value = false
     resetForm()
     message.success(t('common.saved'))
@@ -202,13 +222,17 @@ const columns = computed<DataTableColumns<ManagedUser>>(() => [
     title: t('users.role'),
     key: 'role',
     width: 130,
-    render: (row) => h(NTag, { size: 'small', type: row.role === 'super_admin' ? 'warning' : 'default' }, {
-      default: () => row.role === 'super_admin'
+    render: (row) => {
+      const primaryRole = row.roles?.[0]?.name
+      const fallback = row.role === 'super_admin'
         ? t('users.roles.superAdmin')
         : row.role === 'viewer'
           ? t('users.roles.viewer')
-          : t('users.roles.admin'),
-    }),
+          : t('users.roles.admin')
+      return h(NTag, { size: 'small', type: row.role === 'super_admin' ? 'warning' : 'default' }, {
+        default: () => primaryRole || fallback,
+      })
+    },
   },
   {
     title: t('users.statusLabel'),
@@ -297,12 +321,12 @@ onMounted(loadUsers)
           <NInput v-model:value="form.password" type="password" show-password-on="click" :placeholder="t('login.passwordPlaceholder')" />
         </NFormItem>
         <NFormItem :label="t('users.role')">
-          <NSelect v-model:value="form.role" :options="roleOptions" />
+          <NSelect v-model:value="form.roleId" :options="roleOptions" :placeholder="t('users.rolePlaceholder')" />
         </NFormItem>
         <NFormItem :label="t('users.statusLabel')">
           <NSelect v-model:value="form.status" :options="statusOptions" />
         </NFormItem>
-        <NFormItem v-if="form.role !== 'super_admin'" :label="t('users.profiles')">
+        <NFormItem v-if="selectedRole?.key !== 'super_admin'" :label="t('users.profiles')">
           <NSelect
             v-model:value="form.profiles"
             multiple

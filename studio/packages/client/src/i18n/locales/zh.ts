@@ -342,6 +342,8 @@ export default {
     edit: '编辑用户',
     username: '用户名',
     role: '角色',
+    rolePlaceholder: '选择角色',
+    roleRequired: '请选择角色',
     statusLabel: '状态',
     profiles: '可访问配置',
     profilesPlaceholder: '选择可访问的配置',

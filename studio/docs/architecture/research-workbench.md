@@ -2,6 +2,12 @@
 
 本文说明 MedHealthBuddy Studio 中“科研工作台”与聊天会话、账户、Profile、数据文件和 RBAC 的关系。
 
+配套可视化图：
+
+- [科研工作台模块关系](./research-workbench-modules.png)
+- [研究运行自动化流程](./research-automation-flow.png)
+- [图表说明文档](./research-workbench-diagrams.md)
+
 相关代码入口：
 
 ```text

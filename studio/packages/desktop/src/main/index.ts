@@ -635,6 +635,9 @@ async function createWindow(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // The paper preview is an iframe over a local PDF blob. Electron's
+      // built-in PDF viewer is disabled unless plugins are enabled.
+      plugins: true,
       additionalArguments: desktopPreloadArguments('main', !!activeRemoteServerUrl),
       session: desktopWindowSession(webUiHome(), activeRemoteServerUrl),
     },
@@ -754,6 +757,7 @@ async function openChatWindow(sessionIdInput: unknown, profileInput?: unknown): 
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      plugins: true,
       additionalArguments: desktopPreloadArguments('chat', !!activeRemoteServerUrl),
       session: desktopWindowSession(webUiHome(), activeRemoteServerUrl),
     },

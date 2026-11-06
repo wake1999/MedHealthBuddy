@@ -261,7 +261,7 @@ interface ResearchRunBranch {
 
 interface ResearchApprovalRequest {
   id: string
-  type: 'evidence' | 'claims' | 'experiment' | 'result'
+  type: 'evidence' | 'claims' | 'experiment' | 'result' | 'final'
   stage: string
   reason: string
   payload: Record<string, string>
@@ -1543,6 +1543,7 @@ export function RunsView({
         body: JSON.stringify({
           serverId,
           command: selected.experimentPlan?.command || '',
+          query: selected.question,
           timeoutMs: 120000,
         }),
       })
@@ -2175,7 +2176,7 @@ export function RunsView({
                 <button
                   type="button"
                   className={css.btnPrimary}
-                  disabled={autoBusy || branchFrozen || selected.paperIds.length === 0}
+                  disabled={autoBusy || branchFrozen}
                   onClick={() => void autoRunToResultGate()}
                 >
                   {autoBusy ? t('runs.autoRealBusy') : t('runs.autoReal')}

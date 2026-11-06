@@ -524,6 +524,10 @@ export async function bootstrap() {
   // Initialize all web-ui SQLite tables
   const { initAllStores } = await import('../modules/studio/infrastructure/database/init')
   initAllStores()
+  // Resume automation left behind by a previous process. Only runs with an
+  // explicit automation flag are touched.
+  const { startResearchOrchestrator } = await import('../modules/studio/services/research/run-orchestrator')
+  startResearchOrchestrator()
   // Refresh once on every startup; context and cost lookups can use the disk cache immediately.
   void refreshModelCatalog(true)
   const { interruptOrphanedTaskPlans } = await import('../modules/studio/repositories/task-plan-store')

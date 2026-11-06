@@ -873,6 +873,8 @@ export async function autoRunHandler(ctx: any) {
           baselines: String(body.baselines || ''),
           metrics: String(body.metrics || ''),
           timeoutMs: Number(body.timeoutMs || 120_000),
+          query: String(body.query || ''),
+          maxPapers: Number(body.maxPapers || 3),
         },
       )),
     }

@@ -15,7 +15,9 @@ import {
 } from './runs'
 import { uploadRawArtifact } from './run-merge-artifacts'
 import { downloadRemoteFile } from './ssh'
-import { readStore, updateStore } from './store'
+import { fetchPaperPdf } from './pdf'
+import { searchArxiv, type ArxivEntry } from './arxiv'
+import { newId, readStore, updateStore } from './store'
 
 export interface AutoRunOptions {
   serverId?: string
@@ -25,6 +27,8 @@ export interface AutoRunOptions {
   baselines?: string
   metrics?: string
   timeoutMs?: number
+  query?: string
+  maxPapers?: number
 }
 
 export interface AutoRunResult {
@@ -39,7 +43,7 @@ export interface AutoRunResult {
   approvalId?: string
 }
 
-function hasApproval(run: Awaited<ReturnType<typeof getRun>>, type: 'evidence' | 'claims' | 'experiment' | 'result'): boolean {
+function hasApproval(run: Awaited<ReturnType<typeof getRun>>, type: 'evidence' | 'claims' | 'experiment' | 'result' | 'final'): boolean {
   return run.approvals.some(item => item.type === type
     || (type === 'evidence' && item.stage === 'evidence' && item.type === undefined))
 }
@@ -89,6 +93,176 @@ function artifactSamples(content: string): { samples: Record<string, number[]>; 
     .filter(value => Number.isFinite(value))
   if (values.length === 0) throw new Error('research_artifact_rows_invalid')
   return { samples: { [metric.toLowerCase()]: values }, metric }
+}
+
+async function configureAutomation(
+  profile: string,
+  runId: string,
+  options: AutoRunOptions,
+): Promise<void> {
+  await updateStore(profile, 'run.automation.configured', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const previous = run.automation
+    run.automation = {
+      enabled: true,
+      serverId: options.serverId ?? previous?.serverId ?? '',
+      command: options.command ?? previous?.command ?? '',
+      artifactPath: options.artifactPath ?? previous?.artifactPath ?? '',
+      query: options.query ?? previous?.query ?? '',
+      dataset: options.dataset ?? previous?.dataset ?? '',
+      baselines: options.baselines ?? previous?.baselines ?? '',
+      metrics: options.metrics ?? previous?.metrics ?? '',
+      timeoutMs: Number(options.timeoutMs ?? previous?.timeoutMs ?? 120_000),
+      nextRunAt: 0,
+      lastError: '',
+    }
+    run.updatedAt = Date.now()
+    return run
+  }, { actor: { kind: 'system', id: 'run-orchestrator' }, action: 'run.automation.configured' })
+}
+
+async function importArxivForRun(
+  profile: string,
+  runId: string,
+  entries: ArxivEntry[],
+): Promise<string[]> {
+  const selected = entries.slice(0, 3)
+  if (selected.length === 0) return []
+  return updateStore(profile, 'run.literature.imported', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const ids: string[] = []
+    for (const entry of selected) {
+      const existing = draft.papers.find(paper => paper.projectId === run.projectId
+        && paper.arxivId === entry.arxivId)
+      if (existing) {
+        ids.push(existing.id)
+        continue
+      }
+      const paperId = newId('paper')
+      draft.papers.unshift({
+        id: paperId,
+        projectId: run.projectId,
+        title: entry.title,
+        authors: entry.authors,
+        year: entry.year,
+        venue: entry.venue || 'arXiv',
+        doi: entry.doi,
+        url: entry.url || `https://arxiv.org/abs/${entry.arxivId}`,
+        arxivId: entry.arxivId,
+        score: 0,
+        status: 'new',
+        notes: entry.summary,
+        tags: ['auto-selected'],
+        addedAt: Date.now(),
+      })
+      ids.push(paperId)
+    }
+    run.paperIds = [...new Set(ids)]
+    run.updatedAt = Date.now()
+    return run.paperIds
+  }, { actor: { kind: 'system', id: 'run-orchestrator' }, action: 'run.literature.imported' })
+}
+
+async function autoSelectLiterature(profile: string, runId: string, query: string): Promise<string[]> {
+  const result = await searchArxiv(query, 5)
+  if (result.error) throw new Error(`research_literature_search_failed: ${result.error}`)
+  const imported = await importArxivForRun(profile, runId, result.entries)
+  if (imported.length === 0) throw new Error('research_literature_search_empty')
+  const ready: string[] = []
+  const store = await readStore(profile)
+  const run = store.runs.find(row => row.id === runId)
+  if (!run) throw new Error('research_run_not_found')
+  for (const paperId of imported) {
+    const paper = store.papers.find(row => row.id === paperId)
+    if (!paper?.arxivId) continue
+    try {
+      await fetchPaperPdf(profile, run.projectId, paper.arxivId)
+      ready.push(paperId)
+    } catch {
+      // Keep metadata; evidence extraction will skip papers without a PDF.
+    }
+  }
+  if (ready.length === 0) throw new Error('research_literature_pdf_unavailable')
+  await updateStore(profile, 'run.literature.ready', draft => {
+    const current = draft.runs.find(row => row.id === runId)
+    if (current) {
+      current.paperIds = ready
+      current.updatedAt = Date.now()
+    }
+  }, { actor: { kind: 'system', id: 'run-orchestrator' }, action: 'run.literature.ready' })
+  return ready
+}
+
+async function finalizeJobResult(
+  profile: string,
+  runId: string,
+  serverId: string,
+  artifactPath: string,
+  jobId: string,
+  insight: Awaited<ReturnType<typeof refreshExperimentJob>>['insight'],
+): Promise<Awaited<ReturnType<typeof getRun>>> {
+  let run = await getRun(profile, runId)
+  let samples: Record<string, number[]> | null = null
+  let artifactName = ''
+  if (artifactPath !== '') {
+    const store = await readStore(profile)
+    const server = store.servers.find(row => row.id === serverId)
+    if (!server) throw new Error('research_server_not_found')
+    const downloaded = await downloadRemoteFile(
+      { host: server.host, user: server.user, port: server.port },
+      artifactPath,
+    )
+    if (!downloaded.ok) throw new Error(downloaded.detail || 'remote_artifact_download_failed')
+    const content = downloaded.data.toString('utf-8')
+    const parsed = artifactSamples(content)
+    samples = parsed.samples
+    artifactName = artifactPath.split('/').pop() || 'remote-artifact.json'
+    if (run.activeBranchId) {
+      await uploadRawArtifact(profile, runId, run.activeBranchId, {
+        name: artifactName,
+        content,
+      })
+    }
+    run = await getRun(profile, runId)
+  }
+  if (!samples && insight?.metrics?.length) {
+    samples = Object.fromEntries(insight.metrics.map(metric => [metric.name.toLowerCase(), [metric.value]]))
+  }
+  if (!samples) return run
+  const metricText = Object.entries(samples)
+    .flatMap(([metric, values]) => values.map(value => `${metric}=${value}`))
+    .join('\n')
+  return recordExperimentResult(profile, runId, {
+    summary: `SSH job ${jobId} completed${artifactName ? `; artifact ${artifactName}` : ''}.`,
+    metrics: metricText,
+    metricSamples: samples,
+    confirmedFinal: true,
+  })
+}
+
+/** Poll an already-submitted job; only records a result once it finished successfully. */
+export async function refreshAutomationJob(
+  profile: string,
+  runId: string,
+  serverId: string,
+  artifactPath: string,
+): Promise<{ run: Awaited<ReturnType<typeof getRun>>; state: string }> {
+  const refreshed = await refreshExperimentJob(profile, runId)
+  const state = refreshed.state?.state || 'unknown'
+  if (state !== 'succeeded') {
+    return { run: refreshed.run, state }
+  }
+  const run = await finalizeJobResult(
+    profile,
+    runId,
+    serverId,
+    artifactPath,
+    String(refreshed.job?.id || ''),
+    refreshed.insight,
+  )
+  return { run, state }
 }
 
 async function submitAndWait(
@@ -175,7 +349,12 @@ export async function autoRunToResultGate(
   runId: string,
   options: AutoRunOptions = {},
 ): Promise<AutoRunResult> {
+  await configureAutomation(profile, runId, options)
   let run = await getRun(profile, runId)
+  if (run.paperIds.length === 0) {
+    await autoSelectLiterature(profile, runId, String(options.query || run.question || '').trim())
+    run = await getRun(profile, runId)
+  }
   if (run.paperIds.length === 0) throw new Error('research_run_no_papers')
 
   let evidenceAdded = 0
@@ -313,6 +492,7 @@ export async function autoRunToResultGate(
   }
 
   if (!run.result && options.serverId && command) {
+    const effectiveCommand = String(run.experimentPlan?.command || command).trim()
     if (!hasApproval(run, 'experiment')) {
       run = await requestRunApproval(profile, runId, {
         type: 'experiment',
@@ -320,7 +500,7 @@ export async function autoRunToResultGate(
         reason: '即将在远程服务器执行实验命令，需要确认服务器、命令和产物路径。',
         payload: {
           serverId: String(options.serverId),
-          command,
+          command: effectiveCommand,
           artifactPath: String(options.artifactPath || ''),
         },
       })
@@ -331,16 +511,31 @@ export async function autoRunToResultGate(
         claimsApproved: approved.count,
       })
     }
-    const waited = await submitAndWait(
-      profile,
-      runId,
-      String(options.serverId),
-      command,
-      String(options.artifactPath || ''),
-      Number(options.timeoutMs || 120_000),
-    )
-    run = waited.run
-    if (!run.result) {
+    if (run.experimentJobId !== '') {
+      const refreshed = await refreshAutomationJob(
+        profile,
+        runId,
+        String(options.serverId),
+        String(options.artifactPath || ''),
+      )
+      run = refreshed.run
+      if (!run.result) {
+        return {
+          run,
+          status: 'awaiting_result',
+          evidenceAdded,
+          evidenceSkipped,
+          claimsDerived,
+          claimsApproved: approved.count,
+          message: refreshed.state === 'failed'
+            ? 'SSH 任务失败，未生成结果。'
+            : 'SSH 任务仍在运行，后台编排器会继续等待结果。',
+          jobId: run.experimentJobId,
+        }
+      }
+    } else {
+      const submitted = await submitExperimentJob(profile, runId, String(options.serverId))
+      run = await getRun(profile, runId)
       return {
         run,
         status: 'awaiting_result',
@@ -348,8 +543,8 @@ export async function autoRunToResultGate(
         evidenceSkipped,
         claimsDerived,
         claimsApproved: approved.count,
-        message: waited.message,
-        jobId: waited.jobId,
+        message: 'SSH 任务已提交，后台编排器会等待任务完成并回传结果。',
+        jobId: String(submitted.job.id || ''),
       }
     }
   }
@@ -389,6 +584,27 @@ export async function autoRunToResultGate(
   run = await advanceRun(profile, runId)
   await generateRunReport(profile, runId)
   await generateResultsDraft(profile, runId)
+  run = await getRun(profile, runId)
+
+  if (run.fixtureOwnerUserId === undefined && !hasApproval(run, 'final')) {
+    run = await requestRunApproval(profile, runId, {
+      type: 'final',
+      stage: 'analysis',
+      reason: '报告和 Results 草稿已生成，需要人工确认后才能结束研究运行。',
+      payload: {
+        stage: run.stage,
+        report: 'generated',
+        resultsDraft: 'generated',
+      },
+    })
+    return approvalResult(run, '最终报告需要人工确认；批准后将结束本次研究运行。', {
+      evidenceAdded,
+      evidenceSkipped,
+      claimsDerived,
+      claimsApproved: approved.count,
+    })
+  }
+
   return {
     run,
     status: 'completed',

@@ -579,7 +579,7 @@ export interface ResearchRunJobInsight {
   at: number
 }
 
-export type ResearchApprovalType = 'evidence' | 'claims' | 'experiment' | 'result'
+export type ResearchApprovalType = 'evidence' | 'claims' | 'experiment' | 'result' | 'final'
 
 export interface ResearchRunApproval {
   stage: ResearchRunStage
@@ -604,6 +604,20 @@ export interface ResearchApprovalHistoryEntry extends Omit<ResearchApprovalReque
   resolvedAt: number
   resolvedBy: string
   comment: string
+}
+
+export interface ResearchAutomation {
+  enabled: boolean
+  serverId: string
+  command: string
+  artifactPath: string
+  query: string
+  dataset: string
+  baselines: string
+  metrics: string
+  timeoutMs: number
+  nextRunAt: number
+  lastError: string
 }
 
 export type ResearchRunStatus = 'running' | 'waiting_approval' | 'completed' | 'cancelled'
@@ -643,6 +657,7 @@ export interface ResearchRun {
   approvals: ResearchRunApproval[]
   approvalRequest?: ResearchApprovalRequest | null
   approvalHistory?: ResearchApprovalHistoryEntry[]
+  automation?: ResearchAutomation
   /** Only set for fixture-created runs; used to isolate test data by account. */
   fixtureOwnerUserId?: number
   createdAt: number

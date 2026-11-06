@@ -773,15 +773,19 @@ async function uninstall(skill: MarketSkill) {
 
 /** Row overflow menu: details plus uninstall, greyed out with the reason when blocked. */
 function rowActions(skill: MarketSkill) {
-  const reason = uninstallHint(skill)
-  return [
+  const actions: Array<{ key: string; label: string; disabled?: boolean }> = [
     { key: 'detail', label: t('skillMarket.detail') },
-    {
-      key: 'uninstall',
-      label: reason ? `${t('skillMarket.uninstall')} · ${reason}` : t('skillMarket.uninstall'),
-      disabled: !canUninstall(skill),
-    },
   ]
+  // Built-in skills ship with the app; an uninstall action is not applicable,
+  // so omit it instead of showing a permanently disabled menu item.
+  if ((skill.source || 'local') === 'builtin') return actions
+  const reason = uninstallHint(skill)
+  actions.push({
+    key: 'uninstall',
+    label: reason ? `${t('skillMarket.uninstall')} · ${reason}` : t('skillMarket.uninstall'),
+    disabled: !canUninstall(skill),
+  })
+  return actions
 }
 
 function onRowAction(skill: MarketSkill, key: string) {

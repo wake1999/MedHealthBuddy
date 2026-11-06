@@ -1,4 +1,5 @@
 import { createReadStream, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import YAML from 'js-yaml'
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
 import { basename, join } from 'path'
 import { tmpdir } from 'os'
@@ -14,7 +15,7 @@ import {
 import { logger } from '../../studio/public/logging'
 import { smartCloneCleanup, copyModelProviderAuthForClone } from '../services/profiles/profile-credentials'
 import { detectHermesRootHome } from '../services/runtime/path'
-import { getActiveProfileName, listProfileNamesFromDisk } from '../services/profiles/profile'
+import { getActiveProfileName, getProfileDir, listProfileNamesFromDisk } from '../services/profiles/profile'
 import { listProfilesFromDisk, type HermesProfile } from '../services/profiles/catalog'
 import {
   createProfileWithoutHermes,
@@ -208,6 +209,24 @@ function renameProfileMetadata(oldName: string, newName: string): void {
   if (!existsSync(oldDir) || oldDir === newDir) return
   rmSync(newDir, { recursive: true, force: true })
   renameSync(oldDir, newDir)
+}
+
+/** The default profile's canonical id is reserved; rename is presentation-only. */
+function writeProfileDisplayName(name: string, displayName: string): void {
+  const metaPath = join(getProfileDir(name), 'profile.yaml')
+  let meta: Record<string, unknown> = {}
+  if (existsSync(metaPath)) {
+    try {
+      const parsed = YAML.load(readFileSync(metaPath, 'utf-8'), { json: true })
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        meta = parsed as Record<string, unknown>
+      }
+    } catch (err: any) {
+      logger.warn(err, '[renameProfile] could not parse %s; rewriting display name', metaPath)
+    }
+  }
+  meta.display_name = displayName
+  writeFileSync(metaPath, YAML.dump(meta, { noRefs: true, lineWidth: -1 }), 'utf-8')
 }
 
 async function useProfileWithFallback(name: string): Promise<string> {
@@ -692,10 +711,16 @@ export async function rename(ctx: any) {
     return
   }
   try {
+    if (isDisplayNameRename) {
+      // `default` is a reserved canonical id, so the CLI rejects renaming it.
+      // Write presentation metadata directly and keep every profile reference intact.
+      writeProfileDisplayName(ctx.params.name, String(new_name).trim())
+      ctx.body = { success: true, displayName: String(new_name).trim() }
+      return
+    }
     const ok = await hermesCli.renameProfile(ctx.params.name, new_name)
     if (ok) {
-      // A display-name rename keeps the canonical id, so metadata stays keyed to 'default'.
-      if (!isDisplayNameRename) renameProfileMetadata(ctx.params.name, new_name)
+      renameProfileMetadata(ctx.params.name, new_name)
       ctx.body = { success: true }
     } else {
       ctx.status = 500

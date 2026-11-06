@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref } from 'vue'
-import { NButton, NCheckbox, NCheckboxGroup, NDataTable, NForm, NFormItem, NInput, NModal, NPopconfirm, NSelect, NSpace, NTag, useMessage, type DataTableColumns } from 'naive-ui'
+import { NButton, NDataTable, NForm, NFormItem, NInput, NModal, NPopconfirm, NSelect, NSpace, NTag, useMessage, type DataTableColumns } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import {
   createManagedUser,
   deleteManagedUser,
   fetchManagedUsers,
+  fetchRoles,
   updateManagedUser,
   updateManagedUserRoles,
   type ManagedUser,
@@ -25,7 +26,7 @@ const showModal = ref(false)
 const editingUser = ref<ManagedUser | null>(null)
 const roleModal = ref(false)
 const roleTarget = ref<ManagedUser | null>(null)
-const roleDraft = ref<number[]>([])
+const roleDraftId = ref<number | null>(null)
 const roleSaving = ref(false)
 
 const form = reactive({
@@ -37,6 +38,9 @@ const form = reactive({
 })
 
 const roleOptions = computed(() => roles.value.map(role => ({ label: role.name, value: role.id })))
+const assignRoleOptions = computed(() => roles.value
+  .filter(role => role.key !== 'super_admin')
+  .map(role => ({ label: role.name, value: role.id })))
 const selectedRole = computed(() => roles.value.find(role => role.id === form.roleId) || null)
 
 function defaultRoleId(): number | null {
@@ -55,23 +59,42 @@ const statusOptions = computed(() => [
 ])
 
 const profileOptions = computed(() => profiles.value.map(profile => ({ label: profile, value: profile })))
-const assignableRoles = computed(() => roles.value.filter(role => role.key !== 'super_admin'))
 
-function openRoles(user: ManagedUser) {
+async function refreshRoles() {
+  try {
+    const res = await fetchRoles()
+    roles.value = res.roles
+  } catch {
+    // Keep the last known list; the save path will surface an actionable error.
+  }
+}
+
+async function openRoles(user: ManagedUser) {
   if (user.role === 'super_admin') {
     message.warning(t('users.superAdminRolesLocked'))
     return
   }
+  await refreshRoles()
   roleTarget.value = user
-  roleDraft.value = (user.roles || []).filter(role => role.key !== 'super_admin').map(role => role.id)
+  roleDraftId.value = user.roles?.[0]?.id ?? roles.value.find(role => role.key === user.role)?.id ?? defaultRoleId()
   roleModal.value = true
 }
 
 async function saveRoles() {
   if (!roleTarget.value) return
+  if (roleDraftId.value === null) {
+    message.error(t('users.roleRequired'))
+    return
+  }
+  const selected = roles.value.find(role => role.id === roleDraftId.value)
+  if (!selected) {
+    message.error(t('users.roleRequired'))
+    return
+  }
   roleSaving.value = true
   try {
-    const res = await updateManagedUserRoles(roleTarget.value.id, roleDraft.value)
+    await updateManagedUser(roleTarget.value.id, { role: legacyRoleFor(selected) })
+    const res = await updateManagedUserRoles(roleTarget.value.id, [selected.id])
     users.value = res.users
     profiles.value = res.profiles
     roles.value = res.roles
@@ -107,12 +130,14 @@ async function loadUsers() {
   }
 }
 
-function openCreate() {
+async function openCreate() {
+  await refreshRoles()
   resetForm()
   showModal.value = true
 }
 
-function openEdit(user: ManagedUser) {
+async function openEdit(user: ManagedUser) {
+  await refreshRoles()
   editingUser.value = user
   form.username = user.username
   form.password = ''
@@ -352,17 +377,11 @@ onMounted(loadUsers)
         <p class="role-hint">
           {{ t('users.assignRolesHint', { username: roleTarget?.username || '' }) }}
         </p>
-        <NCheckboxGroup v-model:value="roleDraft">
-          <div class="role-grid">
-            <NCheckbox
-              v-for="role in assignableRoles"
-              :key="role.id"
-              :value="role.id"
-              :label="`${role.name} (${role.key})`"
-            />
-          </div>
-        </NCheckboxGroup>
-        <p v-if="assignableRoles.length === 0" class="role-hint">{{ t('users.noAssignableRoles') }}</p>
+        <NSelect
+          v-model:value="roleDraftId"
+          :options="assignRoleOptions"
+          :placeholder="t('users.rolePlaceholder')"
+        />
       </div>
       <template #action>
         <NButton @click="roleModal = false">{{ t('common.cancel') }}</NButton>
@@ -418,24 +437,5 @@ onMounted(loadUsers)
   line-height: 1.6;
 }
 
-.role-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px 16px;
-  max-height: 280px;
-  overflow: auto;
-  padding: 10px;
-  border: 1px solid var(--n-border-color, #e5e7eb);
-  border-radius: 8px;
-}
-
-.role-names {
-  max-width: 140px;
-  overflow: hidden;
-  color: $text-muted;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 </style>

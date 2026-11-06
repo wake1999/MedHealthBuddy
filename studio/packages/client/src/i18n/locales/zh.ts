@@ -365,7 +365,7 @@ export default {
     superAdminRole: '超级管理员',
     noRoles: '未分配角色',
     assignRoles: '分配角色',
-    assignRolesHint: '为账户“{username}”选择角色，权限将取所选角色的并集。',
+    assignRolesHint: '为账户“{username}”选择主角色，保存后立即按该角色权限生效。',
     noAssignableRoles: '没有可分配的自定义角色',
     rolesSaved: '角色分配已更新',
     rolesSaveFailed: '角色分配保存失败',

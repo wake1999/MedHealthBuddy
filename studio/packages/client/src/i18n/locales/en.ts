@@ -365,7 +365,7 @@ export default {
     superAdminRole: 'Super Admin',
     noRoles: 'No roles',
     assignRoles: 'Assign roles',
-    assignRolesHint: 'Choose roles for “{username}”. Effective permissions are the union of all selected roles.',
+    assignRolesHint: 'Choose the primary role for “{username}”. Its permissions apply immediately after saving.',
     noAssignableRoles: 'No custom roles available',
     rolesSaved: 'Role assignments updated',
     rolesSaveFailed: 'Failed to save role assignments',

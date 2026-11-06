@@ -3794,6 +3794,53 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                   </button>
                 </div>
               </div>
+                <div v-if="activeChatApp && activeChatScene" class="new-chat-agents" :aria-label="t('chat.agentsTitle')">
+                  <div class="new-chat-agents-head">
+                    <span class="new-chat-agents-title">{{ t('chat.agentsTitle') }}</span>
+                    <span class="new-chat-agents-count" :title="t('chat.agentsCount', { count: sceneAgents.length })">{{ sceneAgents.length }}</span>
+                    <span v-if="sceneAgents.length > 4" class="new-chat-agents-hint">{{ t('chat.agentsSwipeHint') }}</span>
+                    <button v-if="!fastGptAgentsLoading && fastGptAgents.length === 0" type="button" class="new-chat-agents-retry"
+                      @click="loadFastGptAgents(true)">
+                      {{ t('chat.agentsReload') }}
+                    </button>
+                  </div>
+                  <div v-if="fastGptAgentsLoading && sceneAgents.length === 0" class="new-chat-agents-track" aria-hidden="true">
+                    <span v-for="index in 4" :key="index" class="new-chat-agent-skeleton"></span>
+                  </div>
+                  <div v-else-if="sceneAgents.length > 0" class="new-chat-agents-viewport">
+                    <div ref="agentsTrackRef" class="new-chat-agents-track" @scroll.passive="updateAgentsScrollState">
+                      <div v-for="agent in sceneAgents" :key="agent.appId" class="new-chat-agent"
+                        :class="{ 'is-active': activeAgentCard?.appId === agent.appId }">
+                        <button type="button" class="new-chat-agent-hit" :aria-label="agent.name" :title="agent.name"
+                          @click="openAgentDetail(agent)"></button>
+                        <span class="new-chat-agent-icon" :style="{ background: agent.tint }" aria-hidden="true">{{
+                          agent.short.slice(0, 1) }}</span>
+                        <span class="new-chat-agent-text">
+                          <span class="new-chat-agent-name">{{ agent.short }}</span>
+                          <span class="new-chat-agent-desc">{{ agent.desc }}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <button v-if="agentsOverflow && !agentsAtStart" type="button"
+                      class="new-chat-agents-pager is-prev" :aria-label="t('chat.agentsScrollPrev')"
+                      :title="t('chat.agentsScrollPrev')" @click="scrollAgentsBy(-1)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m14 6-6 6 6 6" />
+                      </svg>
+                    </button>
+                    <button v-if="agentsOverflow && !agentsAtEnd" type="button"
+                      class="new-chat-agents-pager is-next" :aria-label="t('chat.agentsScrollNext')"
+                      :title="t('chat.agentsScrollNext')" @click="scrollAgentsBy(1)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m10 6 6 6-6 6" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p v-else class="new-chat-agents-empty">{{ t('chat.agentsEmpty') }}</p>
+                </div>
+
               <div class="new-chat-compose">
                 <div class="new-chat-config-bar">
                   <div class="new-chat-config-actions">
@@ -3924,53 +3971,6 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                 <button v-else-if="newChatMissingCredentials" type="button" class="new-chat-config-hint" @click="showNewChatSettings = true">
                   {{ t('chat.newChatCredentialsHint') }}
                 </button>
-                <div v-if="activeChatApp && activeChatScene" class="new-chat-agents" :aria-label="t('chat.agentsTitle')">
-                  <div class="new-chat-agents-head">
-                    <span class="new-chat-agents-title">{{ t('chat.agentsTitle') }}</span>
-                    <span class="new-chat-agents-count" :title="t('chat.agentsCount', { count: sceneAgents.length })">{{ sceneAgents.length }}</span>
-                    <span v-if="sceneAgents.length > 4" class="new-chat-agents-hint">{{ t('chat.agentsSwipeHint') }}</span>
-                    <button v-if="!fastGptAgentsLoading && fastGptAgents.length === 0" type="button" class="new-chat-agents-retry"
-                      @click="loadFastGptAgents(true)">
-                      {{ t('chat.agentsReload') }}
-                    </button>
-                  </div>
-                  <div v-if="fastGptAgentsLoading && sceneAgents.length === 0" class="new-chat-agents-track" aria-hidden="true">
-                    <span v-for="index in 4" :key="index" class="new-chat-agent-skeleton"></span>
-                  </div>
-                  <div v-else-if="sceneAgents.length > 0" class="new-chat-agents-viewport">
-                    <div ref="agentsTrackRef" class="new-chat-agents-track" @scroll.passive="updateAgentsScrollState">
-                      <div v-for="agent in sceneAgents" :key="agent.appId" class="new-chat-agent"
-                        :class="{ 'is-active': activeAgentCard?.appId === agent.appId }">
-                        <button type="button" class="new-chat-agent-hit" :aria-label="agent.name" :title="agent.name"
-                          @click="openAgentDetail(agent)"></button>
-                        <span class="new-chat-agent-icon" :style="{ background: agent.tint }" aria-hidden="true">{{
-                          agent.short.slice(0, 1) }}</span>
-                        <span class="new-chat-agent-text">
-                          <span class="new-chat-agent-name">{{ agent.short }}</span>
-                          <span class="new-chat-agent-desc">{{ agent.desc }}</span>
-                        </span>
-                      </div>
-                    </div>
-                    <button v-if="agentsOverflow && !agentsAtStart" type="button"
-                      class="new-chat-agents-pager is-prev" :aria-label="t('chat.agentsScrollPrev')"
-                      :title="t('chat.agentsScrollPrev')" @click="scrollAgentsBy(-1)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="m14 6-6 6 6 6" />
-                      </svg>
-                    </button>
-                    <button v-if="agentsOverflow && !agentsAtEnd" type="button"
-                      class="new-chat-agents-pager is-next" :aria-label="t('chat.agentsScrollNext')"
-                      :title="t('chat.agentsScrollNext')" @click="scrollAgentsBy(1)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="m10 6 6 6-6 6" />
-                      </svg>
-                    </button>
-                  </div>
-                  <p v-else class="new-chat-agents-empty">{{ t('chat.agentsEmpty') }}</p>
-                </div>
-
                 <NModal :show="agentDetail !== null" :auto-focus="false" :mask-closable="true"
                   @update:show="handleAgentDrawerToggle">
                   <div v-if="agentDetail" class="agent-sheet" :class="{ 'is-embed': agentEmbedUrl }" role="dialog" aria-modal="true">

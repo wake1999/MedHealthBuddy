@@ -161,7 +161,6 @@ const router = createRouter({
       path: '/hermes/skill-market',
       name: 'hermes.skillMarket',
       component: () => import('@/views/hermes/SkillMarketView.vue'),
-      meta: { requiresSuperAdmin: true },
     },
     {
       path: '/hermes/petdex',

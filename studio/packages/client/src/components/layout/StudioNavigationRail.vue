@@ -32,8 +32,8 @@ const entries = computed(() => [
   { key: 'connections', route: 'hermes.connections', label: 'sidebar.connections', path: 'M3 4h14a1 1 0 0 1 1 1v4M3 4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h9M7 16v4M5 20h7M15 9h6a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1M17 18h2' },
   ...(canManageAgents.value ? [
     { key: 'agents', route: 'hermes.agentManager', label: 'sidebar.agentManager', path: 'M12 8V4H8M7 8h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3M2 14h2M20 14h2M9 13v2M15 13v2' },
-    { key: 'skillMarket', route: 'hermes.skillMarket', label: 'sidebar.skillMarket', path: 'M3 9.5 5.2 4h13.6L21 9.5M3 9.5h18M4.5 9.5V20h15V9.5M9.5 20v-5.5h5V20' },
   ] : []),
+  { key: 'skillMarket', route: 'hermes.skillMarket', label: 'sidebar.skillMarket', path: 'M3 9.5 5.2 4h13.6L21 9.5M3 9.5h18M4.5 9.5V20h15V9.5M9.5 20v-5.5h5V20' },
   { key: 'promptTemplates', route: 'hermes.promptTemplates', label: 'sidebar.promptTemplates', path: 'M4 5.5A1.5 1.5 0 0 1 5.5 4h9L20 9.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13M14 4v5.5h5.5M8 13h8M8 16.5h5' },
   { key: 'models', route: 'hermes.models', label: 'sidebar.models', path: 'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1' },
   { key: 'usage', route: 'hermes.usage', label: 'sidebar.usage', path: 'M3 12h4v9H3zM10 7h4v14h-4zM17 3h4v18h-4z' },

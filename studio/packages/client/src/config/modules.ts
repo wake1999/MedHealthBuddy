@@ -18,7 +18,7 @@ export const APP_MODULES: readonly AppModuleDefinition[] = [
   { key: 'history', labelKey: 'sidebar.history', routes: ['hermes.history', 'hermes.historySession'] },
   { key: 'connections', labelKey: 'sidebar.connections', routes: ['hermes.connections', 'hermes.terminal', 'hermes.devices'] },
   { key: 'agents', labelKey: 'sidebar.agentManager', routes: ['hermes.agentManager'], superAdminOnly: true },
-  { key: 'skillMarket', labelKey: 'sidebar.skillMarket', routes: ['hermes.skillMarket'], superAdminOnly: true },
+  { key: 'skillMarket', labelKey: 'sidebar.skillMarket', routes: ['hermes.skillMarket'] },
   { key: 'promptTemplates', labelKey: 'sidebar.promptTemplates', routes: ['hermes.promptTemplates'] },
   { key: 'models', labelKey: 'sidebar.models', routes: ['hermes.models'] },
   { key: 'usage', labelKey: 'sidebar.usage', routes: ['hermes.usage'] },

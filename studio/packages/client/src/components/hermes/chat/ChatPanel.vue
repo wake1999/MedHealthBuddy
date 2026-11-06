@@ -4626,7 +4626,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 .new-chat-agents-track {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 24px) / 3);
+  grid-auto-columns: calc((100% - 36px) / 4);
   gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -4688,14 +4688,16 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 .new-chat-agent {
   position: relative;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   grid-template-rows: auto 1fr;
-  column-gap: 12px;
-  row-gap: 7px;
+  column-gap: 10px;
+  row-gap: 5px;
   align-items: start;
   min-width: 0;
-  min-height: 104px;
-  padding: 15px;
+  min-height: 0;
+  /* Standard ID card: 85.6mm x 54mm = 1.586:1. */
+  aspect-ratio: 1.586 / 1;
+  padding: 13px;
   border: 1px solid $border-light;
   border-radius: 14px;
   background: $bg-card;
@@ -4991,9 +4993,9 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
   color: #ffffff;
   font-size: 14px;
@@ -5019,17 +5021,17 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $text-primary;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .new-chat-agent-desc {
   color: $text-secondary;
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 11.5px;
+  line-height: 1.5;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -5046,7 +5048,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 }
 
 @media (max-width: 1180px) {
-  .new-chat-agents-track { grid-auto-columns: calc((100% - 12px) / 2); }
+  .new-chat-agents-track { grid-auto-columns: calc((100% - 24px) / 3); }
 }
 
 /* 详情：居中一张卡（不用贴边抽屉），图标 + 标题 + 场景，下面是简介、建议与元信息。 */

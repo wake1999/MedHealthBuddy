@@ -579,10 +579,31 @@ export interface ResearchRunJobInsight {
   at: number
 }
 
+export type ResearchApprovalType = 'evidence' | 'claims' | 'experiment' | 'result'
+
 export interface ResearchRunApproval {
   stage: ResearchRunStage
   at: number
   note: string
+  type?: ResearchApprovalType
+}
+
+export interface ResearchApprovalRequest {
+  id: string
+  type: ResearchApprovalType
+  stage: ResearchRunStage
+  reason: string
+  payload: Record<string, string>
+  status: 'pending'
+  createdAt: number
+  expiresAt: number
+}
+
+export interface ResearchApprovalHistoryEntry extends Omit<ResearchApprovalRequest, 'status'> {
+  status: 'approved' | 'rejected' | 'changes_requested'
+  resolvedAt: number
+  resolvedBy: string
+  comment: string
 }
 
 export type ResearchRunStatus = 'running' | 'waiting_approval' | 'completed' | 'cancelled'
@@ -620,6 +641,8 @@ export interface ResearchRun {
   merges: ResearchRunMerge[]
   artifacts: ResearchRunArtifact[]
   approvals: ResearchRunApproval[]
+  approvalRequest?: ResearchApprovalRequest | null
+  approvalHistory?: ResearchApprovalHistoryEntry[]
   /** Only set for fixture-created runs; used to isolate test data by account. */
   fixtureOwnerUserId?: number
   createdAt: number

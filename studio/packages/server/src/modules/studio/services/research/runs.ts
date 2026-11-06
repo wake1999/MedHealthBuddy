@@ -4,6 +4,7 @@ import {
   newId,
   readStore,
   updateStore,
+  type ResearchApprovalType,
   type ResearchRun,
   type ResearchRunClaim,
   type ResearchRunEvidence,
@@ -996,7 +997,7 @@ export async function approveEvidence(profile: string, runId: string, note = '')
     if (run.evidence.length === 0) throw new Error('research_evidence_empty')
     const now = Date.now()
     if (!run.approvals.some(item => item.stage === 'evidence')) {
-      run.approvals.push({ stage: 'evidence', at: now, note: clean(note, 1000) })
+      run.approvals.push({ stage: 'evidence', at: now, note: clean(note, 1000), type: 'evidence' })
     }
     // The evidence gate locks the table; claim review is a separate gate
     // before hypothesis. Do not skip it by advancing here.
@@ -1005,6 +1006,90 @@ export async function approveEvidence(profile: string, runId: string, note = '')
     run.updatedAt = now
     return run
   }, { actor: { kind: 'user', id: 'workbench' }, action: 'run.evidence.approved' })
+}
+
+export interface RequestRunApprovalInput {
+  type: ResearchApprovalType
+  stage: ResearchRunStage
+  reason: string
+  payload?: Record<string, string>
+  ttlMs?: number
+}
+
+export interface RunApprovalDecision {
+  approvalId: string
+  decision: 'approved' | 'rejected' | 'changes_requested'
+  comment?: string
+  resolvedBy?: string
+}
+
+/** Pause a Run on a persisted, resumable human approval request. */
+export async function requestRunApproval(
+  profile: string,
+  runId: string,
+  input: RequestRunApprovalInput,
+): Promise<ResearchRun> {
+  return updateStore(profile, 'run.approval.requested', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    if (run.approvalRequest?.status === 'pending') return run
+    const now = Date.now()
+    run.approvalRequest = {
+      id: newId('approval'),
+      type: input.type,
+      stage: input.stage,
+      reason: clean(input.reason, 1000),
+      payload: input.payload || {},
+      status: 'pending',
+      createdAt: now,
+      expiresAt: now + Math.max(5 * 60_000, Number(input.ttlMs || 24 * 60 * 60_000)),
+    }
+    run.status = 'waiting_approval'
+    run.updatedAt = now
+    return run
+  }, { actor: { kind: 'system', id: 'run-orchestrator' }, action: 'run.approval.requested' })
+}
+
+export async function resolveRunApproval(
+  profile: string,
+  runId: string,
+  input: RunApprovalDecision,
+): Promise<ResearchRun> {
+  return updateStore(profile, 'run.approval.resolved', draft => {
+    const run = draft.runs.find(row => row.id === runId)
+    if (!run) throw new Error('research_run_not_found')
+    const request = run.approvalRequest
+    if (!request || request.status !== 'pending' || request.id !== input.approvalId) {
+      throw new Error('research_approval_not_found')
+    }
+    const now = Date.now()
+    const comment = clean(input.comment || '', 2000)
+    const history = run.approvalHistory || []
+    history.push({
+      ...request,
+      status: input.decision,
+      resolvedAt: now,
+      resolvedBy: clean(input.resolvedBy || 'workbench', 120),
+      comment,
+    })
+    run.approvalHistory = history
+    run.approvalRequest = null
+    if (input.decision === 'approved') {
+      if (!run.approvals.some(item => item.type === request.type)) {
+        run.approvals.push({
+          stage: request.stage,
+          at: now,
+          note: comment || `Approved ${request.type}`,
+          type: request.type,
+        })
+      }
+      run.status = 'running'
+    } else {
+      run.status = 'waiting_approval'
+    }
+    run.updatedAt = now
+    return run
+  }, { actor: { kind: 'user', id: input.resolvedBy || 'workbench' }, action: 'run.approval.resolved' })
 }
 
 export async function advanceRun(profile: string, runId: string): Promise<ResearchRun> {

@@ -8,6 +8,7 @@ import {
   getRun,
   recordExperimentResult,
   refreshExperimentJob,
+  requestRunApproval,
   saveExperimentPlan,
   saveHypothesis,
   submitExperimentJob,
@@ -28,13 +29,33 @@ export interface AutoRunOptions {
 
 export interface AutoRunResult {
   run: Awaited<ReturnType<typeof getRun>>
-  status: 'awaiting_result' | 'completed'
+  status: 'awaiting_approval' | 'awaiting_result' | 'completed'
   evidenceAdded: number
   evidenceSkipped: number
   claimsDerived: number
   claimsApproved: number
   message: string
   jobId?: string
+  approvalId?: string
+}
+
+function hasApproval(run: Awaited<ReturnType<typeof getRun>>, type: 'evidence' | 'claims' | 'experiment' | 'result'): boolean {
+  return run.approvals.some(item => item.type === type
+    || (type === 'evidence' && item.stage === 'evidence' && item.type === undefined))
+}
+
+function approvalResult(
+  run: Awaited<ReturnType<typeof getRun>>,
+  message: string,
+  counts: Pick<AutoRunResult, 'evidenceAdded' | 'evidenceSkipped' | 'claimsDerived' | 'claimsApproved'>,
+): AutoRunResult {
+  return {
+    run,
+    status: 'awaiting_approval',
+    ...counts,
+    message,
+    approvalId: run.approvalRequest?.id,
+  }
 }
 
 const KNOWN_METRICS = ['F1', 'AUC', 'accuracy', 'precision', 'recall', 'RMSE', 'MAE', 'BLEU', 'ROUGE']
@@ -167,8 +188,28 @@ export async function autoRunToResultGate(
   }
   if (run.evidence.length === 0) throw new Error('research_evidence_empty')
 
-  if (!run.approvals.some(item => item.stage === 'evidence')) {
+  const evidenceNeedsReview = run.evidence.some(item =>
+    item.support !== 'supports' || item.confidence < 0.8)
+  if (evidenceNeedsReview && !hasApproval(run, 'evidence')) {
+    run = await requestRunApproval(profile, runId, {
+      type: 'evidence',
+      stage: 'evidence',
+      reason: '部分证据置信度较低或包含矛盾/混合结论，需要人工确认后锁定证据表。',
+      payload: {
+        evidenceCount: String(run.evidence.length),
+        lowConfidence: String(run.evidence.filter(item => item.confidence < 0.8).length),
+      },
+    })
+    return approvalResult(run, '证据表需要人工审核；批准后自动继续生成 Claim。', {
+      evidenceAdded,
+      evidenceSkipped,
+      claimsDerived: 0,
+      claimsApproved: 0,
+    })
+  }
+  if (!hasApproval(run, 'evidence')) {
     await approveEvidence(profile, runId, 'Automatic pipeline: evidence table locked for generation')
+    run = await getRun(profile, runId)
   }
 
   let claimsDerived = 0
@@ -177,6 +218,27 @@ export async function autoRunToResultGate(
   }
   run = await getRun(profile, runId)
   if (run.claims.length === 0) throw new Error('research_claims_empty')
+
+  const claimsNeedReview = run.claims.some(claim => claim.reviewStatus !== 'approved'
+    && (claim.contradictionIds.length > 0 || claim.confidence < 0.8 || claim.evidenceIds.length === 0))
+  if (claimsNeedReview && !hasApproval(run, 'claims')) {
+    run = await requestRunApproval(profile, runId, {
+      type: 'claims',
+      stage: 'evidence',
+      reason: '存在矛盾、低置信度或缺少证据的 Claim，需要人工审核后再进入假设阶段。',
+      payload: {
+        claimCount: String(run.claims.length),
+        contradictionCount: String(run.claims.filter(claim => claim.contradictionIds.length > 0).length),
+        missingEvidence: String(run.claims.filter(claim => claim.evidenceIds.length === 0).length),
+      },
+    })
+    return approvalResult(run, 'Claim 需要人工审核；批准后自动继续生成假设和实验计划。', {
+      evidenceAdded,
+      evidenceSkipped,
+      claimsDerived,
+      claimsApproved: 0,
+    })
+  }
 
   const approved = await updateStore(profile, 'run.auto.claims-approved', draft => {
     const current = draft.runs.find(row => row.id === runId)
@@ -251,6 +313,24 @@ export async function autoRunToResultGate(
   }
 
   if (!run.result && options.serverId && command) {
+    if (!hasApproval(run, 'experiment')) {
+      run = await requestRunApproval(profile, runId, {
+        type: 'experiment',
+        stage: 'experiment',
+        reason: '即将在远程服务器执行实验命令，需要确认服务器、命令和产物路径。',
+        payload: {
+          serverId: String(options.serverId),
+          command,
+          artifactPath: String(options.artifactPath || ''),
+        },
+      })
+      return approvalResult(run, '实验执行需要人工批准；批准后自动提交并等待结果。', {
+        evidenceAdded,
+        evidenceSkipped,
+        claimsDerived,
+        claimsApproved: approved.count,
+      })
+    }
     const waited = await submitAndWait(
       profile,
       runId,
@@ -283,9 +363,27 @@ export async function autoRunToResultGate(
       claimsDerived,
       claimsApproved: approved.count,
       message: command === ''
-        ? '计划已自动填充，但还没有可执行命令；填写命令并选择 SSH 服务器后可自动提交。'
+        ? '计划已自动填写，但还没有可执行命令；填写命令并选择 SSH 服务器后可自动提交。'
         : '自动流程已到实验阶段，等待真实实验结果。',
     }
+  }
+
+  if (run.fixtureOwnerUserId === undefined && !hasApproval(run, 'result')) {
+    run = await requestRunApproval(profile, runId, {
+      type: 'result',
+      stage: 'analysis',
+      reason: '实验结果已回传，需要人工确认结果和指标是否可信，再生成最终报告。',
+      payload: {
+        resultSummary: String(run.result.summary || ''),
+        metrics: String(run.result.metrics || ''),
+      },
+    })
+    return approvalResult(run, '实验结果需要人工确认；批准后自动生成报告和 Results 草稿。', {
+      evidenceAdded,
+      evidenceSkipped,
+      claimsDerived,
+      claimsApproved: approved.count,
+    })
   }
 
   run = await advanceRun(profile, runId)

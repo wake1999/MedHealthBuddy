@@ -259,11 +259,23 @@ interface ResearchRunBranch {
   updatedAt: number
 }
 
+interface ResearchApprovalRequest {
+  id: string
+  type: 'evidence' | 'claims' | 'experiment' | 'result'
+  stage: string
+  reason: string
+  payload: Record<string, string>
+  status: 'pending'
+  createdAt: number
+  expiresAt: number
+}
+
 interface ResearchRun {
   id: string
   projectId: string
   title: string
   question: string
+  approvalRequest?: ResearchApprovalRequest | null
   fixtureOwnerUserId?: number
   stage: Stage
   status: 'running' | 'waiting_approval' | 'completed' | 'cancelled'
@@ -506,9 +518,12 @@ export function RunsView({
   const [flowBusy, setFlowBusy] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [autoBusy, setAutoBusy] = useState(false)
+  const [approvalBusy, setApprovalBusy] = useState(false)
+  const [approvalComment, setApprovalComment] = useState('')
   const [activeFlow, setActiveFlow] = useState<ResearchFlow | null>(null)
   const [resultsPrimary, setResultsPrimary] = useState(false)
   const selected = runs.find(run => run.id === selectedId) || null
+  const pendingApprovalCount = runs.filter(run => run.approvalRequest?.status === 'pending').length
   const visibleBranches = (selected?.branches || []).filter(branch => branch.archivedAt === 0)
   const activeBranch = (selected?.branches || []).find(branch => branch.id === selected?.activeBranchId) || null
   const branchFrozen = Boolean(activeBranch?.frozenAt)
@@ -615,6 +630,10 @@ export function RunsView({
   useEffect(() => {
     if (serverId === '' && servers.length > 0) setServerId(servers[0].id)
   }, [servers, serverId])
+
+  useEffect(() => {
+    setApprovalComment('')
+  }, [selected?.id, selected?.approvalRequest?.id])
 
   useEffect(() => {
     if (!selected) {
@@ -1521,7 +1540,11 @@ export function RunsView({
         jobId?: string
       }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/auto`, {
         method: 'POST',
-        body: JSON.stringify({ timeoutMs: 120000 }),
+        body: JSON.stringify({
+          serverId,
+          command: selected.experimentPlan?.command || '',
+          timeoutMs: 120000,
+        }),
       })
       replaceRun(body.run)
       setNotice(body.message)
@@ -1529,6 +1552,32 @@ export function RunsView({
       setError((err as Error).message)
     } finally {
       setAutoBusy(false)
+    }
+  }
+
+  async function resolveApproval(decision: 'approved' | 'rejected' | 'changes_requested') {
+    if (!selected?.approvalRequest) return
+    setApprovalBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const body = await request<{
+        run: ResearchRun
+        auto?: { run: ResearchRun; message: string } | null
+        autoError?: string
+      }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/approvals/${encodeURIComponent(selected.approvalRequest.id)}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify({ decision, comment: approvalComment.trim() }),
+      })
+      replaceRun(body.run)
+      if (body.auto?.message) setNotice(body.auto.message)
+      else if (decision === 'approved') setNotice(t('runs.approval.approved'))
+      else setNotice(t('runs.approval.closed'))
+      if (body.autoError) setError(body.autoError)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setApprovalBusy(false)
     }
   }
 
@@ -1822,6 +1871,19 @@ export function RunsView({
               </button>
             </div>
           </details>
+          {pendingApprovalCount > 0 && (
+            <button
+              type="button"
+              className={css.btn}
+              data-active
+              onClick={() => {
+                const pending = runs.find(run => run.approvalRequest?.status === 'pending')
+                if (pending) setSelectedId(pending.id)
+              }}
+            >
+              {t('runs.pendingApprovals', { count: pendingApprovalCount })}
+            </button>
+          )}
           <button type="button" className={css.btn} onClick={() => void loadRuns(selectedId)} disabled={loading}>
             {t('runs.refresh')}
           </button>
@@ -1985,6 +2047,56 @@ export function RunsView({
                   </button>
                 </div>
               </div>
+
+              {selected.approvalRequest?.status === 'pending' && (
+                <div className={css.runsApprovalCard} role="alert">
+                  <div className={css.runsApprovalBody}>
+                    <strong>
+                      {t('runs.approval.title')} · {t(`runs.approval.${selected.approvalRequest.type}`)}
+                    </strong>
+                    <p>{selected.approvalRequest.reason}</p>
+                    <div className={css.runsApprovalPayload}>
+                      {Object.entries(selected.approvalRequest.payload)
+                        .filter(([, value]) => String(value).trim() !== '')
+                        .map(([key, value]) => (
+                          <code key={key}>{key}: {value}</code>
+                        ))}
+                    </div>
+                  </div>
+                  <input
+                    className={css.runsInput}
+                    value={approvalComment}
+                    onChange={event => setApprovalComment(event.target.value)}
+                    placeholder={t('runs.approval.commentPlaceholder')}
+                  />
+                  <div className={css.runsApprovalActions}>
+                    <button
+                      type="button"
+                      className={css.btnPrimary}
+                      disabled={approvalBusy}
+                      onClick={() => void resolveApproval('approved')}
+                    >
+                      {t('runs.approval.approve')}
+                    </button>
+                    <button
+                      type="button"
+                      className={css.btnDanger}
+                      disabled={approvalBusy}
+                      onClick={() => void resolveApproval('rejected')}
+                    >
+                      {t('runs.approval.reject')}
+                    </button>
+                    <button
+                      type="button"
+                      className={css.btn}
+                      disabled={approvalBusy}
+                      onClick={() => void resolveApproval('changes_requested')}
+                    >
+                      {t('runs.approval.requestChanges')}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {extracting && extractionProgress && (
                 <div className={css.runsExtractionProgress} role="status">

@@ -3,6 +3,7 @@ import Router from '@koa/router'
 import * as ctrl from '../controllers/research'
 import * as paperCtrl from '../controllers/research-paper'
 import * as runCtrl from '../controllers/research-runs'
+import { requirePermission } from '../middleware/auth'
 
 export const researchRoutes = new Router()
 
@@ -51,6 +52,11 @@ researchRoutes.patch('/api/studio/research/runs/:id', runCtrl.updateRunHandler)
 researchRoutes.delete('/api/studio/research/runs/:id', runCtrl.deleteRunHandler)
 researchRoutes.post('/api/studio/research/runs/:id/advance', runCtrl.advanceRunHandler)
 researchRoutes.post('/api/studio/research/runs/:id/auto', runCtrl.autoRunHandler)
+researchRoutes.post(
+  '/api/studio/research/runs/:id/approvals/:approvalId/resolve',
+  requirePermission('research.run:approve'),
+  runCtrl.resolveRunApprovalHandler,
+)
 researchRoutes.post('/api/studio/research/runs/:id/approve-evidence', runCtrl.approveEvidenceHandler)
 researchRoutes.post('/api/studio/research/runs/:id/evidence', runCtrl.addEvidenceHandler)
 researchRoutes.post('/api/studio/research/runs/:id/extract-evidence', runCtrl.extractEvidenceHandler)

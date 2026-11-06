@@ -20,6 +20,7 @@ import {
   submitExperimentJob,
   removeEvidence,
   removeRun,
+  resolveRunApproval,
   saveExperimentPlan,
   saveHypothesis,
   updateEvidence,
@@ -874,6 +875,52 @@ export async function autoRunHandler(ctx: any) {
           timeoutMs: Number(body.timeoutMs || 120_000),
         },
       )),
+    }
+  } catch (error) {
+    failRun(ctx, error)
+  }
+}
+
+export async function resolveRunApprovalHandler(ctx: any) {
+  const body = readBody(ctx) || {}
+  const decision = String(body.decision || '')
+  if (decision !== 'approved' && decision !== 'rejected' && decision !== 'changes_requested') {
+    ctx.status = 400
+    ctx.body = { error: 'decision must be approved, rejected or changes_requested' }
+    return
+  }
+  const profile = profileOf(ctx) || 'default'
+  const runId = String(ctx.params.id || '')
+  try {
+    const resolved = await resolveRunApproval(profile, runId, {
+      approvalId: String(ctx.params.approvalId || ''),
+      decision,
+      comment: String(body.comment || ''),
+      resolvedBy: String(ctx.state.user?.username || 'workbench'),
+    })
+    const last = resolved.approvalHistory?.[resolved.approvalHistory.length - 1]
+    let auto: Awaited<ReturnType<typeof autoRunToResultGate>> | null = null
+    let autoError = ''
+    if (last?.status === 'approved') {
+      const options = last.type === 'experiment'
+        ? {
+          serverId: last.payload.serverId || '',
+          command: last.payload.command || '',
+          artifactPath: last.payload.artifactPath || '',
+          timeoutMs: Number(last.payload.timeoutMs || 120_000),
+        }
+        : {}
+      try {
+        auto = await autoRunToResultGate(profile, runId, options)
+      } catch (error: any) {
+        autoError = error?.message || 'auto_resume_failed'
+      }
+    }
+    ctx.body = {
+      ok: true,
+      run: auto?.run || await getRun(profile, runId),
+      auto,
+      ...(autoError ? { autoError } : {}),
     }
   } catch (error) {
     failRun(ctx, error)

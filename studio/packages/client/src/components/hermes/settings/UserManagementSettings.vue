@@ -50,10 +50,6 @@ const statusOptions = computed(() => [
 const profileOptions = computed(() => profiles.value.map(profile => ({ label: profile, value: profile })))
 const assignableRoles = computed(() => roles.value.filter(role => role.key !== 'super_admin'))
 
-function roleNames(user: ManagedUser): string {
-  return (user.roles || []).map(role => role.name).join('、')
-}
-
 function openRoles(user: ManagedUser) {
   if (user.role === 'super_admin') {
     message.warning(t('users.superAdminRolesLocked'))
@@ -230,24 +226,6 @@ const columns = computed<DataTableColumns<ManagedUser>>(() => [
       }),
   },
   {
-    title: t('users.assignedRoles'),
-    key: 'roles',
-    minWidth: 220,
-    render: (row) => row.role === 'super_admin'
-      ? h('span', { class: 'muted' }, t('users.superAdminRole'))
-      : h(NSpace, { size: 4, align: 'center' }, {
-        default: () => [
-          h('span', { class: 'role-names' }, roleNames(row) || t('users.noRoles')),
-          h(NButton, {
-            size: 'tiny',
-            quaternary: true,
-            type: 'primary',
-            onClick: () => openRoles(row),
-          }, { default: () => t('users.assignRoles') }),
-        ],
-      }),
-  },
-  {
     title: t('users.lastLogin'),
     key: 'last_login_at',
     minWidth: 170,
@@ -256,11 +234,16 @@ const columns = computed<DataTableColumns<ManagedUser>>(() => [
   {
     title: t('common.edit'),
     key: 'actions',
-    width: 280,
+    width: 360,
     fixed: 'right',
     render: (row) => h(NSpace, { size: 8 }, {
       default: () => [
         h(NButton, { size: 'small', onClick: () => openEdit(row) }, { default: () => t('common.edit') }),
+        h(NButton, {
+          size: 'small',
+          disabled: row.role === 'super_admin',
+          onClick: () => openRoles(row),
+        }, { default: () => t('users.assignRoles') }),
         h(NButton, {
           size: 'small',
           type: row.status === 'active' ? 'warning' : 'primary',

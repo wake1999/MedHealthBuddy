@@ -3,7 +3,6 @@ import {
   PERMISSIONS_TABLE,
   ROLE_PERMISSIONS_TABLE,
   ROLES_TABLE,
-  USER_MODULE_PERMISSIONS_TABLE,
   USER_ROLES_TABLE,
   USERS_TABLE,
 } from '../infrastructure/database/schemas'
@@ -293,40 +292,54 @@ export function initRbac(): void {
       ).run(permission.code, permission.module_key, permission.resource, permission.action, permission.name, permission.description, permission.sort)
     }
     const allCodes = ALL_PERMISSIONS.map(permission => permission.code)
-    const viewCodes = VIEW_PERMISSION_CODES
     const superId = insertRole('super_admin', '超级管理员', '拥有全部权限', true)
-    const adminId = insertRole('admin', '管理员', '拥有全部业务权限', true)
-    const viewerId = insertRole('viewer', '只读用户', '仅查看权限', true)
-    for (const [roleId, codes] of [[adminId, allCodes], [viewerId, viewCodes]] as const) {
-      for (const code of codes) {
-        db.prepare(
-          `INSERT OR IGNORE INTO ${ROLE_PERMISSIONS_TABLE} (role_id, permission_code, scope) VALUES (?, ?, 'all')`,
-        ).run(roleId, code)
-      }
+    const adminId = insertRole('admin', '普通管理员', '拥有全部业务权限', true)
+    db.prepare(`UPDATE ${ROLES_TABLE} SET name = '普通管理员', description = '拥有全部业务权限', updated_at = ? WHERE id = ?`)
+      .run(now(), adminId)
+    for (const code of allCodes) {
+      db.prepare(
+        `INSERT OR IGNORE INTO ${ROLE_PERMISSIONS_TABLE} (role_id, permission_code, scope) VALUES (?, ?, 'all')`,
+      ).run(adminId, code)
     }
     // Keep built-in super_admin empty; getUserPermissions() bypasses it.
+
+    // The first RBAC version seeded a viewer role. Account management now has
+    // exactly two primary roles, so fold any viewer members into admin.
+    const viewer = db.prepare(`SELECT id FROM ${ROLES_TABLE} WHERE key = 'viewer'`).get() as { id: number } | undefined
+    if (viewer) {
+      const members = db.prepare(`SELECT user_id FROM ${USER_ROLES_TABLE} WHERE role_id = ?`).all(viewer.id) as Array<{ user_id: number }>
+      for (const member of members) {
+        db.prepare(`DELETE FROM ${USER_ROLES_TABLE} WHERE user_id = ?`).run(member.user_id)
+        db.prepare(`INSERT OR IGNORE INTO ${USER_ROLES_TABLE} (user_id, role_id, created_at) VALUES (?, ?, ?)`)
+          .run(member.user_id, adminId, now())
+      }
+      db.prepare(`DELETE FROM ${ROLE_PERMISSIONS_TABLE} WHERE role_id = ?`).run(viewer.id)
+      db.prepare(`DELETE FROM ${ROLES_TABLE} WHERE id = ?`).run(viewer.id)
+    }
+
+    // The first RBAC migration created per-user `legacy_*` roles to preserve
+    // old module grants. Product now exposes exactly the two primary account
+    // roles, so fold those users back into the normal administrator role and
+    // remove the migration-only roles.
+    const legacyRoles = db.prepare(
+      `SELECT id FROM ${ROLES_TABLE} WHERE built_in = 0 AND key LIKE 'legacy\\_%' ESCAPE '\\'`,
+    ).all() as Array<{ id: number }>
+    for (const legacy of legacyRoles) {
+      const members = db.prepare(`SELECT user_id FROM ${USER_ROLES_TABLE} WHERE role_id = ?`).all(legacy.id) as Array<{ user_id: number }>
+      for (const member of members) {
+        db.prepare(`DELETE FROM ${USER_ROLES_TABLE} WHERE user_id = ?`).run(member.user_id)
+        db.prepare(`INSERT OR IGNORE INTO ${USER_ROLES_TABLE} (user_id, role_id, created_at) VALUES (?, ?, ?)`)
+          .run(member.user_id, adminId, now())
+      }
+      db.prepare(`DELETE FROM ${ROLE_PERMISSIONS_TABLE} WHERE role_id = ?`).run(legacy.id)
+      db.prepare(`DELETE FROM ${ROLES_TABLE} WHERE id = ?`).run(legacy.id)
+    }
 
     const users = db.prepare(`SELECT id, username, role FROM ${USERS_TABLE} ORDER BY id`).all() as Array<{ id: number; username: string; role: string }>
     for (const user of users) {
       const assigned = db.prepare(`SELECT COUNT(*) AS count FROM ${USER_ROLES_TABLE} WHERE user_id = ?`).get(user.id) as { count?: number } | undefined
       if (Number(assigned?.count || 0) > 0) continue
-      let roleId = user.role === 'super_admin' ? superId : adminId
-      const rows = db.prepare(
-        `SELECT module_key, allowed FROM ${USER_MODULE_PERMISSIONS_TABLE} WHERE user_id = ?`,
-      ).all(user.id) as Array<{ module_key: string; allowed: number }>
-      if (user.role !== 'super_admin' && rows.length > 0) {
-        const allowed = rows.filter(row => row.allowed === 1).map(row => row.module_key)
-        if (allowed.length < USER_MODULES.length) {
-          const legacyKey = `legacy_${user.id}`
-          const legacyId = insertRole(legacyKey, `${user.username}（旧模块权限）`, '从 user_module_permissions 迁移', false)
-          for (const moduleKey of allowed) {
-            db.prepare(
-              `INSERT OR IGNORE INTO ${ROLE_PERMISSIONS_TABLE} (role_id, permission_code, scope) VALUES (?, ?, 'all')`,
-            ).run(legacyId, `module.${moduleKey}:view`)
-          }
-          roleId = legacyId
-        }
-      }
+      const roleId = user.role === 'super_admin' ? superId : adminId
       db.prepare(`INSERT OR IGNORE INTO ${USER_ROLES_TABLE} (user_id, role_id, created_at) VALUES (?, ?, ?)`)
         .run(user.id, roleId, now())
     }

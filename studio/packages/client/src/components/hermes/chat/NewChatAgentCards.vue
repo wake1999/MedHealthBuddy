@@ -20,7 +20,11 @@ const props = defineProps<{
   disabled?: boolean
   loading?: boolean
 }>()
-const emit = defineEmits<{ 'update:value': [value: string] }>()
+const emit = defineEmits<{
+  'update:value': [value: string]
+  /** User clicked a card; carousel scrolling only emits update:value. */
+  'card-click': [value: string]
+}>()
 const sourceItems = computed<AgentCardItem[]>(() => {
   if (props.items && props.items.length > 0) return [...props.items]
   return (props.options ?? []).map(option => ({
@@ -200,7 +204,9 @@ async function syncSelection() {
 
 function select(position: number) {
   if (props.disabled || suppressClick) return
-  emit('update:value', cards.value[position].value)
+  const value = cards.value[position].value
+  emit('update:value', value)
+  emit('card-click', value)
   center(position, true)
 }
 

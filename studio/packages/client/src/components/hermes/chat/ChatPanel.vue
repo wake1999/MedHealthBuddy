@@ -237,15 +237,12 @@ const sceneAgentCards = computed(() => sceneAgents.value.map(agent => ({
 })))
 const sceneAgentCardValue = computed(() => activeAgentCard.value?.appId || sceneAgents.value[0]?.appId || '')
 
-function selectSceneAgent(appId: string) {
+function openSceneAgentDetail(appId: string) {
   const agent = sceneAgents.value.find(item => item.appId === appId)
   if (!agent) return
-  // First click selects the agent; clicking the active card opens its detail sheet.
-  if (activeAgentCard.value?.appId === agent.appId) {
-    openAgentDetail(agent)
-    return
-  }
-  void toggleAgentCard(agent)
+  // Clicking a scene card only opens details. Selecting an agent for the
+  // current chat stays in the composer's agent picker.
+  openAgentDetail(agent)
 }
 
 
@@ -3784,15 +3781,6 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                 </div>
               </div>
                 <div v-if="activeChatApp && activeChatScene" class="new-chat-agents" :aria-label="t('chat.agentsTitle')">
-                  <div class="new-chat-agents-head">
-                    <span class="new-chat-agents-title">{{ t('chat.agentsTitle') }}</span>
-                    <span class="new-chat-agents-count" :title="t('chat.agentsCount', { count: sceneAgents.length })">{{ sceneAgents.length }}</span>
-                    <span v-if="sceneAgents.length > 4" class="new-chat-agents-hint">{{ t('chat.agentsSwipeHint') }}</span>
-                    <button v-if="!fastGptAgentsLoading && fastGptAgents.length === 0" type="button" class="new-chat-agents-retry"
-                      @click="loadFastGptAgents(true)">
-                      {{ t('chat.agentsReload') }}
-                    </button>
-                  </div>
                   <div v-if="fastGptAgentsLoading && sceneAgents.length === 0" class="new-chat-agents-track" aria-hidden="true">
                     <span v-for="index in 4" :key="index" class="new-chat-agent-skeleton"></span>
                   </div>
@@ -3800,7 +3788,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                     <NewChatAgentCards
                       :items="sceneAgentCards"
                       :value="sceneAgentCardValue"
-                      @update:value="selectSceneAgent"
+                      @card-click="openSceneAgentDetail"
                     />
                   </div>
                   <p v-else class="new-chat-agents-empty">{{ t('chat.agentsEmpty') }}</p>
@@ -4528,10 +4516,10 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 .new-chat-agents {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 18px;
-  border-top: 1px solid $border-light;
+  gap: 0;
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .new-chat-agents-head {

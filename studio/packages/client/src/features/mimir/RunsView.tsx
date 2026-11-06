@@ -1504,16 +1504,13 @@ export function RunsView({
 
   async function autoRunToResultGate() {
     if (!selected) return
-    const serverId = window.prompt(t('runs.autoServerPrompt'), servers[0]?.id || '')
-    if (serverId === null) return
-    const command = window.prompt(t('runs.autoCommandPrompt'), selected.experimentPlan?.command || '')
-    if (command === null) return
-    const artifactPath = window.prompt(t('runs.autoArtifactPrompt'), '')
-    if (artifactPath === null) return
     setAutoBusy(true)
     setError('')
     setNotice('')
     try {
+      // This action only advances evidence/claims/hypothesis/plan to the result
+      // gate. SSH submission is an explicit separate operation; asking through
+      // window.prompt here silently aborts the whole action in Electron.
       const body = await request<{
         run: ResearchRun
         status: 'awaiting_result' | 'completed'
@@ -1521,7 +1518,7 @@ export function RunsView({
         jobId?: string
       }>(`/api/studio/research/runs/${encodeURIComponent(selected.id)}/auto`, {
         method: 'POST',
-        body: JSON.stringify({ serverId, command, artifactPath, timeoutMs: 120000 }),
+        body: JSON.stringify({ timeoutMs: 120000 }),
       })
       replaceRun(body.run)
       setNotice(body.message)

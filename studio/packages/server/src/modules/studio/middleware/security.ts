@@ -175,6 +175,7 @@ export function securityHeaders(): Middleware {
         "default-src 'self'",
         "base-uri 'self'",
         "object-src 'none'",
+        "frame-src 'self' blob:",
         "frame-ancestors 'none'",
         "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",

@@ -85,8 +85,8 @@ function openCreate() {
 }
 
 function openEdit(role: RoleSummary) {
-  if (role.built_in === 1) {
-    message.warning(t('roles.builtInLocked'))
+  if (role.key === 'super_admin') {
+    message.warning(t('roles.superAdminLocked'))
     return
   }
   editing.value = role
@@ -165,7 +165,7 @@ const columns = computed<DataTableColumns<RoleSummary>>(() => [
     render: row => h('div', { class: 'role-actions' }, [
       h(NButton, {
         size: 'small',
-        disabled: row.built_in === 1,
+        disabled: row.key === 'super_admin',
         onClick: () => openEdit(row),
       }, { default: () => t('common.edit') }),
       h(NPopconfirm, {

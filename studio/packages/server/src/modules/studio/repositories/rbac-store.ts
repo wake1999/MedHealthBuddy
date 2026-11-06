@@ -24,6 +24,7 @@ export interface RoleRecord {
   name: string
   description: string
   built_in: number
+  permissions_seeded: number
   created_at: number
   updated_at: number
 }
@@ -176,6 +177,7 @@ export function replaceRolePermissions(roleId: number, permissionCodes: string[]
       `INSERT INTO ${ROLE_PERMISSIONS_TABLE} (role_id, permission_code, scope) VALUES (?, ?, 'all')`,
     )
     for (const code of codes) stmt.run(roleId, code)
+    db.prepare(`UPDATE ${ROLES_TABLE} SET permissions_seeded = 1, updated_at = ? WHERE id = ?`).run(now(), roleId)
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')
@@ -248,7 +250,7 @@ export function updateRole(roleId: number, input: RoleInput, permissionCodes?: s
   if (!db) return null
   const role = db.prepare(`SELECT * FROM ${ROLES_TABLE} WHERE id = ?`).get(roleId) as RoleRecord | undefined
   if (!role) return null
-  if (role.built_in === 1) throw new Error('role_built_in_locked')
+  if (role.key === 'super_admin') throw new Error('role_built_in_locked')
   const name = input.name.trim()
   if (name.length < 2) throw new Error('role_name_too_short')
   db.prepare(`UPDATE ${ROLES_TABLE} SET name = ?, description = ?, updated_at = ? WHERE id = ?`)
@@ -293,29 +295,26 @@ export function initRbac(): void {
     }
     const allCodes = ALL_PERMISSIONS.map(permission => permission.code)
     const superId = insertRole('super_admin', '超级管理员', '拥有全部权限', true)
-    const adminId = insertRole('admin', '普通管理员', '拥有全部业务权限', true)
-    db.prepare(`UPDATE ${ROLES_TABLE} SET name = '普通管理员', description = '拥有全部业务权限', updated_at = ? WHERE id = ?`)
-      .run(now(), adminId)
-    for (const code of allCodes) {
-      db.prepare(
-        `INSERT OR IGNORE INTO ${ROLE_PERMISSIONS_TABLE} (role_id, permission_code, scope) VALUES (?, ?, 'all')`,
-      ).run(adminId, code)
+    const adminId = insertRole('admin', '管理员', '拥有全部业务权限', true)
+    const viewerId = insertRole('viewer', '只读用户', '仅查看权限', true)
+    const adminSeed = db.prepare(`SELECT permissions_seeded FROM ${ROLES_TABLE} WHERE id = ?`).get(adminId) as { permissions_seeded?: number } | undefined
+    if (Number(adminSeed?.permissions_seeded || 0) === 0) {
+      db.prepare(`UPDATE ${ROLES_TABLE} SET name = '管理员', description = '拥有全部业务权限', updated_at = ? WHERE id = ?`)
+        .run(now(), adminId)
     }
-    // Keep built-in super_admin empty; getUserPermissions() bypasses it.
 
-    // The first RBAC version seeded a viewer role. Account management now has
-    // exactly two primary roles, so fold any viewer members into admin.
-    const viewer = db.prepare(`SELECT id FROM ${ROLES_TABLE} WHERE key = 'viewer'`).get() as { id: number } | undefined
-    if (viewer) {
-      const members = db.prepare(`SELECT user_id FROM ${USER_ROLES_TABLE} WHERE role_id = ?`).all(viewer.id) as Array<{ user_id: number }>
-      for (const member of members) {
-        db.prepare(`DELETE FROM ${USER_ROLES_TABLE} WHERE user_id = ?`).run(member.user_id)
-        db.prepare(`INSERT OR IGNORE INTO ${USER_ROLES_TABLE} (user_id, role_id, created_at) VALUES (?, ?, ?)`)
-          .run(member.user_id, adminId, now())
-      }
-      db.prepare(`DELETE FROM ${ROLE_PERMISSIONS_TABLE} WHERE role_id = ?`).run(viewer.id)
-      db.prepare(`DELETE FROM ${ROLES_TABLE} WHERE id = ?`).run(viewer.id)
+    const seedRolePermissions = (roleId: number, codes: string[]): void => {
+      const row = db.prepare(`SELECT permissions_seeded FROM ${ROLES_TABLE} WHERE id = ?`).get(roleId) as { permissions_seeded?: number } | undefined
+      if (Number(row?.permissions_seeded || 0) === 1) return
+      const stmt = db.prepare(
+        `INSERT OR IGNORE INTO ${ROLE_PERMISSIONS_TABLE} (role_id, permission_code, scope) VALUES (?, ?, 'all')`,
+      )
+      for (const code of codes) stmt.run(roleId, code)
+      db.prepare(`UPDATE ${ROLES_TABLE} SET permissions_seeded = 1, updated_at = ? WHERE id = ?`).run(now(), roleId)
     }
+    seedRolePermissions(adminId, allCodes)
+    seedRolePermissions(viewerId, VIEW_PERMISSION_CODES)
+    // Keep built-in super_admin empty; getUserPermissions() bypasses it.
 
     // The first RBAC migration created per-user `legacy_*` roles to preserve
     // old module grants. Product now exposes exactly the two primary account

@@ -52,6 +52,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import FolderPicker from "./FolderPicker.vue";
 import StarIcon from "@/components/common/StarIcon.vue";
 import ChatInput from "./ChatInput.vue";
+import NewChatAgentCards from "./NewChatAgentCards.vue";
 import {
   PROMPT_TEMPLATE_DOMAINS,
   type PromptTemplateDomainId,
@@ -219,27 +220,6 @@ const activeAgentVarValues = ref<Record<string, string>>({})
 /** 聊天框里那个「智能体」选择器的展开状态。 */
 const agentPickerOpen = ref(false)
 
-/** 智能体卡片横向翻页：只有真的溢出时才显示两侧按钮。 */
-const agentsTrackRef = ref<HTMLElement | null>(null)
-const agentsOverflow = ref(false)
-const agentsAtStart = ref(true)
-const agentsAtEnd = ref(false)
-
-function updateAgentsScrollState() {
-  const el = agentsTrackRef.value
-  if (!el) return
-  const max = el.scrollWidth - el.clientWidth
-  agentsOverflow.value = max > 8
-  agentsAtStart.value = el.scrollLeft <= 4
-  agentsAtEnd.value = el.scrollLeft >= max - 4
-}
-
-function scrollAgentsBy(direction: 1 | -1) {
-  const el = agentsTrackRef.value
-  if (!el) return
-  el.scrollBy({ left: direction * el.clientWidth * 0.92, behavior: 'smooth' })
-}
-
 /** 当前场景下的智能体：只跟 chat app 的 scene 走，不再参与「发现应用」的选择。 */
 const sceneAgents = computed(() => {
   const app = activeChatApp.value
@@ -247,6 +227,26 @@ const sceneAgents = computed(() => {
   if (!app || !scene) return []
   return fastGptAgents.value.filter(agent => agent.sceneId === scene.id)
 })
+
+/** BTIT cards use the same carousel model as the built-in agent cards. */
+const sceneAgentCards = computed(() => sceneAgents.value.map(agent => ({
+  value: agent.appId,
+  label: agent.short || agent.name,
+  initial: (agent.short || agent.name).slice(0, 1),
+  tint: agent.tint,
+})))
+const sceneAgentCardValue = computed(() => activeAgentCard.value?.appId || sceneAgents.value[0]?.appId || '')
+
+function selectSceneAgent(appId: string) {
+  const agent = sceneAgents.value.find(item => item.appId === appId)
+  if (!agent) return
+  // First click selects the agent; clicking the active card opens its detail sheet.
+  if (activeAgentCard.value?.appId === agent.appId) {
+    openAgentDetail(agent)
+    return
+  }
+  void toggleAgentCard(agent)
+}
 
 
 
@@ -891,17 +891,7 @@ onMounted(() => {
   window.addEventListener(OPEN_SUBAGENT_STREAM_EVENT, handleOpenSubagentStreamRequest);
   window.addEventListener(OPEN_PROMPT_TEMPLATES_PANEL_EVENT, handleOpenPromptTemplatesPanelRequest);
   window.addEventListener("resize", handleToolPanelViewportResize);
-  window.addEventListener("resize", updateAgentsScrollState);
   window.addEventListener("keydown", handleNewChatEscape);
-  // 卡片渲染完或列表变化后重新判断有没有溢出；和上面同理，watch 必须挂在 mounted 里注册。
-  watch([sceneAgents, fastGptAgentsLoading], () => {
-    void nextTick(updateAgentsScrollState);
-  });
-  // 智能体数据通常在首页加载完就有了，进入新建页时 sceneAgents 不再变化，得单独量一次。
-  watch(showNewChatPage, (visible) => {
-    if (!visible) return;
-    void nextTick(() => { window.setTimeout(updateAgentsScrollState, 60); });
-  });
   handleToolPanelViewportResize();
   if (profilesStore.profiles.length === 0) {
     void profilesStore.fetchProfiles();
@@ -955,7 +945,6 @@ onUnmounted(() => {
   window.removeEventListener(OPEN_SUBAGENT_STREAM_EVENT, handleOpenSubagentStreamRequest);
   window.removeEventListener(OPEN_PROMPT_TEMPLATES_PANEL_EVENT, handleOpenPromptTemplatesPanelRequest);
   window.removeEventListener("resize", handleToolPanelViewportResize);
-  window.removeEventListener("resize", updateAgentsScrollState);
   window.removeEventListener("keydown", handleNewChatEscape);
   stopToolResize();
   sessionFadeAnimation?.cancel();
@@ -3807,36 +3796,12 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                   <div v-if="fastGptAgentsLoading && sceneAgents.length === 0" class="new-chat-agents-track" aria-hidden="true">
                     <span v-for="index in 4" :key="index" class="new-chat-agent-skeleton"></span>
                   </div>
-                  <div v-else-if="sceneAgents.length > 0" class="new-chat-agents-viewport">
-                    <div ref="agentsTrackRef" class="new-chat-agents-track" @scroll.passive="updateAgentsScrollState">
-                      <div v-for="agent in sceneAgents" :key="agent.appId" class="new-chat-agent"
-                        :class="{ 'is-active': activeAgentCard?.appId === agent.appId }">
-                        <button type="button" class="new-chat-agent-hit" :aria-label="agent.name" :title="agent.name"
-                          @click="openAgentDetail(agent)"></button>
-                        <span class="new-chat-agent-icon" :style="{ background: agent.tint }" aria-hidden="true">{{
-                          agent.short.slice(0, 1) }}</span>
-                        <span class="new-chat-agent-text">
-                          <span class="new-chat-agent-name">{{ agent.short }}</span>
-                          <span class="new-chat-agent-desc">{{ agent.desc }}</span>
-                        </span>
-                      </div>
-                    </div>
-                    <button v-if="agentsOverflow && !agentsAtStart" type="button"
-                      class="new-chat-agents-pager is-prev" :aria-label="t('chat.agentsScrollPrev')"
-                      :title="t('chat.agentsScrollPrev')" @click="scrollAgentsBy(-1)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="m14 6-6 6 6 6" />
-                      </svg>
-                    </button>
-                    <button v-if="agentsOverflow && !agentsAtEnd" type="button"
-                      class="new-chat-agents-pager is-next" :aria-label="t('chat.agentsScrollNext')"
-                      :title="t('chat.agentsScrollNext')" @click="scrollAgentsBy(1)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="m10 6 6 6-6 6" />
-                      </svg>
-                    </button>
+                  <div v-else-if="sceneAgents.length > 0" class="new-chat-agent-showcase">
+                    <NewChatAgentCards
+                      :items="sceneAgentCards"
+                      :value="sceneAgentCardValue"
+                      @update:value="selectSceneAgent"
+                    />
                   </div>
                   <p v-else class="new-chat-agents-empty">{{ t('chat.agentsEmpty') }}</p>
                 </div>
@@ -4620,6 +4585,12 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 /* 卡片带：宽屏一屏 3 张，滚动条隐掉，翻页交给两侧按钮。 */
 .new-chat-agents-viewport {
   position: relative;
+  min-width: 0;
+}
+
+/* Reuse the existing holographic agent-card carousel at scene scale. */
+.new-chat-agent-showcase {
+  height: clamp(250px, 34vh, 330px);
   min-width: 0;
 }
 

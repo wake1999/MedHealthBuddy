@@ -5,18 +5,35 @@ import { chatSessionAgentAvatar } from '@/utils/chat-agent-avatar'
 import type { AGENT_OPTIONS } from '@/utils/agent-options'
 
 type AgentOption = typeof AGENT_OPTIONS[number]
+export interface AgentCardItem {
+  value: string
+  label: string
+  /** Optional artwork. When absent, `initial` is rendered on the stone. */
+  avatar?: string
+  initial?: string
+  tint?: string
+}
 const props = defineProps<{
-  value: AgentOption['value']
-  options: readonly AgentOption[]
+  value: string
+  options?: readonly AgentOption[]
+  items?: readonly AgentCardItem[]
   disabled?: boolean
   loading?: boolean
 }>()
-const emit = defineEmits<{ 'update:value': [value: AgentOption['value']] }>()
+const emit = defineEmits<{ 'update:value': [value: string] }>()
+const sourceItems = computed<AgentCardItem[]>(() => {
+  if (props.items && props.items.length > 0) return [...props.items]
+  return (props.options ?? []).map(option => ({
+    value: option.value,
+    label: option.label,
+    avatar: chatSessionAgentAvatar({ codingAgentId: option.value }).src,
+  }))
+})
 const { t } = useI18n()
 const viewport = ref<HTMLElement>()
 const effects = ref<HTMLElement>()
-const loop = computed(() => props.options.length > 5)
-const cards = computed(() => Array.from({ length: loop.value ? 3 : 1 }, () => props.options).flat())
+const loop = computed(() => sourceItems.value.length > 5)
+const cards = computed(() => Array.from({ length: loop.value ? 3 : 1 }, () => sourceItems.value).flat())
 const activePosition = ref(0)
 type EmberEdge = 'left' | 'right' | 'top' | 'bottom'
 const random = (min: number, max: number) => min + Math.random() * (max - min)
@@ -174,10 +191,10 @@ function center(position: number, smooth = false) {
 
 async function syncSelection() {
   await nextTick()
-  const index = props.options.findIndex(option => option.value === props.value)
+  const index = sourceItems.value.findIndex(option => option.value === props.value)
   if (index < 0) return
   const position = cards.value[activePosition.value]?.value === props.value
-    ? activePosition.value : index + (loop.value ? props.options.length : 0)
+    ? activePosition.value : index + (loop.value ? sourceItems.value.length : 0)
   center(position)
 }
 
@@ -209,7 +226,7 @@ function onScroll() {
   const option = cards.value[closest]
   if (option && option.value !== props.value) emit('update:value', option.value)
   // Rebase the repeating row without changing the position within a card.
-  const count = props.options.length
+  const count = sourceItems.value.length
   if (loop.value && (closest < count || closest >= count * 2)) {
     const next = closest < count ? closest + count : closest - count
     const delta = allSlots[next].offsetLeft - allSlots[closest].offsetLeft
@@ -259,7 +276,7 @@ function finishScroll() {
   const position = movingTo
   clearTimeout(selectionTimer)
   movingTo = null
-  const count = props.options.length
+  const count = sourceItems.value.length
   if (el && position !== null && loop.value && (position < count || position >= count * 2)) {
     // The clicked card has already animated to its selected size. Switching
     // to the middle copy must not replay that animation on a different node.
@@ -293,7 +310,7 @@ function finishScroll() {
 function onWheel(event: WheelEvent) {
   const el = viewport.value
   // Ctrl+wheel belongs to browser zoom, including trackpad pinch gestures.
-  if (!el || props.disabled || props.options.length < 2 || event.ctrlKey) return
+  if (!el || props.disabled || sourceItems.value.length < 2 || event.ctrlKey) return
   const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
   const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
     : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? el.clientWidth : 1
@@ -309,9 +326,9 @@ function onWheel(event: WheelEvent) {
 function onKeydown(event: KeyboardEvent) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || props.disabled) return
   event.preventDefault()
-  const count = props.options.length
+  const count = sourceItems.value.length
   if (!count) return
-  const index = props.options.findIndex(option => option.value === props.value)
+  const index = sourceItems.value.findIndex(option => option.value === props.value)
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? count - 1
     : (index + (event.key === 'ArrowRight' ? 1 : -1) + count) % count
   suppressClick = false
@@ -323,9 +340,9 @@ watch(() => props.value, () => {
   if (cards.value[activePosition.value]?.value !== props.value) void syncSelection()
 })
 watch(activePosition, syncEffectMotion)
-watch(() => props.options, () => {
-  activePosition.value = Math.max(0, props.options.findIndex(option => option.value === props.value))
-    + (loop.value ? props.options.length : 0)
+watch(sourceItems, () => {
+  activePosition.value = Math.max(0, sourceItems.value.findIndex(option => option.value === props.value))
+    + (loop.value ? sourceItems.value.length : 0)
   void syncSelection()
 }, { deep: true })
 onMounted(() => {
@@ -372,7 +389,12 @@ onUnmounted(() => {
             </span>
             <span class="agent-card-surface">
               <span class="agent-card-art" aria-hidden="true">
-                <span class="agent-card-stone"><img :src="chatSessionAgentAvatar({ codingAgentId: option.value }).src" alt="" draggable="false" /></span>
+                <span class="agent-card-stone">
+                  <img v-if="option.avatar" :src="option.avatar" alt="" draggable="false" />
+                  <span v-else class="agent-card-initial" :style="{ background: option.tint || '#5b7f9a' }">
+                    {{ option.initial || option.label.slice(0, 1) }}
+                  </span>
+                </span>
               </span>
               <span class="agent-card-name" :class="{ long: option.label.length > 11 }">{{ option.label }}</span>
               <span class="agent-card-mark" aria-hidden="true"></span>
@@ -398,7 +420,7 @@ onUnmounted(() => {
   --card-width: clamp(64px, calc((100cqh - 84px) / 1.4), max(176px, 16vw)); --card-gap: 14px;
   --edge-fade-width: 70px;
   --logo-size: calc(var(--card-width) * .47); --logo-gap: clamp(6px, calc(var(--card-width) * .1), 18px);
-  position: relative; container-type: size; min-width: 0; width: 100%;
+  position: relative; container-type: size; min-width: 0; width: 100%; height: 100%;
 }
 .agent-card-viewport {
   position: relative; height: 100%; display: flex; align-items: center;
@@ -478,6 +500,19 @@ onUnmounted(() => {
   transform: translate(-50%, -50%) rotate(-9deg) rotateX(7deg); transition: transform .2s;
   .active & { transform: translate(calc(-50% - var(--px, 0px)), calc(-50% - var(--py, 0px))) rotate(-9deg) rotateX(7deg); }
   img { width: 62%; height: 62%; object-fit: contain; border-radius: 22%; clip-path: inset(0 round 22%); pointer-events: none; }
+}
+
+.agent-card-initial {
+  display: grid;
+  place-items: center;
+  width: 62%;
+  height: 62%;
+  border-radius: 22%;
+  color: #ffffff;
+  font-size: calc(var(--logo-size) * .42);
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 18%);
 }
 .agent-card-name {
   position: relative; z-index: 5; flex: none; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

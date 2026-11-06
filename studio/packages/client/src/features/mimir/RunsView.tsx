@@ -264,6 +264,7 @@ interface ResearchRun {
   projectId: string
   title: string
   question: string
+  fixtureOwnerUserId?: number
   stage: Stage
   status: 'running' | 'waiting_approval' | 'completed' | 'cancelled'
   paperIds: string[]
@@ -1956,6 +1957,9 @@ export function RunsView({
                 onClick={() => setSelectedId(run.id)}
               >
                 <strong>{run.title}</strong>
+                {(run.fixtureOwnerUserId !== undefined || /fixture/i.test(run.title)) && (
+                  <em className={css.runsTestBadge}>{t('runs.testData')}</em>
+                )}
                 <span>{t(`runs.stage.${run.stage}`)} · {t(`runs.status.${run.status}`)}</span>
                 <small>{run.evidence.length} {t('runs.evidenceUnit')}</small>
               </button>
@@ -1966,7 +1970,12 @@ export function RunsView({
             <div className={css.runsDetail}>
               <div className={css.runsDetailHead}>
                 <div>
-                  <h3>{selected.title}</h3>
+                  <h3>
+                    {selected.title}
+                    {(selected.fixtureOwnerUserId !== undefined || /fixture/i.test(selected.title)) && (
+                      <em className={css.runsTestBadge}>{t('runs.testData')}</em>
+                    )}
+                  </h3>
                   <p>{selected.question}</p>
                 </div>
                 <div className={css.runsDetailActions}>

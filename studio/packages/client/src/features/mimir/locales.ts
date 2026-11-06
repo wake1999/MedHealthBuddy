@@ -289,7 +289,6 @@ export const zh = {
   // 文库首页（reader-redesign）：筛选、排序、视图、批量与收录。
   'papers.libFilter': '筛选题名、作者、期刊…',
   'papers.batch': '批量',
-  'papers.testData': '测试数据',
   'papers.filter': '筛选',
   'papers.sort': '排序',
   'papers.sortAdded': '按添加时间',
@@ -885,6 +884,7 @@ export const zh = {
   'runs.flowAuto': '全流程自动',
   'runs.flowAutoCompleted': '全流程自动演示已完成；真实实验仍需单独记录结果。',
   'runs.newRun': '新建运行',
+  'runs.testData': '测试数据',
   'runs.closeCreate': '收起新建',
   'runs.createHint': '选择文献、描述研究问题，再创建可恢复的运行。',
   'runs.papersSelected': '已选 {selected}/{total} 组',
@@ -1745,7 +1745,6 @@ export const en = {
   // Library home (reader-redesign): filter, sort, view, batch and collect.
   'papers.libFilter': 'Filter by title, author, venue…',
   'papers.batch': 'Batch',
-  'papers.testData': 'Test data',
   'papers.filter': 'Filter',
   'papers.sort': 'Sort',
   'papers.sortAdded': 'By date added',
@@ -2336,6 +2335,7 @@ export const en = {
   'runs.flowAuto': 'Full auto',
   'runs.flowAutoCompleted': 'Full automated fixture run completed; real experiments still need a recorded result.',
   'runs.newRun': 'New run',
+  'runs.testData': 'Test data',
   'runs.closeCreate': 'Close create',
   'runs.createHint': 'Select literature, describe the question, then create a resumable run.',
   'runs.papersSelected': '{selected}/{total} groups selected',

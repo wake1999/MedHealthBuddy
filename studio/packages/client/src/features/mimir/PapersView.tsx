@@ -20,7 +20,7 @@
  * @module dsh-client-ui-mimir/client/PapersView
  */
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ArxivEntry, PaperRecord, ResearchProjectView, WebSearchEntry } from 'dsh-mimir/types'
 import type {
@@ -4576,9 +4576,6 @@ export function PapersView({
     })
   }
   const [pdfFilter, setPdfFilter] = useState<'all' | 'ready' | 'missing' | 'favorite'>('all')
-  // Test data is explicitly opt-in in the library, but the section is open by
-  // default so a user can still see their own fixture records.
-  const [showTestData, setShowTestData] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set())
@@ -4596,21 +4593,18 @@ export function PapersView({
       || (activeFolder === 'none'
         ? (extraOf(paper).folderId ?? '') === ''
         : extraOf(paper).folderId === activeFolder))
+    // Fixture records belong to the test Run, never to the literature library.
+    .filter(paper => !isFixturePaper(paper))
   const libNeedle = libFilter.trim().toLowerCase()
   const searched = visibleBase.filter(paper => libNeedle === '' || libraryHit(paper, libNeedle))
   const ordered = sortMode === 'title'
     ? searched.slice().sort((a, b) => a.title.localeCompare(b.title, 'zh-Hans-CN'))
     : searched
-  const orderedReal = ordered.filter(paper => !isFixturePaper(paper))
-  const orderedFixture = ordered.filter(paper => isFixturePaper(paper))
   // 置顶的排在整段最前，其余保持当前排序。
-  const sortPinned = (rows: typeof ordered) => [
-    ...rows.filter(paper => extraOf(paper).pinned === true),
-    ...rows.filter(paper => extraOf(paper).pinned !== true),
+  const visible = [
+    ...ordered.filter(paper => extraOf(paper).pinned === true),
+    ...ordered.filter(paper => extraOf(paper).pinned !== true),
   ]
-  const visible = sortPinned(orderedReal)
-  const fixtureVisible = sortPinned(orderedFixture)
-  const displayed = showTestData ? [...visible, ...fixtureVisible] : visible
   const activeTranslations = papers.list.filter(paper => translatingIds.has(paperKey(paper)))
   const noticePaper = translationNotice === null
     ? undefined
@@ -5277,15 +5271,6 @@ export function PapersView({
             <button type="button" className={css.btn} disabled={visible.length === 0} onClick={startSelectMode}>
               {t('papers.batch')}
             </button>
-            <button
-              type="button"
-              className={css.btn}
-              data-active={showTestData || undefined}
-              aria-pressed={showTestData}
-              onClick={() => setShowTestData(current => !current)}
-            >
-              {t('papers.testData')}
-            </button>
             <div className={css.papersToolbarMenu} ref={filterMenuRef}>
               <button
                 type="button"
@@ -5911,11 +5896,11 @@ export function PapersView({
               )}
             </section>
           )}
-          {displayed.length === 0 ? (
+          {visible.length === 0 ? (
             <p className={css.hint}>{t('papers.noMatch')}</p>
           ) : (
             <div className={css.papersGrid} data-view={viewMode}>
-              {displayed.map((paper, index) => {
+              {visible.map((paper) => {
                 const open = Boolean(expanded[paperKey(paper)])
                 const selected = selectedIds.has(paperKey(paper))
                 const openReader = (): void => {
@@ -5929,11 +5914,8 @@ export function PapersView({
                   setExpanded(prev => ({ ...prev, [paperKey(paper)]: true }))
                 }
                 return (
-                  <Fragment key={paperKey(paper)}>
-                  {showTestData && index === visible.length && fixtureVisible.length > 0 && (
-                    <div className={css.papersTestHeader}>{t('papers.testData')}</div>
-                  )}
                   <article
+                    key={paperKey(paper)}
                     className={css.paperCard}
                     data-library
                     data-open={open || undefined}
@@ -6092,7 +6074,6 @@ export function PapersView({
                       />
                     )}
                   </article>
-                  </Fragment>
                 )
               })}
             </div>

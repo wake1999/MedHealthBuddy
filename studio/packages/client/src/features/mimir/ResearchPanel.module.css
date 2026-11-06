@@ -2291,18 +2291,6 @@ li.dropIndicator {
 }
 
 
-.papersTestHeader {
-  grid-column: 1 / -1;
-  margin: 8px 0 -8px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--dsw-alias-border-l2, rgb(0 0 0 / 12%));
-  color: var(--mimir-muted, #6b6b66);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 .papersGrid {
   display: grid;
   /*
@@ -10754,6 +10742,23 @@ button.paperNoteBlockMeta:hover {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.runsTestBadge {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border: 1px solid rgb(154 106 47 / 22%);
+  border-radius: 999px;
+  background: rgb(154 106 47 / 8%);
+  color: var(--mimir-accent, #9a6a2f);
+  font-size: 9.5px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+h3 .runsTestBadge {
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
 .runsListItem span,

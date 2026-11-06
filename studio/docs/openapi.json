@@ -1022,6 +1022,223 @@
         }
       }
     },
+    "/api/auth/roles": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get roles",
+        "description": "GET /api/auth/roles",
+        "operationId": "listRolesHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create roles",
+        "description": "POST /api/auth/roles",
+        "operationId": "createRoleHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "name": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "permissions": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/roles/{id}": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Update :id",
+        "description": "PUT /api/auth/roles/:id",
+        "operationId": "updateRoleHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "name": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "permissions": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Delete :id",
+        "description": "DELETE /api/auth/roles/:id",
+        "operationId": "deleteRoleHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/api/auth/roles/{id}/permissions": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Update permissions",
+        "description": "PUT /api/auth/roles/:id/permissions",
+        "operationId": "replaceRolePermissionsHandler",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "permissions": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/setup": {
       "post": {
         "tags": [
@@ -1259,14 +1476,14 @@
         ]
       }
     },
-    "/api/auth/users/{id}/modules": {
+    "/api/auth/users/{id}/roles": {
       "put": {
         "tags": [
           "Auth"
         ],
-        "summary": "Update modules",
-        "description": "PUT /api/auth/users/:id/modules",
-        "operationId": "updateManagedUserModules",
+        "summary": "Update roles",
+        "description": "PUT /api/auth/users/:id/roles",
+        "operationId": "replaceUserRolesHandler",
         "security": [
           {
             "BearerAuth": []
@@ -1300,7 +1517,7 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "modules": {
+                  "roleIds": {
                     "type": "object",
                     "additionalProperties": true
                   }

@@ -1,6 +1,6 @@
 import Router from '@koa/router'
 import * as ctrl from '../controllers/auth'
-import { requireSuperAdmin } from '../middleware/auth'
+import { requirePermission, requireSuperAdmin } from '../middleware/auth'
 
 // Public routes (no auth required)
 export const authPublicRoutes = new Router()
@@ -21,7 +21,13 @@ authProtectedRoutes.delete('/api/auth/password', ctrl.removePassword)
 authProtectedRoutes.get('/api/auth/users', requireSuperAdmin, ctrl.listManagedUsers)
 authProtectedRoutes.post('/api/auth/users', requireSuperAdmin, ctrl.createManagedUser)
 authProtectedRoutes.put('/api/auth/users/:id', requireSuperAdmin, ctrl.updateManagedUser)
-authProtectedRoutes.put('/api/auth/users/:id/modules', requireSuperAdmin, ctrl.updateManagedUserModules)
 authProtectedRoutes.delete('/api/auth/users/:id', requireSuperAdmin, ctrl.deleteManagedUser)
+authProtectedRoutes.put('/api/auth/users/:id/roles', requirePermission('account.role:assign'), ctrl.replaceUserRolesHandler)
+
+authProtectedRoutes.get('/api/auth/roles', requirePermission('account.role:view'), ctrl.listRolesHandler)
+authProtectedRoutes.post('/api/auth/roles', requirePermission('account.role:create'), ctrl.createRoleHandler)
+authProtectedRoutes.put('/api/auth/roles/:id', requirePermission('account.role:edit'), ctrl.updateRoleHandler)
+authProtectedRoutes.put('/api/auth/roles/:id/permissions', requirePermission('account.role:edit'), ctrl.replaceRolePermissionsHandler)
+authProtectedRoutes.delete('/api/auth/roles/:id', requirePermission('account.role:delete'), ctrl.deleteRoleHandler)
 authProtectedRoutes.get('/api/auth/locked-ips', ctrl.listLockedIps)
 authProtectedRoutes.delete('/api/auth/locked-ips', ctrl.unlockIpHandler)

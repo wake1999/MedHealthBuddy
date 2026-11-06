@@ -612,6 +612,46 @@ export const USER_PROFILES_INDEXES = {
   idx_user_profiles_default: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_default ON user_profiles(user_id) WHERE is_default = 1',
 }
 
+export const ROLES_TABLE = 'roles'
+
+export const ROLES_SCHEMA: Record<string, string> = {
+  id: 'INTEGER PRIMARY KEY AUTOINCREMENT',
+  key: 'TEXT NOT NULL UNIQUE',
+  name: 'TEXT NOT NULL',
+  description: "TEXT NOT NULL DEFAULT ''",
+  built_in: 'INTEGER NOT NULL DEFAULT 0',
+  created_at: 'INTEGER NOT NULL',
+  updated_at: 'INTEGER NOT NULL',
+}
+
+export const PERMISSIONS_TABLE = 'permissions'
+
+export const PERMISSIONS_SCHEMA: Record<string, string> = {
+  code: 'TEXT PRIMARY KEY',
+  module_key: "TEXT NOT NULL DEFAULT ''",
+  resource: 'TEXT NOT NULL',
+  action: 'TEXT NOT NULL',
+  name: 'TEXT NOT NULL',
+  description: "TEXT NOT NULL DEFAULT ''",
+  sort: 'INTEGER NOT NULL DEFAULT 0',
+}
+
+export const ROLE_PERMISSIONS_TABLE = 'role_permissions'
+
+export const ROLE_PERMISSIONS_SCHEMA: Record<string, string> = {
+  role_id: 'INTEGER NOT NULL',
+  permission_code: 'TEXT NOT NULL',
+  scope: "TEXT NOT NULL DEFAULT 'all'",
+}
+
+export const USER_ROLES_TABLE = 'user_roles'
+
+export const USER_ROLES_SCHEMA: Record<string, string> = {
+  user_id: 'INTEGER NOT NULL',
+  role_id: 'INTEGER NOT NULL',
+  created_at: 'INTEGER NOT NULL',
+}
+
 export const USER_MODULE_PERMISSIONS_TABLE = 'user_module_permissions'
 
 export const USER_MODULE_PERMISSIONS_SCHEMA: Record<string, string> = {
@@ -1888,6 +1928,14 @@ export function initAllHermesTables(): void {
     syncTable(USER_MODULE_PERMISSIONS_TABLE, USER_MODULE_PERMISSIONS_SCHEMA, {
       primaryKey: 'user_id, module_key',
       indexes: USER_MODULE_PERMISSIONS_INDEXES,
+    })
+    syncTable(ROLES_TABLE, ROLES_SCHEMA, { primaryKey: 'id' })
+    syncTable(PERMISSIONS_TABLE, PERMISSIONS_SCHEMA, { primaryKey: 'code' })
+    syncTable(ROLE_PERMISSIONS_TABLE, ROLE_PERMISSIONS_SCHEMA, {
+      primaryKey: 'role_id, permission_code',
+    })
+    syncTable(USER_ROLES_TABLE, USER_ROLES_SCHEMA, {
+      primaryKey: 'user_id, role_id',
     })
     syncTable(USER_THEMES_TABLE, USER_THEMES_SCHEMA)
 

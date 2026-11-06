@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref } from 'vue'
-import { NButton, NCheckbox, NCheckboxGroup, NDataTable, NForm, NFormItem, NInput, NModal, NPopconfirm, NPopover, NSelect, NSpace, NTag, useMessage, type DataTableColumns } from 'naive-ui'
+import { NButton, NCheckbox, NCheckboxGroup, NDataTable, NForm, NFormItem, NInput, NModal, NPopconfirm, NSelect, NSpace, NTag, useMessage, type DataTableColumns } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import {
   createManagedUser,
   deleteManagedUser,
   fetchManagedUsers,
   updateManagedUser,
-  updateManagedUserModules,
+  updateManagedUserRoles,
   type ManagedUser,
+  type RoleSummary,
   type UserRole,
   type UserStatus,
 } from '@/api/studio/auth'
-import { APP_MODULE_KEYS, APP_MODULES } from '@/config/modules'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -21,13 +21,13 @@ const loading = ref(false)
 const saving = ref(false)
 const users = ref<ManagedUser[]>([])
 const profiles = ref<string[]>([])
-const modules = ref<string[]>([])
+const roles = ref<RoleSummary[]>([])
 const showModal = ref(false)
 const editingUser = ref<ManagedUser | null>(null)
-const moduleModal = ref(false)
-const moduleTarget = ref<ManagedUser | null>(null)
-const moduleDraft = ref<string[]>([])
-const moduleSaving = ref(false)
+const roleModal = ref(false)
+const roleTarget = ref<ManagedUser | null>(null)
+const roleDraft = ref<number[]>([])
+const roleSaving = ref(false)
 
 const form = reactive({
   username: '',
@@ -48,50 +48,36 @@ const statusOptions = computed(() => [
 ])
 
 const profileOptions = computed(() => profiles.value.map(profile => ({ label: profile, value: profile })))
-const moduleOptions = computed(() => {
-  const available = new Set(modules.value.length > 0 ? modules.value : APP_MODULE_KEYS)
-  return APP_MODULES
-    .filter(module => available.has(module.key))
-    .map(module => ({
-      key: module.key,
-      label: module.superAdminOnly
-        ? `${t(module.labelKey)} (${t('users.superAdminOnly')})`
-        : t(module.labelKey),
-      disabled: module.superAdminOnly === true,
-    }))
-})
+const assignableRoles = computed(() => roles.value.filter(role => role.key !== 'super_admin'))
 
-function moduleCountText(user: ManagedUser): string {
-  return t('users.modulesCount', {
-    count: user.allowedModules?.length ?? 0,
-    total: moduleOptions.value.length,
-  })
+function roleNames(user: ManagedUser): string {
+  return (user.roles || []).map(role => role.name).join('、')
 }
 
-function openModules(user: ManagedUser) {
+function openRoles(user: ManagedUser) {
   if (user.role === 'super_admin') {
-    message.warning(t('users.superAdminModulesLocked'))
+    message.warning(t('users.superAdminRolesLocked'))
     return
   }
-  moduleTarget.value = user
-  moduleDraft.value = [...(user.allowedModules || [])]
-  moduleModal.value = true
+  roleTarget.value = user
+  roleDraft.value = (user.roles || []).filter(role => role.key !== 'super_admin').map(role => role.id)
+  roleModal.value = true
 }
 
-async function saveModules() {
-  if (!moduleTarget.value) return
-  moduleSaving.value = true
+async function saveRoles() {
+  if (!roleTarget.value) return
+  roleSaving.value = true
   try {
-    const res = await updateManagedUserModules(moduleTarget.value.id, moduleDraft.value)
+    const res = await updateManagedUserRoles(roleTarget.value.id, roleDraft.value)
     users.value = res.users
     profiles.value = res.profiles
-    modules.value = res.modules
-    moduleModal.value = false
-    message.success(t('users.modulesSaved'))
+    roles.value = res.roles
+    roleModal.value = false
+    message.success(t('users.rolesSaved'))
   } catch (err: any) {
-    message.error(err.message || t('users.modulesSaveFailed'))
+    message.error(err.message || t('users.rolesSaveFailed'))
   } finally {
-    moduleSaving.value = false
+    roleSaving.value = false
   }
 }
 
@@ -110,7 +96,7 @@ async function loadUsers() {
     const res = await fetchManagedUsers()
     users.value = res.users
     profiles.value = res.profiles
-    modules.value = res.modules || []
+    roles.value = res.roles || []
   } catch (err: any) {
     message.error(err.message || t('users.loadFailed'))
   } finally {
@@ -149,17 +135,21 @@ async function submit() {
 
   saving.value = true
   try {
-    const payload = {
+    const base = {
       username: form.username.trim(),
-      password: form.password || undefined,
-      role: form.role,
       status: form.status,
       profiles: form.role === 'super_admin' ? [] : form.profiles,
       defaultProfile: form.profiles[0] || null,
     }
     const res = editingUser.value
-      ? await updateManagedUser(editingUser.value.id, payload)
-      : await createManagedUser({ ...payload, password: form.password })
+      ? await updateManagedUser(editingUser.value.id, {
+        ...base,
+        password: form.password || undefined,
+        // Do not resend an unchanged legacy role: updateUser would reset the
+        // user's custom role assignments to the built-in admin role.
+        role: editingUser.value.role === form.role ? undefined : form.role,
+      })
+      : await createManagedUser({ ...base, role: form.role, password: form.password })
     users.value = res.users
     profiles.value = res.profiles
     showModal.value = false
@@ -240,29 +230,20 @@ const columns = computed<DataTableColumns<ManagedUser>>(() => [
       }),
   },
   {
-    title: t('users.modulePermissions'),
-    key: 'allowedModules',
-    minWidth: 230,
+    title: t('users.assignedRoles'),
+    key: 'roles',
+    minWidth: 220,
     render: (row) => row.role === 'super_admin'
-      ? h('span', { class: 'muted' }, t('users.allModules'))
+      ? h('span', { class: 'muted' }, t('users.superAdminRole'))
       : h(NSpace, { size: 4, align: 'center' }, {
         default: () => [
-          h(NPopover, { trigger: 'hover', style: 'max-width: 280px' }, {
-            trigger: () => h(NTag, { size: 'small', bordered: false }, { default: () => moduleCountText(row) }),
-            default: () => h('div', { class: 'module-summary' }, moduleOptions.value.map(option => {
-              const allowed = (row.allowedModules || []).includes(option.key)
-              return h('div', { class: 'module-summary-row', 'data-allowed': allowed || undefined }, [
-                h('span', { 'aria-hidden': 'true' }, allowed ? '✓' : '—'),
-                h('span', option.label),
-              ])
-            })),
-          }),
+          h('span', { class: 'role-names' }, roleNames(row) || t('users.noRoles')),
           h(NButton, {
             size: 'tiny',
             quaternary: true,
             type: 'primary',
-            onClick: () => openModules(row),
-          }, { default: () => t('users.configureModules') }),
+            onClick: () => openRoles(row),
+          }, { default: () => t('users.assignRoles') }),
         ],
       }),
   },
@@ -349,44 +330,34 @@ onMounted(loadUsers)
       </template>
     </NModal>
 
-    <NModal
-      v-model:show="moduleModal"
+        <NModal
+      v-model:show="roleModal"
       preset="dialog"
-      :title="t('users.modulePermissions')"
-      style="width: min(680px, calc(100vw - 32px))"
+      :title="t('users.assignRoles')"
+      style="width: min(560px, calc(100vw - 32px))"
     >
-      <div class="module-modal">
-        <p class="module-hint">
-          {{ t('users.modulePermissionsHint', { username: moduleTarget?.username || '' }) }}
+      <div class="role-modal">
+        <p class="role-hint">
+          {{ t('users.assignRolesHint', { username: roleTarget?.username || '' }) }}
         </p>
-        <div class="module-actions">
-          <NButton size="small" quaternary @click="moduleDraft = moduleOptions.map(item => item.key)">
-            {{ t('users.selectAllModules') }}
-          </NButton>
-          <NButton size="small" quaternary @click="moduleDraft = []">
-            {{ t('users.clearModules') }}
-          </NButton>
-          <span class="module-selected">
-            {{ t('users.modulesSelected', { count: moduleDraft.length, total: moduleOptions.length }) }}
-          </span>
-        </div>
-        <NCheckboxGroup v-model:value="moduleDraft">
-          <div class="module-grid">
+        <NCheckboxGroup v-model:value="roleDraft">
+          <div class="role-grid">
             <NCheckbox
-              v-for="option in moduleOptions"
-              :key="option.key"
-              :value="option.key"
-              :label="option.label"
-              :disabled="option.disabled"
+              v-for="role in assignableRoles"
+              :key="role.id"
+              :value="role.id"
+              :label="`${role.name} (${role.key})`"
             />
           </div>
         </NCheckboxGroup>
+        <p v-if="assignableRoles.length === 0" class="role-hint">{{ t('users.noAssignableRoles') }}</p>
       </div>
       <template #action>
-        <NButton @click="moduleModal = false">{{ t('common.cancel') }}</NButton>
-        <NButton type="primary" :loading="moduleSaving" @click="saveModules">{{ t('common.save') }}</NButton>
+        <NButton @click="roleModal = false">{{ t('common.cancel') }}</NButton>
+        <NButton type="primary" :loading="roleSaving" @click="saveRoles">{{ t('common.save') }}</NButton>
       </template>
     </NModal>
+
   </div>
 </template>
 
@@ -422,58 +393,37 @@ onMounted(loadUsers)
   color: $text-muted;
 }
 
-.module-modal {
+.role-modal {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
-.module-hint {
+.role-hint {
   margin: 0;
   color: $text-muted;
   font-size: 13px;
   line-height: 1.6;
 }
 
-.module-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.module-selected {
-  margin-left: auto;
-  color: $text-muted;
-  font-size: 12px;
-}
-
-.module-grid {
+.role-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 8px 16px;
-  max-height: 320px;
+  max-height: 280px;
   overflow: auto;
   padding: 10px;
   border: 1px solid var(--n-border-color, #e5e7eb);
   border-radius: 8px;
 }
 
-.module-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.module-summary-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.role-names {
+  max-width: 140px;
+  overflow: hidden;
   color: $text-muted;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.module-summary-row[data-allowed] {
-  color: $text-primary;
-}
 </style>

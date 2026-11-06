@@ -7,8 +7,11 @@
  */
 
 import { initAllHermesTables } from './schemas'
+import { initRbac } from '../../repositories/rbac-store'
 
 export function initAllStores(): void {
   // Initialize all tables with centralized schema definitions and migrations
   initAllHermesTables()
+  // RBAC seed/migration must run after its tables exist.
+  initRbac()
 }

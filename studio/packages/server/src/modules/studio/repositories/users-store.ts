@@ -1,7 +1,13 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto'
 import { getDb } from '../infrastructure/database'
-import { USER_PROFILES_TABLE, USER_THEMES_TABLE, USERS_TABLE } from '../infrastructure/database/schemas'
-import { deleteUserModulePermissions, getAllowedModulesForUser, replaceUserModulePermissions, USER_MODULES } from './module-permissions'
+import { USER_PROFILES_TABLE, USER_ROLES_TABLE, USER_THEMES_TABLE, USERS_TABLE } from '../infrastructure/database/schemas'
+import {
+  assignBuiltInRole,
+  getAllowedModulesFromPermissions,
+  getUserPermissions,
+  getUserRoles,
+  type RoleSummary,
+} from './rbac-store'
 
 export type UserRole = 'super_admin' | 'admin'
 export type UserStatus = 'active' | 'disabled'
@@ -34,6 +40,7 @@ export interface UserSummary {
   profiles: string[]
   default_profile: string | null
   allowedModules: string[]
+  roles: RoleSummary[]
   created_at: number
   updated_at: number
   last_login_at: number | null
@@ -96,14 +103,16 @@ export function listUsers(): UserSummary[] {
   if (!db) return []
   const users = db.prepare(
     `SELECT id, username, role, status, created_at, updated_at, last_login_at FROM ${USERS_TABLE} ORDER BY id ASC`
-  ).all() as Array<Omit<UserSummary, 'profiles' | 'default_profile' | 'allowedModules'>>
+  ).all() as Array<Omit<UserSummary, 'profiles' | 'default_profile' | 'allowedModules' | 'roles'>>
   return users.map(user => {
     const profiles = listUserProfiles(user.id)
+    const permissions = getUserPermissions(user.id, user.role)
     return {
       ...user,
       profiles: profiles.map(profile => profile.profile_name),
       default_profile: profiles.find(profile => profile.is_default === 1)?.profile_name || null,
-      allowedModules: getAllowedModulesForUser(user.id, user.role),
+      allowedModules: getAllowedModulesFromPermissions(permissions),
+      roles: getUserRoles(user.id),
     }
   })
 }
@@ -225,7 +234,7 @@ export function createUser(input: {
   const user = findUserByUsername(input.username)
   if (user) {
     replaceUserProfiles(user.id, input.profiles || [], input.defaultProfile)
-    replaceUserModulePermissions(user.id, [...USER_MODULES])
+    assignBuiltInRole(user.id, role)
   }
   return user
 }
@@ -260,6 +269,7 @@ export function updateUser(input: {
   ).run(nextUsername, nextPasswordHash, nextRole, nextStatus, now, id)
 
   if (input.profiles) replaceUserProfiles(id, input.profiles, input.defaultProfile)
+  if (input.role) assignBuiltInRole(id, nextRole)
   return findUserById(id)
 }
 
@@ -272,7 +282,7 @@ export function deleteUser(userId: UserId): boolean {
   try {
     db.prepare(`DELETE FROM ${USER_PROFILES_TABLE} WHERE user_id = ?`).run(id)
     db.prepare(`DELETE FROM ${USER_THEMES_TABLE} WHERE user_id = ?`).run(id)
-    deleteUserModulePermissions(id)
+    db.prepare(`DELETE FROM ${USER_ROLES_TABLE} WHERE user_id = ?`).run(id)
     const result = db.prepare(`DELETE FROM ${USERS_TABLE} WHERE id = ?`).run(id)
     db.exec('COMMIT')
     return result.changes > 0
@@ -318,7 +328,9 @@ export function createDefaultSuperAdmin(): UserRecord | null {
      VALUES (?, ?, ?, ?, ?, ?)`
   ).run(DEFAULT_USERNAME, hashPassword(DEFAULT_PASSWORD), 'super_admin', 'active', now, now)
 
-  return findUserByUsername(DEFAULT_USERNAME)
+  const created = findUserByUsername(DEFAULT_USERNAME)
+  if (created) assignBuiltInRole(created.id, 'super_admin')
+  return created
 }
 
 export function bootstrapDefaultSuperAdmin(username: string, password: string): UserRecord | null {

@@ -15,7 +15,8 @@ import CompressionSettings from "@/components/hermes/settings/CompressionSetting
 import PrivacySettings from "@/components/hermes/settings/PrivacySettings.vue";
 import ModelSettings from "@/components/hermes/settings/ModelSettings.vue";
 import AccountSettings from "@/components/hermes/settings/AccountSettings.vue";
-import UserManagementSettings from "@/components/hermes/settings/UserManagementSettings.vue";
+import UserManagementSettings from "@/components/hermes/settings/UserManagementSettings.vue"
+import RolesSettings from "@/components/hermes/settings/RolesSettings.vue";
 import WebhookSettings from "@/components/hermes/settings/WebhookSettings.vue";
 import { isStoredSuperAdmin } from "@/api/client";
 import { useProfilesStore } from "@/stores/hermes/profiles";
@@ -31,6 +32,7 @@ const activeTab = ref("account");
 const validTabs = computed(() => new Set([
   "account",
   ...(canManageUsers ? ["users"] : []),
+  ...(canManageUsers ? ["roles"] : []),
   ...(canManageUsers ? ["webhooks"] : []),
   "display",
   "proxy",
@@ -108,6 +110,9 @@ onMounted(() => {
           </NTabPane>
           <NTabPane v-if="canManageUsers" name="users" :tab="t('settings.tabs.users')">
             <UserManagementSettings />
+          </NTabPane>
+          <NTabPane v-if="canManageUsers" name="roles" :tab="t('settings.tabs.roles')">
+            <RolesSettings />
           </NTabPane>
           <NTabPane v-if="canManageUsers" name="webhooks" :tab="t('settings.tabs.webhooks')">
             <WebhookSettings />

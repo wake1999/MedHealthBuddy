@@ -43,6 +43,8 @@ export interface CurrentUser {
   updated_at: number
   last_login_at: number | null
   avatar?: string
+  roles: string[]
+  permissions: string[]
   allowedModules: string[]
   requiresCredentialChange?: boolean
 }
@@ -115,6 +117,28 @@ export async function removePassword(): Promise<void> {
 export type UserRole = 'super_admin' | 'admin'
 export type UserStatus = 'active' | 'disabled'
 
+export interface RoleSummary {
+  id: number
+  key: string
+  name: string
+  description: string
+  built_in: number
+  permissions: string[]
+  userCount: number
+  created_at: number
+  updated_at: number
+}
+
+export interface PermissionRecord {
+  code: string
+  module_key: string
+  resource: string
+  action: string
+  name: string
+  description: string
+  sort: number
+}
+
 export interface ManagedUser {
   id: number
   username: string
@@ -123,6 +147,7 @@ export interface ManagedUser {
   profiles: string[]
   default_profile: string | null
   allowedModules: string[]
+  roles: RoleSummary[]
   created_at: number
   updated_at: number
   last_login_at: number | null
@@ -131,7 +156,8 @@ export interface ManagedUser {
 export interface ManagedUsersResponse {
   users: ManagedUser[]
   profiles: string[]
-  modules: string[]
+  roles: RoleSummary[]
+  permissions: PermissionRecord[]
 }
 
 export async function fetchManagedUsers(): Promise<ManagedUsersResponse> {
@@ -170,13 +196,33 @@ export async function updateManagedUser(id: number, input: {
   return { ...current, users: res.users }
 }
 
-export async function updateManagedUserModules(id: number, modules: string[]): Promise<ManagedUsersResponse> {
-  const res = await request<{ users: ManagedUser[]; modules: string[] }>(`/api/auth/users/${id}/modules`, {
-    method: 'PUT',
-    body: JSON.stringify({ modules }),
-  })
+export async function updateManagedUserRoles(id: number, roleIds: number[]): Promise<ManagedUsersResponse> {
+  const res = await request<{ users: ManagedUser[]; roles: RoleSummary[]; permissions: PermissionRecord[] }>(
+    `/api/auth/users/${id}/roles`,
+    { method: 'PUT', body: JSON.stringify({ roleIds }) },
+  )
   const current = await fetchManagedUsers()
-  return { ...current, users: res.users, modules: res.modules }
+  return { ...current, users: res.users, roles: res.roles, permissions: res.permissions }
+}
+
+export async function fetchRoles(): Promise<{ roles: RoleSummary[]; permissions: PermissionRecord[] }> {
+  return request('/api/auth/roles')
+}
+
+export async function createRole(input: { name: string; description: string; permissions: string[] }): Promise<void> {
+  await request('/api/auth/roles', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function updateRole(id: number, input: { name: string; description: string; permissions?: string[] }): Promise<void> {
+  await request(`/api/auth/roles/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export async function replaceRolePermissions(id: number, permissions: string[]): Promise<void> {
+  await request(`/api/auth/roles/${id}/permissions`, { method: 'PUT', body: JSON.stringify({ permissions }) })
+}
+
+export async function deleteRole(id: number): Promise<void> {
+  await request(`/api/auth/roles/${id}`, { method: 'DELETE' })
 }
 
 export async function deleteManagedUser(id: number): Promise<ManagedUsersResponse> {

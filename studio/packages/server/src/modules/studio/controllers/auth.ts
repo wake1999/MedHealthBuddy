@@ -27,12 +27,17 @@ import { getUserJwtExpiresSeconds, issueAppJwt, issueUserJwt } from '../public/a
 import { consumeAppAuthorizationCode, upsertAppConnection, type AppConnectionType } from '../services/app-relay/app-connections'
 import { listProfileNamesFromDisk } from '../public/profile-config'
 import {
-  getAllowedModulesForUser,
-  isUserModule,
-  replaceUserModulePermissions,
-  USER_MODULES,
-  type UserModule,
-} from '../repositories/module-permissions'
+  createRole,
+  deleteRole,
+  getAllowedModulesFromPermissions,
+  getUserPermissions,
+  getUserRoles,
+  listPermissions,
+  listRoles,
+  replaceRolePermissions,
+  replaceUserRoles,
+  updateRole,
+} from '../repositories/rbac-store'
 import { startOutboundRelayClient, stopOutboundRelayClient } from '../public/global-agent'
 import { getLanEndpointKind } from '../services/network/lan-discovery'
 import { getPublicSystemInfo } from '../public/system-info'
@@ -71,7 +76,9 @@ export async function currentUser(ctx: Context) {
       updated_at: user.updated_at,
       last_login_at: user.last_login_at,
       avatar: user.avatar || '',
-      allowedModules: getAllowedModulesForUser(user.id, user.role),
+      roles: getUserRoles(user.id).map(role => role.key),
+      permissions: getUserPermissions(user.id, user.role),
+      allowedModules: getAllowedModulesFromPermissions(getUserPermissions(user.id, user.role)),
       requiresCredentialChange: process.env.HERMES_DESKTOP === 'true'
         ? false
         : user.username === DEFAULT_USERNAME && verifyPassword(DEFAULT_PASSWORD, user.password_hash),
@@ -621,16 +628,84 @@ export async function listManagedUsers(ctx: Context) {
   ctx.body = {
     users: listUsers(),
     profiles: listProfileNamesFromDisk(),
-    modules: [...USER_MODULES],
+    roles: listRoles(),
+    permissions: listPermissions(),
   }
 }
 
-/**
- * PUT /api/auth/users/:id/modules
- * Replace one account's module access. Super admin only; super-admin targets
- * always retain every module and cannot be restricted here.
- */
-export async function updateManagedUserModules(ctx: Context) {
+/** GET /api/auth/roles */
+export async function listRolesHandler(ctx: Context) {
+  ctx.body = { roles: listRoles(), permissions: listPermissions() }
+}
+
+/** POST /api/auth/roles */
+export async function createRoleHandler(ctx: Context) {
+  const body = ctx.request.body as { name?: unknown; description?: unknown; permissions?: unknown }
+  const name = String(body.name || '').trim()
+  const permissionCodes = Array.isArray(body.permissions) ? body.permissions.map(item => String(item || '')) : []
+  try {
+    const role = createRole({ name, description: String(body.description || '') }, permissionCodes)
+    ctx.status = 201
+    ctx.body = { role, roles: listRoles(), permissions: listPermissions() }
+  } catch (error: any) {
+    const message = error?.message || 'role_create_failed'
+    ctx.status = message === 'role_name_too_short' ? 400 : 500
+    ctx.body = { error: message }
+  }
+}
+
+/** PUT /api/auth/roles/:id */
+export async function updateRoleHandler(ctx: Context) {
+  const id = Number(ctx.params.id)
+  const body = ctx.request.body as { name?: unknown; description?: unknown; permissions?: unknown }
+  const permissionCodes = Array.isArray(body.permissions) ? body.permissions.map(item => String(item || '')) : undefined
+  try {
+    const role = updateRole(id, { name: String(body.name || ''), description: String(body.description || '') }, permissionCodes)
+    if (!role) {
+      ctx.status = 404
+      ctx.body = { error: 'Role not found' }
+      return
+    }
+    ctx.body = { role, roles: listRoles(), permissions: listPermissions() }
+  } catch (error: any) {
+    const message = error?.message || 'role_update_failed'
+    ctx.status = message === 'role_built_in_locked' ? 400 : 500
+    ctx.body = { error: message }
+  }
+}
+
+/** PUT /api/auth/roles/:id/permissions */
+export async function replaceRolePermissionsHandler(ctx: Context) {
+  const id = Number(ctx.params.id)
+  const body = ctx.request.body as { permissions?: unknown }
+  if (!Array.isArray(body.permissions)) {
+    ctx.status = 400
+    ctx.body = { error: 'permissions must be an array' }
+    return
+  }
+  const role = replaceRolePermissions(id, body.permissions.map(item => String(item || '')))
+  if (!role) {
+    ctx.status = 404
+    ctx.body = { error: 'Role not found' }
+    return
+  }
+  ctx.body = { role, roles: listRoles(), permissions: listPermissions() }
+}
+
+/** DELETE /api/auth/roles/:id */
+export async function deleteRoleHandler(ctx: Context) {
+  try {
+    deleteRole(Number(ctx.params.id))
+    ctx.body = { ok: true, roles: listRoles(), permissions: listPermissions() }
+  } catch (error: any) {
+    const message = error?.message || 'role_delete_failed'
+    ctx.status = message === 'role_in_use' ? 409 : message === 'role_not_found' ? 404 : 400
+    ctx.body = { error: message }
+  }
+}
+
+/** PUT /api/auth/users/:id/roles */
+export async function replaceUserRolesHandler(ctx: Context) {
   const id = Number(ctx.params.id)
   const user = Number.isInteger(id) ? findUserById(id) : null
   if (!user) {
@@ -638,30 +713,25 @@ export async function updateManagedUserModules(ctx: Context) {
     ctx.body = { error: 'User not found' }
     return
   }
-  if (user.role === 'super_admin') {
+  const body = ctx.request.body as { roleIds?: unknown }
+  if (!Array.isArray(body.roleIds)) {
     ctx.status = 400
-    ctx.body = { error: 'Super administrator module access cannot be restricted' }
+    ctx.body = { error: 'roleIds must be an array' }
     return
   }
-
-  const body = ctx.request.body as { modules?: unknown }
-  if (!Array.isArray(body.modules)) {
-    ctx.status = 400
-    ctx.body = { error: 'modules must be an array' }
+  const roleIds = body.roleIds.map(value => Number(value)).filter(Number.isInteger)
+  const superRole = listRoles().find(role => role.key === 'super_admin')
+  if (superRole && roleIds.includes(superRole.id) && ctx.state.user?.role !== 'super_admin') {
+    ctx.status = 403
+    ctx.body = { error: 'Only a super administrator can assign the super administrator role' }
     return
   }
-  const requested = body.modules.map(item => String(item || '').trim())
-  if (requested.some(key => !isUserModule(key))) {
-    ctx.status = 400
-    ctx.body = { error: 'Unknown module key' }
-    return
-  }
-  const modules = [...new Set(requested)] as UserModule[]
-  replaceUserModulePermissions(user.id, modules)
+  replaceUserRoles(user.id, roleIds)
   ctx.body = {
     user: listUsers().find(row => row.id === user.id) || null,
     users: listUsers(),
-    modules: [...USER_MODULES],
+    roles: listRoles(),
+    permissions: listPermissions(),
   }
 }
 

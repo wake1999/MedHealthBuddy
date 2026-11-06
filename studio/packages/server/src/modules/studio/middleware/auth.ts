@@ -17,12 +17,15 @@ import {
   type AppConnectionTokenStatus,
   type AppConnectionType,
 } from '../repositories/app-connections-store'
+import { getUserPermissions, getUserRoles } from '../repositories/rbac-store'
 
 export interface AuthenticatedUser {
   id: number
   username: string
   role: UserRole
   profiles?: string[]
+  roles?: string[]
+  permissions?: string[]
 }
 
 export interface RequestProfile {
@@ -264,6 +267,8 @@ export function toAuthenticatedUser(user: Pick<UserRecord, 'id' | 'username' | '
     id: user.id,
     username: user.username,
     role: user.role,
+    roles: getUserRoles(user.id).map(role => role.key),
+    permissions: getUserPermissions(user.id, user.role),
   }
   if (user.role !== 'super_admin') {
     authenticated.profiles = listUserProfiles(user.id).map(profile => profile.profile_name)
@@ -413,6 +418,19 @@ export async function requireAdmin(ctx: Context, next: Next): Promise<void> {
     return
   }
   await next()
+}
+
+/** Require one permission code; super administrators bypass the check. */
+export function requirePermission(code: string) {
+  return async function permissionGuard(ctx: Context, next: Next): Promise<void> {
+    const user = ctx.state.user
+    if (user?.role === 'super_admin' || user?.permissions?.includes(code)) {
+      await next()
+      return
+    }
+    ctx.status = 403
+    ctx.body = { error: 'Permission denied', code }
+  }
 }
 
 export function resolveRequestedProfile(ctx: Context): string {

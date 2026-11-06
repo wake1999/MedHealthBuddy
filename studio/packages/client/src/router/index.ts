@@ -1,6 +1,8 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { getStoredAllowedModules, hasApiKey, hasStoredModuleAccess, isStoredSuperAdmin } from '@/api/client'
+import { getStoredAllowedModules, hasApiKey, hasStoredModuleAccess, isStoredSuperAdmin, setStoredAllowedModules } from '@/api/client'
+import { fetchCurrentUser } from '@/api/studio/auth'
 import { firstAllowedRoute, moduleForRoute } from '@/config/modules'
+import { useAccountStore } from '@/stores/account'
 import { hasDesktopBrowserBridge } from '@/utils/desktop-bridge'
 import { resolveLoginRedirect } from '@/utils/login-redirect'
 
@@ -366,9 +368,23 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   const moduleKey = moduleForRoute(String(to.name || ''))
-  if (moduleKey && !hasStoredModuleAccess(moduleKey)) {
-    next({ name: firstAllowedRoute(getStoredAllowedModules() || [], isStoredSuperAdmin()) })
-    return
+  if (moduleKey && !isStoredSuperAdmin()) {
+    // Refresh on navigation so a role/permission change applies without a
+    // re-login. If the probe fails, fall back to the last known snapshot.
+    try {
+      const user = await fetchCurrentUser()
+      setStoredAllowedModules(user.allowedModules)
+      useAccountStore().allowedModules = user.allowedModules
+      if (!user.allowedModules.includes(moduleKey)) {
+        next({ name: firstAllowedRoute(user.allowedModules, false) })
+        return
+      }
+    } catch {
+      if (!hasStoredModuleAccess(moduleKey)) {
+        next({ name: firstAllowedRoute(getStoredAllowedModules() || [], false) })
+        return
+      }
+    }
   }
 
   next()

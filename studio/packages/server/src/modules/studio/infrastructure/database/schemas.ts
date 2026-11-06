@@ -612,6 +612,19 @@ export const USER_PROFILES_INDEXES = {
   idx_user_profiles_default: 'CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_default ON user_profiles(user_id) WHERE is_default = 1',
 }
 
+export const USER_MODULE_PERMISSIONS_TABLE = 'user_module_permissions'
+
+export const USER_MODULE_PERMISSIONS_SCHEMA: Record<string, string> = {
+  user_id: 'INTEGER NOT NULL',
+  module_key: 'TEXT NOT NULL',
+  allowed: 'INTEGER NOT NULL DEFAULT 1',
+  updated_at: 'INTEGER NOT NULL',
+}
+
+export const USER_MODULE_PERMISSIONS_INDEXES = {
+  idx_user_module_permissions_user: 'CREATE INDEX IF NOT EXISTS idx_user_module_permissions_user ON user_module_permissions(user_id)',
+}
+
 export const USER_THEMES_TABLE = 'user_themes'
 
 export const USER_THEMES_SCHEMA: Record<string, string> = {
@@ -1871,6 +1884,10 @@ export function initAllHermesTables(): void {
     syncTable(USER_PROFILES_TABLE, USER_PROFILES_SCHEMA, {
       primaryKey: 'user_id, profile_name',
       indexes: USER_PROFILES_INDEXES,
+    })
+    syncTable(USER_MODULE_PERMISSIONS_TABLE, USER_MODULE_PERMISSIONS_SCHEMA, {
+      primaryKey: 'user_id, module_key',
+      indexes: USER_MODULE_PERMISSIONS_INDEXES,
     })
     syncTable(USER_THEMES_TABLE, USER_THEMES_SCHEMA)
 

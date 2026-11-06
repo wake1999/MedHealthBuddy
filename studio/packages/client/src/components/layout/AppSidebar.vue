@@ -8,6 +8,7 @@ import { useAppStore } from "@/stores/hermes/app";
 import RouteLinkItem from "@/components/common/RouteLinkItem.vue";
 import PageSidebarFooter from "@/components/layout/PageSidebarFooter.vue";
 import { isStoredSuperAdmin } from "@/api/client";
+import { useAccountStore } from "@/stores/account";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -18,6 +19,13 @@ const selectedKey = computed(() => {
   return route.name as string;
 });
 const isSuperAdmin = computed(() => isStoredSuperAdmin());
+const accountStore = useAccountStore();
+void accountStore.loadAccount();
+function canModule(key: string): boolean {
+  return isSuperAdmin.value
+    || accountStore.allowedModules === null
+    || accountStore.allowedModules.includes(key);
+}
 const isVersionPreview = import.meta.env.VITE_HERMES_PREVIEW === "1";
 const isDesktopShell = computed(
   () =>
@@ -57,6 +65,7 @@ function handleSidebarClick(event: MouseEvent) {
   >
     <nav class="sidebar-nav">
       <RouteLinkItem
+        v-if="canModule('logs')"
         class="nav-item"
         :to="{ name: 'hermes.logs' }"
         :active="selectedKey === 'hermes.logs'"
@@ -82,7 +91,7 @@ function handleSidebarClick(event: MouseEvent) {
         <span>{{ t("sidebar.logs") }}</span>
       </RouteLinkItem>
       <RouteLinkItem
-        v-if="isSuperAdmin"
+        v-if="isSuperAdmin && canModule('performance')"
         class="nav-item"
         :to="{ name: 'hermes.performance' }"
         :active="selectedKey === 'hermes.performance'"
@@ -102,6 +111,7 @@ function handleSidebarClick(event: MouseEvent) {
         <span>{{ t("sidebar.performance") }}</span>
       </RouteLinkItem>
       <RouteLinkItem
+        v-if="canModule('skillsUsage')"
         class="nav-item"
         :to="{ name: 'hermes.skillsUsage' }"
         :active="selectedKey === 'hermes.skillsUsage'"
@@ -122,7 +132,7 @@ function handleSidebarClick(event: MouseEvent) {
         <span>{{ t("sidebar.skillsUsage") }}</span>
       </RouteLinkItem>
       <RouteLinkItem
-        v-if="isDesktopShell && hasRoute('hermes.browser')"
+        v-if="isDesktopShell && hasRoute('hermes.browser') && canModule('browser')"
         class="nav-item"
         :to="{ name: 'hermes.browser' }"
         :active="selectedKey === 'hermes.browser'"
@@ -174,6 +184,7 @@ function handleSidebarClick(event: MouseEvent) {
         <span>{{ t("sidebar.versionPreview") }}</span>
       </RouteLinkItem>
       <RouteLinkItem
+        v-if="canModule('theme')"
         class="nav-item"
         :to="{ name: 'hermes.theme' }"
         :active="selectedKey === 'hermes.theme'"
@@ -198,6 +209,7 @@ function handleSidebarClick(event: MouseEvent) {
         <span>{{ t("sidebar.theme") }}</span>
       </RouteLinkItem>
       <RouteLinkItem
+        v-if="canModule('petdex')"
         class="nav-item"
         :to="{ name: 'hermes.petdex' }"
         :active="selectedKey === 'hermes.petdex'"
@@ -220,7 +232,7 @@ function handleSidebarClick(event: MouseEvent) {
         <span>{{ t("sidebar.petdex") }}</span>
       </RouteLinkItem>
       <RouteLinkItem
-        v-if="isSuperAdmin"
+        v-if="isSuperAdmin && canModule('profiles')"
         class="nav-item"
         :to="{ name: 'hermes.profiles' }"
         :active="selectedKey === 'hermes.profiles'"

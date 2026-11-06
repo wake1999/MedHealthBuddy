@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { hasApiKey, isStoredSuperAdmin } from '@/api/client'
+import { getStoredAllowedModules, hasApiKey, hasStoredModuleAccess, isStoredSuperAdmin } from '@/api/client'
+import { firstAllowedRoute, moduleForRoute } from '@/config/modules'
 import { hasDesktopBrowserBridge } from '@/utils/desktop-bridge'
 import { resolveLoginRedirect } from '@/utils/login-redirect'
 
@@ -361,6 +362,12 @@ router.beforeEach(async (to, _from, next) => {
 
   if (to.meta.requiresSuperAdmin && !isStoredSuperAdmin()) {
     next({ name: 'hermes.chat' })
+    return
+  }
+
+  const moduleKey = moduleForRoute(String(to.name || ''))
+  if (moduleKey && !hasStoredModuleAccess(moduleKey)) {
+    next({ name: firstAllowedRoute(getStoredAllowedModules() || [], isStoredSuperAdmin()) })
     return
   }
 

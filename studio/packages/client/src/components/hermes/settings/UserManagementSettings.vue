@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, h, onMounted, reactive, ref } from 'vue'
-import { NButton, NDataTable, NForm, NFormItem, NInput, NModal, NPopconfirm, NSelect, NSpace, NTag, useMessage, type DataTableColumns } from 'naive-ui'
+import { NButton, NCheckbox, NCheckboxGroup, NDataTable, NForm, NFormItem, NInput, NModal, NPopconfirm, NPopover, NSelect, NSpace, NTag, useMessage, type DataTableColumns } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import {
   createManagedUser,
   deleteManagedUser,
   fetchManagedUsers,
   updateManagedUser,
+  updateManagedUserModules,
   type ManagedUser,
   type UserRole,
   type UserStatus,
 } from '@/api/studio/auth'
+import { APP_MODULE_KEYS, APP_MODULES } from '@/config/modules'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -19,8 +21,13 @@ const loading = ref(false)
 const saving = ref(false)
 const users = ref<ManagedUser[]>([])
 const profiles = ref<string[]>([])
+const modules = ref<string[]>([])
 const showModal = ref(false)
 const editingUser = ref<ManagedUser | null>(null)
+const moduleModal = ref(false)
+const moduleTarget = ref<ManagedUser | null>(null)
+const moduleDraft = ref<string[]>([])
+const moduleSaving = ref(false)
 
 const form = reactive({
   username: '',
@@ -41,6 +48,52 @@ const statusOptions = computed(() => [
 ])
 
 const profileOptions = computed(() => profiles.value.map(profile => ({ label: profile, value: profile })))
+const moduleOptions = computed(() => {
+  const available = new Set(modules.value.length > 0 ? modules.value : APP_MODULE_KEYS)
+  return APP_MODULES
+    .filter(module => available.has(module.key))
+    .map(module => ({
+      key: module.key,
+      label: module.superAdminOnly
+        ? `${t(module.labelKey)} (${t('users.superAdminOnly')})`
+        : t(module.labelKey),
+      disabled: module.superAdminOnly === true,
+    }))
+})
+
+function moduleCountText(user: ManagedUser): string {
+  return t('users.modulesCount', {
+    count: user.allowedModules?.length ?? 0,
+    total: moduleOptions.value.length,
+  })
+}
+
+function openModules(user: ManagedUser) {
+  if (user.role === 'super_admin') {
+    message.warning(t('users.superAdminModulesLocked'))
+    return
+  }
+  moduleTarget.value = user
+  moduleDraft.value = [...(user.allowedModules || [])]
+  moduleModal.value = true
+}
+
+async function saveModules() {
+  if (!moduleTarget.value) return
+  moduleSaving.value = true
+  try {
+    const res = await updateManagedUserModules(moduleTarget.value.id, moduleDraft.value)
+    users.value = res.users
+    profiles.value = res.profiles
+    modules.value = res.modules
+    moduleModal.value = false
+    message.success(t('users.modulesSaved'))
+  } catch (err: any) {
+    message.error(err.message || t('users.modulesSaveFailed'))
+  } finally {
+    moduleSaving.value = false
+  }
+}
 
 function resetForm() {
   editingUser.value = null
@@ -57,6 +110,7 @@ async function loadUsers() {
     const res = await fetchManagedUsers()
     users.value = res.users
     profiles.value = res.profiles
+    modules.value = res.modules || []
   } catch (err: any) {
     message.error(err.message || t('users.loadFailed'))
   } finally {
@@ -186,6 +240,33 @@ const columns = computed<DataTableColumns<ManagedUser>>(() => [
       }),
   },
   {
+    title: t('users.modulePermissions'),
+    key: 'allowedModules',
+    minWidth: 230,
+    render: (row) => row.role === 'super_admin'
+      ? h('span', { class: 'muted' }, t('users.allModules'))
+      : h(NSpace, { size: 4, align: 'center' }, {
+        default: () => [
+          h(NPopover, { trigger: 'hover', style: 'max-width: 280px' }, {
+            trigger: () => h(NTag, { size: 'small', bordered: false }, { default: () => moduleCountText(row) }),
+            default: () => h('div', { class: 'module-summary' }, moduleOptions.value.map(option => {
+              const allowed = (row.allowedModules || []).includes(option.key)
+              return h('div', { class: 'module-summary-row', 'data-allowed': allowed || undefined }, [
+                h('span', { 'aria-hidden': 'true' }, allowed ? '✓' : '—'),
+                h('span', option.label),
+              ])
+            })),
+          }),
+          h(NButton, {
+            size: 'tiny',
+            quaternary: true,
+            type: 'primary',
+            onClick: () => openModules(row),
+          }, { default: () => t('users.configureModules') }),
+        ],
+      }),
+  },
+  {
     title: t('users.lastLogin'),
     key: 'last_login_at',
     minWidth: 170,
@@ -234,7 +315,7 @@ onMounted(loadUsers)
       :loading="loading"
       :bordered="false"
       :single-line="false"
-      :scroll-x="1080"
+      :scroll-x="1320"
       size="small"
     />
 
@@ -265,6 +346,45 @@ onMounted(loadUsers)
       <template #action>
         <NButton @click="showModal = false">{{ t('common.cancel') }}</NButton>
         <NButton type="primary" :loading="saving" @click="submit">{{ t('common.save') }}</NButton>
+      </template>
+    </NModal>
+
+    <NModal
+      v-model:show="moduleModal"
+      preset="dialog"
+      :title="t('users.modulePermissions')"
+      style="width: min(680px, calc(100vw - 32px))"
+    >
+      <div class="module-modal">
+        <p class="module-hint">
+          {{ t('users.modulePermissionsHint', { username: moduleTarget?.username || '' }) }}
+        </p>
+        <div class="module-actions">
+          <NButton size="small" quaternary @click="moduleDraft = moduleOptions.map(item => item.key)">
+            {{ t('users.selectAllModules') }}
+          </NButton>
+          <NButton size="small" quaternary @click="moduleDraft = []">
+            {{ t('users.clearModules') }}
+          </NButton>
+          <span class="module-selected">
+            {{ t('users.modulesSelected', { count: moduleDraft.length, total: moduleOptions.length }) }}
+          </span>
+        </div>
+        <NCheckboxGroup v-model:value="moduleDraft">
+          <div class="module-grid">
+            <NCheckbox
+              v-for="option in moduleOptions"
+              :key="option.key"
+              :value="option.key"
+              :label="option.label"
+              :disabled="option.disabled"
+            />
+          </div>
+        </NCheckboxGroup>
+      </div>
+      <template #action>
+        <NButton @click="moduleModal = false">{{ t('common.cancel') }}</NButton>
+        <NButton type="primary" :loading="moduleSaving" @click="saveModules">{{ t('common.save') }}</NButton>
       </template>
     </NModal>
   </div>
@@ -300,5 +420,60 @@ onMounted(loadUsers)
 
 :deep(.muted) {
   color: $text-muted;
+}
+
+.module-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.module-hint {
+  margin: 0;
+  color: $text-muted;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.module-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.module-selected {
+  margin-left: auto;
+  color: $text-muted;
+  font-size: 12px;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px 16px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--n-border-color, #e5e7eb);
+  border-radius: 8px;
+}
+
+.module-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.module-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: $text-muted;
+  font-size: 12px;
+}
+
+.module-summary-row[data-allowed] {
+  color: $text-primary;
 }
 </style>

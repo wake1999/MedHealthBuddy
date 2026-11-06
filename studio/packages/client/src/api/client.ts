@@ -45,6 +45,7 @@ export function setServerUrl(url: string) {
 export function setApiKey(key: string) {
   const changed = getApiKey() !== key
   localStorage.setItem('hermes_api_key', key)
+  if (changed) localStorage.removeItem(ALLOWED_MODULES_STORAGE_KEY)
   authExpired = false
   if (changed) invalidateAuth()
 }
@@ -57,6 +58,7 @@ export function clearApiKey() {
 function clearAuthSessionState() {
   clearApiKey()
   localStorage.removeItem(ACTIVE_PROFILE_STORAGE_KEY)
+  localStorage.removeItem(ALLOWED_MODULES_STORAGE_KEY)
 }
 
 export function hasApiKey(): boolean {
@@ -81,6 +83,30 @@ export function getStoredUserRole(): StoredUserRole | null {
 
 export function isStoredSuperAdmin(): boolean {
   return getStoredUserRole() === 'super_admin'
+}
+
+const ALLOWED_MODULES_STORAGE_KEY = 'hermes_allowed_modules'
+
+export function setStoredAllowedModules(modules: readonly string[]): void {
+  localStorage.setItem(ALLOWED_MODULES_STORAGE_KEY, JSON.stringify([...new Set(modules)]))
+}
+
+/** null means not loaded yet; callers should fail open until /auth/me responds. */
+export function getStoredAllowedModules(): string[] | null {
+  const raw = localStorage.getItem(ALLOWED_MODULES_STORAGE_KEY)
+  if (raw === null) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : null
+  } catch {
+    return null
+  }
+}
+
+export function hasStoredModuleAccess(moduleKey: string): boolean {
+  if (isStoredSuperAdmin()) return true
+  const allowed = getStoredAllowedModules()
+  return allowed === null || allowed.includes(moduleKey)
 }
 
 export function getStoredUsername(): string | null {

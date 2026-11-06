@@ -43,6 +43,7 @@ export interface CurrentUser {
   updated_at: number
   last_login_at: number | null
   avatar?: string
+  allowedModules: string[]
   requiresCredentialChange?: boolean
 }
 
@@ -121,6 +122,7 @@ export interface ManagedUser {
   status: UserStatus
   profiles: string[]
   default_profile: string | null
+  allowedModules: string[]
   created_at: number
   updated_at: number
   last_login_at: number | null
@@ -129,6 +131,7 @@ export interface ManagedUser {
 export interface ManagedUsersResponse {
   users: ManagedUser[]
   profiles: string[]
+  modules: string[]
 }
 
 export async function fetchManagedUsers(): Promise<ManagedUsersResponse> {
@@ -165,6 +168,15 @@ export async function updateManagedUser(id: number, input: {
   })
   const current = await fetchManagedUsers()
   return { ...current, users: res.users }
+}
+
+export async function updateManagedUserModules(id: number, modules: string[]): Promise<ManagedUsersResponse> {
+  const res = await request<{ users: ManagedUser[]; modules: string[] }>(`/api/auth/users/${id}/modules`, {
+    method: 'PUT',
+    body: JSON.stringify({ modules }),
+  })
+  const current = await fetchManagedUsers()
+  return { ...current, users: res.users, modules: res.modules }
 }
 
 export async function deleteManagedUser(id: number): Promise<ManagedUsersResponse> {

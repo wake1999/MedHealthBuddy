@@ -1,6 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto'
 import { getDb } from '../infrastructure/database'
 import { USER_PROFILES_TABLE, USER_THEMES_TABLE, USERS_TABLE } from '../infrastructure/database/schemas'
+import { deleteUserModulePermissions, getAllowedModulesForUser, replaceUserModulePermissions, USER_MODULES } from './module-permissions'
 
 export type UserRole = 'super_admin' | 'admin'
 export type UserStatus = 'active' | 'disabled'
@@ -32,6 +33,7 @@ export interface UserSummary {
   status: UserStatus
   profiles: string[]
   default_profile: string | null
+  allowedModules: string[]
   created_at: number
   updated_at: number
   last_login_at: number | null
@@ -94,13 +96,14 @@ export function listUsers(): UserSummary[] {
   if (!db) return []
   const users = db.prepare(
     `SELECT id, username, role, status, created_at, updated_at, last_login_at FROM ${USERS_TABLE} ORDER BY id ASC`
-  ).all() as Array<Omit<UserSummary, 'profiles' | 'default_profile'>>
+  ).all() as Array<Omit<UserSummary, 'profiles' | 'default_profile' | 'allowedModules'>>
   return users.map(user => {
     const profiles = listUserProfiles(user.id)
     return {
       ...user,
       profiles: profiles.map(profile => profile.profile_name),
       default_profile: profiles.find(profile => profile.is_default === 1)?.profile_name || null,
+      allowedModules: getAllowedModulesForUser(user.id, user.role),
     }
   })
 }
@@ -220,7 +223,10 @@ export function createUser(input: {
   ).run(input.username, hashPassword(input.password), role, status, now, now)
 
   const user = findUserByUsername(input.username)
-  if (user) replaceUserProfiles(user.id, input.profiles || [], input.defaultProfile)
+  if (user) {
+    replaceUserProfiles(user.id, input.profiles || [], input.defaultProfile)
+    replaceUserModulePermissions(user.id, [...USER_MODULES])
+  }
   return user
 }
 
@@ -266,6 +272,7 @@ export function deleteUser(userId: UserId): boolean {
   try {
     db.prepare(`DELETE FROM ${USER_PROFILES_TABLE} WHERE user_id = ?`).run(id)
     db.prepare(`DELETE FROM ${USER_THEMES_TABLE} WHERE user_id = ?`).run(id)
+    deleteUserModulePermissions(id)
     const result = db.prepare(`DELETE FROM ${USERS_TABLE} WHERE id = ?`).run(id)
     db.exec('COMMIT')
     return result.changes > 0

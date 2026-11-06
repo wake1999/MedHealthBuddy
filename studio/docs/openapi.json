@@ -1259,6 +1259,58 @@
         ]
       }
     },
+    "/api/auth/users/{id}/modules": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Update modules",
+        "description": "PUT /api/auth/users/:id/modules",
+        "operationId": "updateManagedUserModules",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "modules": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/coding-agents": {
       "get": {
         "tags": [

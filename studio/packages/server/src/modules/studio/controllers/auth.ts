@@ -26,6 +26,13 @@ import { getUserTheme, removeAllUserThemeAssets, toUserThemePayload } from '../s
 import { getUserJwtExpiresSeconds, issueAppJwt, issueUserJwt } from '../public/auth'
 import { consumeAppAuthorizationCode, upsertAppConnection, type AppConnectionType } from '../services/app-relay/app-connections'
 import { listProfileNamesFromDisk } from '../public/profile-config'
+import {
+  getAllowedModulesForUser,
+  isUserModule,
+  replaceUserModulePermissions,
+  USER_MODULES,
+  type UserModule,
+} from '../repositories/module-permissions'
 import { startOutboundRelayClient, stopOutboundRelayClient } from '../public/global-agent'
 import { getLanEndpointKind } from '../services/network/lan-discovery'
 import { getPublicSystemInfo } from '../public/system-info'
@@ -64,6 +71,7 @@ export async function currentUser(ctx: Context) {
       updated_at: user.updated_at,
       last_login_at: user.last_login_at,
       avatar: user.avatar || '',
+      allowedModules: getAllowedModulesForUser(user.id, user.role),
       requiresCredentialChange: process.env.HERMES_DESKTOP === 'true'
         ? false
         : user.username === DEFAULT_USERNAME && verifyPassword(DEFAULT_PASSWORD, user.password_hash),
@@ -613,6 +621,47 @@ export async function listManagedUsers(ctx: Context) {
   ctx.body = {
     users: listUsers(),
     profiles: listProfileNamesFromDisk(),
+    modules: [...USER_MODULES],
+  }
+}
+
+/**
+ * PUT /api/auth/users/:id/modules
+ * Replace one account's module access. Super admin only; super-admin targets
+ * always retain every module and cannot be restricted here.
+ */
+export async function updateManagedUserModules(ctx: Context) {
+  const id = Number(ctx.params.id)
+  const user = Number.isInteger(id) ? findUserById(id) : null
+  if (!user) {
+    ctx.status = 404
+    ctx.body = { error: 'User not found' }
+    return
+  }
+  if (user.role === 'super_admin') {
+    ctx.status = 400
+    ctx.body = { error: 'Super administrator module access cannot be restricted' }
+    return
+  }
+
+  const body = ctx.request.body as { modules?: unknown }
+  if (!Array.isArray(body.modules)) {
+    ctx.status = 400
+    ctx.body = { error: 'modules must be an array' }
+    return
+  }
+  const requested = body.modules.map(item => String(item || '').trim())
+  if (requested.some(key => !isUserModule(key))) {
+    ctx.status = 400
+    ctx.body = { error: 'Unknown module key' }
+    return
+  }
+  const modules = [...new Set(requested)] as UserModule[]
+  replaceUserModulePermissions(user.id, modules)
+  ctx.body = {
+    user: listUsers().find(row => row.id === user.id) || null,
+    users: listUsers(),
+    modules: [...USER_MODULES],
   }
 }
 

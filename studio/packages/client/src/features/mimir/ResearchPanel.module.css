@@ -1646,12 +1646,12 @@ li.dropIndicator {
    flex shrink alone can never crush a pane below its usable floor. */
 .editorPane {
   flex: 3;
-  min-width: 360px;
+  min-width: 320px;
 }
 
 .previewPane {
   flex: 2;
-  min-width: 280px;
+  min-width: 400px;
 }
 
 /* Solo (fullscreen/narrow-tab) mode: the one visible pane fills the well, so

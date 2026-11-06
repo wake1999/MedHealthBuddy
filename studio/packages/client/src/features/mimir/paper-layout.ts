@@ -33,9 +33,9 @@ export const RAIL_COLLAPSE_BELOW = 60
 /** The collapsed rail renders as a slim strip of this width (px). */
 export const RAIL_COLLAPSED_STRIP = 44
 /** The editor never shrinks below this (px). */
-export const EDITOR_MIN_WIDTH = 360
+export const EDITOR_MIN_WIDTH = 320
 /** The preview never shrinks below this (px). */
-export const PREVIEW_MIN_WIDTH = 280
+export const PREVIEW_MIN_WIDTH = 400
 /** Horizontal chrome (padding + border) each pane adds around its
  *  content-box minimum — the floors in footprint terms. */
 export const PANE_FRAME_PX = 30

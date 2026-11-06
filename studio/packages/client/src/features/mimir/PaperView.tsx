@@ -648,6 +648,11 @@ export function PaperView({
     : null
   // 注入了解析器就只认 blob URL：否则 iframe 会落到 SPA 首页（Vite 的 history fallback）。
   const pdfSrc = resolvePdfUrl === undefined ? pdfUrl : (pdfReady ? resolvedPdfSrc : null)
+  // The embedded Chromium PDF viewer defaults to 100%; in the narrow window
+  // pane that clips the page and hides toolbar controls. Ask it to fit width.
+  const pdfFrameSrc = pdfSrc === null
+    ? null
+    : `${pdfSrc}${pdfSrc.includes('#') ? '&' : '#'}zoom=page-width&toolbar=1`
   // Logical lines of the draft; everything line-based derives from this one
   // split so the gutter, the overlay, and the window never disagree.
   const sourceLines = useMemo(() => (currentSource?.content ?? '').split('\n'), [currentSource?.content])
@@ -1111,7 +1116,7 @@ export function PaperView({
                 <span>{t('preview.empty')}</span>
               </div>
             )
-            : <iframe className={css.previewFrame} title={t('preview.title')} src={pdfSrc} />}
+            : <iframe className={css.previewFrame} title={t('preview.title')} src={pdfFrameSrc ?? undefined} />}
       </section>
     </div>
   )

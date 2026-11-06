@@ -43,7 +43,6 @@ import {
   type InsertPromptTemplateDetail,
   type PromptTemplateDomainId,
 } from '@/utils/hermes/prompt-templates'
-import { isStoredSuperAdmin } from '@/api/client'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -290,7 +289,6 @@ function insertVoiceTranscriptIntoInput(text: string) {
  * The template library is part of the same admin surface as the chat tool panel
  * (its toggle is super-admin only), so the row and the picker follow that gate.
  */
-const isSuperAdmin = computed(() => isStoredSuperAdmin())
 
 const activeInstructionTemplates = computed(() =>
   promptTemplatesStore.activeInstructions(chatStore.activeSessionId),
@@ -325,7 +323,7 @@ const visibleInsertTemplates = computed(() =>
  * The shelf belongs to the new-session composer, like the reference product, and
  * shows on both surfaces — which categories appear is the manager's call.
  */
-const showPromptTemplateShelf = computed(() => props.draft && isSuperAdmin.value)
+const showPromptTemplateShelf = computed(() => true)
 
 /** The insert template the draft currently holds, if any: the shelf picks one at a time. */
 const appliedInsertTemplateIds = computed(
@@ -840,7 +838,7 @@ onMounted(() => {
   if (props.initialText) inputText.value = props.initialText
   else if (props.persistDraft) loadDraftForActiveSession()
   // The insert strip needs the library even when the right column never opens.
-  if (isStoredSuperAdmin()) void promptTemplatesStore.ensureLoaded()
+  void promptTemplatesStore.ensureLoaded()
   syncViewport()
   window.addEventListener('resize', syncViewport)
   nextTick(() => {
@@ -1886,7 +1884,7 @@ function openAttachmentPreview(attachment: Attachment) {
         @mousedown="startResize"
         @dblclick="resetTextareaHeight"
       ></div>
-      <div v-if="isSuperAdmin && activeInstructionTemplates.length > 0" class="prompt-template-chips">
+      <div v-if="activeInstructionTemplates.length > 0" class="prompt-template-chips">
         <button
           v-for="template in activeInstructionTemplates"
           :key="template.id"

@@ -4100,6 +4100,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
             />
             <ChatInput
               ref="chatInputRef"
+              :template-domain="activeTemplateDomain"
               :model-label="activeSessionModelLabel"
               :model-disabled="activeSessionUsesGlobalCodingAgentConfig"
               :native-reasoning-efforts="activeSessionUsesGlobalCodingAgentConfig ? activeSessionNativeReasoningEfforts : undefined"

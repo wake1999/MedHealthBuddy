@@ -15,6 +15,9 @@ if not defined SRV (
 
 set "APP=%~dp0studio\packages\desktop"
 set "ELECTRON=%APP%\node_modules\electron\dist\electron.exe"
+rem The packaging pipeline keeps a local Electron runtime in .electron-dist-cache
+rem so it does not get bundled into the Web UI. Use it when node_modules was trimmed.
+if not exist "%ELECTRON%" if exist "%~dp0.electron-dist-cache\electron.exe" set "ELECTRON=%~dp0.electron-dist-cache\electron.exe"
 if not exist "%ELECTRON%" (
   echo Electron is not installed. Run:
   echo   cd /d "%APP%" ^&^& npm ci ^&^& node node_modules\electron\install.js

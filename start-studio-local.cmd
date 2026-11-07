@@ -6,6 +6,15 @@ rem Requires a prior `npm run build` in studio/ (produces dist/client + dist/ser
 
 set "APP=%~dp0studio\packages\desktop"
 set "ELECTRON=%APP%\node_modules\electron\dist\electron.exe"
+rem The packaging pipeline keeps a local Electron runtime in .electron-dist-cache
+rem so it does not get bundled into the Web UI. Use it when node_modules was trimmed.
+if not exist "%ELECTRON%" if exist "%~dp0.electron-dist-cache\electron.exe" set "ELECTRON=%~dp0.electron-dist-cache\electron.exe"
+
+rem Keep the Web UI data (DB, token, logs, workspaces) next to the program
+rem instead of the default %USERPROFILE%\.hermes-web-ui: the app lives on E:,
+rem so its data should not scatter into C:.
+set "HERMES_WEB_UI_HOME=%~dp0data\hermes-web-ui"
+set "HERMES_WEBUI_STATE_DIR=%~dp0data\hermes-web-ui"
 
 if not exist "%ELECTRON%" (
   echo Electron is not installed. Run:

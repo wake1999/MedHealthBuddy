@@ -40,7 +40,7 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 - [开发与测试](#开发与测试)
 - [贡献方式](#贡献方式)
 - [许可证](#许可证)
-- [截图占位清单](#截图占位清单)
+- [截图资源清单](#截图资源清单)
 
 ---
 
@@ -95,9 +95,7 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 - 快速提示词和提示词模板胶囊
 - 本地 Profile 隔离
 
-> **界面截图占位**：`docs/screenshots/chat.png`
->
-> 建议画面：左侧会话列表、右侧消息区、底部输入框、Agent 选择器和工具调用卡片。
+![单聊与多智能体对话](./docs/screenshots/chat.png)
 
 ### 2. 群聊与共享会话
 
@@ -111,9 +109,7 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 - 共享会话只读访问
 - 群聊与单聊共用 Agent、模型和工具能力
 
-> **界面截图占位**：`docs/screenshots/group-chat.png`
->
-> 建议画面：群聊房间列表、多个 Agent 头像、消息流、成员面板和共享入口。
+![群聊与共享会话（空状态）](./docs/screenshots/group-chat.png)
 
 ### 3. 科研工作台
 
@@ -181,13 +177,11 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 
 ![研究运行自动化流程](studio/docs/architecture/research-automation-flow.png)
 
-> **界面截图占位**：`docs/screenshots/research-overview.png`
->
-> 建议画面：科研工作台总览、项目阶段条、统计卡片和最近动态。
+![科研工作台总览](./docs/screenshots/research-overview.png)
 
-> **界面截图占位**：`docs/screenshots/research-runs.png`
->
-> 建议画面：Research Run 阶段列表、审批卡片、批准/拒绝按钮和自动流程状态。
+![Research Run 与审批](./docs/screenshots/research-runs.png)
+
+![文献库](./docs/screenshots/research-papers.png)
 
 ### 4. 工作流、任务与看板
 
@@ -202,13 +196,9 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 - 项目看板与任务状态流转
 - 工作流结果可回到聊天或科研项目
 
-> **界面截图占位**：`docs/screenshots/workflow.png`
->
-> 建议画面：节点画布、连线、Agent 节点配置和运行日志面板。
+![可视化工作流（空状态）](./docs/screenshots/workflow.png)
 
-> **界面截图占位**：`docs/screenshots/jobs-kanban.png`
->
-> 建议画面：任务列表、看板列、执行状态和重试入口。
+![定时任务与运行历史](./docs/screenshots/jobs-kanban.png)
 
 ### 5. 编码 Agent
 
@@ -231,9 +221,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - Agent 配置页、MCP 配置和运行时状态
 - 不同 Agent 共用会话历史与文件面板
 
-> **界面截图占位**：`docs/screenshots/coding-agents.png`
->
-> 建议画面：Agent 选择器、编码 Agent 配置、工作区目录和运行状态。
+![编码 Agent 管理](./docs/screenshots/coding-agents.png)
 
 ### 6. 技能、技能市场与提示词模板
 
@@ -258,13 +246,9 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 /hermes/prompt-templates
 ```
 
-> **界面截图占位**：`docs/screenshots/skill-market.png`
->
-> 建议画面：技能卡片、分类筛选、安装按钮和已安装状态。
+![技能市场](./docs/screenshots/skill-market.png)
 
-> **界面截图占位**：`docs/screenshots/prompt-templates.png`
->
-> 建议画面：模板分类、编辑区、启用开关和输入框胶囊。
+![提示词模板](./docs/screenshots/prompt-templates.png)
 
 ### 7. 模型、API Relay 与可观测性
 
@@ -281,13 +265,9 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - 技能调用统计
 - 超级管理员性能面板
 
-> **界面截图占位**：`docs/screenshots/models.png`
->
-> 建议画面：Provider 列表、模型目录、路由/回退配置和 API Relay 状态。
+![模型与 Provider 管理](./docs/screenshots/models.png)
 
-> **界面截图占位**：`docs/screenshots/usage.png`
->
-> 建议画面：Token/费用趋势、按模型和按 Agent 的用量分解。
+![用量统计](./docs/screenshots/usage.png)
 
 ### 8. 连接、设备与浏览器
 
@@ -304,9 +284,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - MCU / ESP32-C3 设备接入
 - 通知渠道与外部连接配置
 
-> **界面截图占位**：`docs/screenshots/connections.png`
->
-> 建议画面：连接列表、设备状态、App Relay、终端和服务器入口。
+![设备互联](./docs/screenshots/connections.png)
 
 ### 9. 记忆、旅程与桌宠
 
@@ -319,9 +297,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - Petdex / Desktop Pet：桌宠与 Agent 个性化
 - 主题定制和多语言
 
-> **界面截图占位**：`docs/screenshots/memory-petdex.png`
->
-> 建议画面：记忆条目、桌宠状态或个性化设置。
+![Petdex 宠物](./docs/screenshots/memory-petdex.png)
 
 ### 10. 账户、Profile、权限与设置
 
@@ -337,9 +313,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - 主题、语言、语音、STT/TTS 设置
 - 版本预览和系统设置
 
-> **界面截图占位**：`docs/screenshots/settings-rbac.png`
->
-> 建议画面：用户/角色管理、模块权限矩阵和 Profile 选择器。
+![角色与模块权限](./docs/screenshots/settings-rbac.png)
 
 ### 11. 桌面应用
 
@@ -369,9 +343,7 @@ start-studio-local.cmd      → start-studio.cmd local
 start-studio-desktop.cmd    → start-studio.cmd remote
 ```
 
-> **界面截图占位**：`docs/screenshots/desktop.png`
->
-> 建议画面：桌面窗口、本地/远程设备切换和系统设置。
+![MedHealthBuddy 桌面应用](./docs/screenshots/desktop.png)
 
 ### 12. 远程连接器
 
@@ -393,9 +365,7 @@ Studio 兼容服务
 - 入口为 `start-remote-connector.cmd`
 - `start-desktop.cmd` 作为兼容包装保留
 
-> **界面截图占位**：`docs/screenshots/remote-connector.png`
->
-> 建议画面：远程连接器窗口、服务器连接状态和会话入口。
+![远程连接器](./docs/screenshots/remote-connector.png)
 
 ### 13. CLI、MCP 与扩展
 
@@ -421,9 +391,12 @@ medhealthbuddy
 - npm 包构建与发布脚本
 - 插件系统与扩展入口
 
-> **界面截图占位**：`docs/screenshots/cli-mcp.png`
->
-> 建议画面：终端启动输出、MCP 配置或外部客户端连接成功界面。
+CLI/MCP 属于终端界面，实际输出示例如下：
+
+```text
+$ node bin/hermes-web-ui.mjs --help
+$ npx hermes-studio-mcp
+```
 
 ---
 
@@ -668,7 +641,7 @@ npm run dist:win
 - 不提交 `node_modules`、`dist`、`release`、`.deploy.local`
 - 不提交 API Key、SSH 私钥和患者数据
 - 不提交一次性的 `.tmp-*` 脚本或临时截图
-- 修改 UI 时补充对应截图或截图占位
+- 修改 UI 时补充对应真实截图
 - 修改权限逻辑时同时验证只读用户
 
 ---
@@ -688,7 +661,7 @@ npm run dist:win
    - 解决的问题
    - 主要改动
    - 验证方式
-   - 截图或截图占位
+   - 真实截图
    - 对权限、数据迁移和兼容性的影响
 
 发现安全或数据隔离问题时，请优先通过私下渠道联系维护者，不要直接公开患者数据或密钥。
@@ -716,9 +689,9 @@ studio/LICENSE
 
 ---
 
-## 截图占位清单
+## 截图资源清单
 
-截图统一放在 `docs/screenshots/`，建议使用 1440×900 或 1280×800，浅色/深色各一张。
+截图统一放在 `docs/screenshots/`，当前使用 1440×900 的真实运行画面；空状态截图保留真实页面，不用占位图。
 
 | 文件 | 模块 | 建议画面 |
 |---|---|---|
@@ -736,8 +709,8 @@ studio/LICENSE
 | `usage.png` | 用量 | Token/费用趋势和分解 |
 | `connections.png` | 连接 | 设备、App Relay、终端 |
 | `settings-rbac.png` | 权限 | 用户、角色、模块权限 |
-| `desktop.png` | 桌面端 | 本地/远程设备切换 |
+| `desktop.png` | 桌面端 | 真实 Electron 桌面窗口 |
 | `remote-connector.png` | 远程连接器 | SSH 连接状态和会话 |
-| `cli-mcp.png` | CLI/MCP | 终端启动和 MCP 连接 |
+| CLI/MCP | 终端 | 使用命令示例，不需要 GUI 截图 |
 
-当前已有的 `docs/screenshots/install.png`、`server.png`、`sessions.png`、`settings.png` 可以继续使用；新增模块请按上表补充。
+新增模块请按上表命名补充真实截图；已有截图不要用占位图覆盖。`install.png`、`server.png`、`sessions.png`、`settings.png` 为早期截图，可按需更新。

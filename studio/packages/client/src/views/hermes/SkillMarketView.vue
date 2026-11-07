@@ -217,7 +217,14 @@ function agentLabel(agent: SkillTarget) {
 }
 
 const categoryOptions = computed(() => {
-  const names = new Set(agentSkills.value.map(skill => skill.category).filter(Boolean))
+  const names = new Set([
+    'research',
+    'office',
+    'media-production',
+    'engineering',
+    'utilities',
+    ...agentSkills.value.map(skill => skill.category).filter(Boolean),
+  ])
   return [
     { label: t('skillMarket.allCategories'), value: '' },
     ...[...names]

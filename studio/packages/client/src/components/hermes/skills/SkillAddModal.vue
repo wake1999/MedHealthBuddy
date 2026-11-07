@@ -25,7 +25,7 @@ const folderFiles = ref<File[]>([])
 const folderName = ref('')
 const folderInputRef = ref<HTMLInputElement | null>(null)
 const agent = ref<SkillTarget>(props.agents[0]?.value || 'ekko')
-const category = ref('productivity')
+const category = ref('office')
 const skillName = ref('')
 const skillContent = ref('')
 
@@ -143,12 +143,12 @@ async function save() {
     </div>
 
     <div class="form-row">
-      <label class="field-label">{{ t('skills.addAgent') }}</label>
+      <label class="field-label">{{ mode === 'create' ? t('skills.addSource') : t('skills.addAgent') }}</label>
       <NSelect v-model:value="agent" :options="agentOptions" :disabled="loading" />
     </div>
 
     <div class="form-row">
-      <label class="field-label">{{ t('skills.addCategory') }}</label>
+      <label class="field-label">{{ mode === 'create' ? t('skills.addCategory') : t('skills.addTargetCategory') }}</label>
       <NSelect
         v-model:value="category"
         :options="categoryOptions"

@@ -50,6 +50,57 @@ function requestSkillsDir(ctx: any): string {
 type SkillTarget = 'ekko' | 'hermes' | 'claude' | 'codex' | 'pi' | 'grok' | 'opencode' | 'dsh' | 'cursor' | 'antigravity'
 
 const SKILL_TARGETS: SkillTarget[] = ['ekko', 'hermes', 'claude', 'codex', 'pi', 'grok', 'opencode', 'dsh', 'cursor', 'antigravity']
+
+/**
+ * Legacy/flat skills predate category folders. Keep their files in place (the
+ * bundled-skill injector owns that tree) but expose a stable logical category
+ * so the UI does not collapse the whole toolbox into "misc".
+ */
+const LOGICAL_SKILL_CATEGORIES: Record<string, string> = {
+  'academic-research-suite': 'research',
+  'auto-research-in-sleep': 'research',
+  'ocr-and-documents': 'research',
+  'pdf': 'research',
+  'document-to-action-items': 'office',
+  'docx': 'office',
+  'xlsx': 'office',
+  'powerpoint': 'office',
+  'apple-notes': 'office',
+  'apple-reminders': 'office',
+  'obsidian': 'office',
+  'markdown-viewer': 'office',
+  'apikey-image-gen': 'media-production',
+  'image-gen': 'media-production',
+  'grok-image-to-video': 'media-production',
+  'minimax-image-to-video': 'media-production',
+  'hyperframes': 'media-production',
+  'remotion': 'media-production',
+  'video-frames': 'media-production',
+  'visualizer': 'media-production',
+  'github': 'engineering',
+  'gh-issues': 'engineering',
+  'node-inspect-debugger': 'engineering',
+  'python-debugpy': 'engineering',
+  'tmux': 'engineering',
+  'spike': 'engineering',
+  'hermes-studio-installation': 'engineering',
+  'skill-creator': 'engineering',
+  '1password': 'utilities',
+  'weather': 'utilities',
+}
+
+const LOGICAL_CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  research: 'Research and literature',
+  office: 'Office and documents',
+  'media-production': 'Media production',
+  engineering: 'Engineering and automation',
+  utilities: 'Everyday utilities',
+}
+
+function logicalCategoryForSkill(name: string): string {
+  return LOGICAL_SKILL_CATEGORIES[name.toLowerCase()] || 'misc'
+}
+
 const IMPORTED_RESEARCH_SKILLS = new Set([
   'auto-research-in-sleep',
   'academic-research-suite',
@@ -399,7 +450,12 @@ async function findSkillDirInRoot(rootDir: string, category: string, skillName: 
     }
     return null
   }
-  return findSkillDirByName(join(rootDir, category), skillName)
+  const nested = await findSkillDirByName(join(rootDir, category), skillName)
+  if (nested) return nested
+  // Logical categories can contain legacy flat skills that still live at the
+  // skills root; keep them editable/exportable without moving managed files.
+  const flat = join(rootDir, skillName)
+  return await safeReadFile(join(flat, 'SKILL.md')) !== null ? flat : null
 }
 
 async function resolveSkillDirFromConfig(
@@ -464,7 +520,7 @@ async function scanSkillsDir(skillsDir: string, bundledManifest: Map<string, str
 
   // Classify directories: categories vs. flat skills
   const categoryDirs: { name: string; description: string; path: string }[] = []
-  const flatSkills: { name: string; skillMd: string; source: string }[] = []
+  const flatSkills: { name: string; skillMd: string; source: string; category: string }[] = []
 
   for (const entry of dirEntries) {
     const catDir = entry.path
@@ -481,6 +537,7 @@ async function scanSkillsDir(skillsDir: string, bundledManifest: Map<string, str
         name: entry.name,
         skillMd: hasSkillMd,
         source: getSkillSource(entry.name, bundledManifest, hubNames),
+        category: logicalCategoryForSkill(entry.name),
       })
     } else if (!!hasDesc || subDirs.length > 0) {
       // True category: has DESCRIPTION.md or subdirs, but no SKILL.md at top level
@@ -542,12 +599,15 @@ async function scanSkillsDir(skillsDir: string, bundledManifest: Map<string, str
     }
   }
 
-  // Group flat skills into a "misc" (雜項) category
+  // Group flat skills into logical categories. Their files remain at the root
+  // because built-in injection owns those paths; edits/exports resolve back to
+  // the flat directory by name.
   if (flatSkills.length > 0) {
-    const miscSkills: any[] = []
+    const byCategory = new Map<string, any[]>()
     for (const fs of flatSkills) {
       const usage = usageStats.get(fs.name)
-      miscSkills.push({
+      const list = byCategory.get(fs.category) || []
+      list.push({
         name: fs.name,
         description: extractDescription(fs.skillMd),
         enabled: !disabledList.includes(fs.name),
@@ -558,13 +618,20 @@ async function scanSkillsDir(skillsDir: string, bundledManifest: Map<string, str
         viewCount: usage?.view_count,
         pinned: usage?.pinned || undefined,
       })
+      byCategory.set(fs.category, list)
     }
-    miscSkills.sort((a: any, b: any) => a.name.localeCompare(b.name))
-    categories.push({
-      name: 'misc',
-      description: '雜項',
-      skills: miscSkills,
-    })
+    for (const [name, skills] of byCategory) {
+      const existing = categories.find(category => category.name === name)
+      if (existing) {
+        existing.skills.push(...skills)
+      } else {
+        categories.push({
+          name,
+          description: LOGICAL_CATEGORY_DESCRIPTIONS[name] || '',
+          skills,
+        })
+      }
+    }
   }
 
   categories.sort((a, b) => a.name.localeCompare(b.name))

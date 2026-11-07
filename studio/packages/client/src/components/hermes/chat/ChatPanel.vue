@@ -61,7 +61,6 @@ import DiscoverAppsPopover from './DiscoverAppsPopover.vue';
 import { FALLBACK_CHAT_APPS, resolveChatApps, type ChatAppScene } from '@/data/chat-apps';
 import { fetchChatApps, type ChatAppDto } from '@/api/studio/chat-apps';
 import {
-  FASTGPT_EMBED_BASE,
   fetchFastGptAgentVariables,
   fetchFastGptAgents,
   streamFastGptAgentChat,
@@ -212,6 +211,34 @@ const agentEmbedTipHidden = ref(false)
 /** 选中智能体后，输入框直接发给它，回答落在 Studio 会话里。 */
 const activeAgentCard = ref<FastGptAgent | null>(null)
 const agentChatBusy = ref(false)
+const SESSION_AGENT_STORAGE_KEY = 'hermes-session-fastgpt-agent-v1'
+const sessionAgentIds = ref<Record<string, string>>(readSessionAgentIds())
+
+function readSessionAgentIds(): Record<string, string> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SESSION_AGENT_STORAGE_KEY) || '{}')
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeSessionAgentIds() {
+  try {
+    localStorage.setItem(SESSION_AGENT_STORAGE_KEY, JSON.stringify(sessionAgentIds.value))
+  } catch {
+    // Private windows may refuse storage; the in-memory map still works.
+  }
+}
+
+function rememberAgentForSession(sessionId: string, agent: FastGptAgent | null) {
+  if (!sessionId) return
+  const next = { ...sessionAgentIds.value }
+  if (agent) next[sessionId] = agent.appId
+  else delete next[sessionId]
+  sessionAgentIds.value = next
+  writeSessionAgentIds()
+}
 /** 每个 Studio 会话对应一个 FastGPT chatId，多轮上下文留在 FastGPT 侧。 */
 const agentChatIds = new Map<string, string>()
 /** 选中智能体的运行时变量（record_id / domain …），发送时一并带给 FastGPT。 */
@@ -268,9 +295,11 @@ async function loadFastGptAgents(force = false) {
 async function toggleAgentCard(agent: FastGptAgent) {
   if (activeAgentCard.value?.appId === agent.appId) {
     activeAgentCard.value = null
+    if (!showNewChatPage.value) rememberAgentForSession(chatStore.activeSessionId || '', null)
     return
   }
   activeAgentCard.value = agent
+  if (!showNewChatPage.value) rememberAgentForSession(chatStore.activeSessionId || '', agent)
   activeAgentVars.value = []
   activeAgentVarValues.value = {}
   // 变量定义从分享页元数据里读，一个应用一次；切走之后回来的结果直接丢掉。
@@ -293,6 +322,7 @@ async function selectAgentFromPicker(agent: FastGptAgent) {
 
 function exitAgentChat() {
   activeAgentCard.value = null
+  if (!showNewChatPage.value) rememberAgentForSession(chatStore.activeSessionId || '', null)
 }
 
 /** 换场景或退出应用后，原来选中的智能体已不在列表里，顺手退出对话模式。 */
@@ -315,12 +345,16 @@ async function submitAgentChat(text: string): Promise<boolean> {
   if (!agent || !content || agentChatBusy.value) return false
   agentChatBusy.value = true
   try {
-    const session = chatStore.newChat({
+    // Selecting an agent inside an existing conversation must keep that
+    // conversation. Only the new-chat composer creates a fresh session.
+    const currentSession = !showNewChatPage.value ? chatStore.activeSession : null
+    const session = currentSession || chatStore.newChat({
       profile: newChatProfile.value,
       source: 'builtin_agent',
       agent: 'ekko-agent',
     });
-    const target = chatStore.sessions.find(item => item.id === session.id)
+    const target = currentSession || chatStore.sessions.find(item => item.id === session.id)
+    rememberAgentForSession(session.id, agent)
     const now = Date.now()
     target?.messages.push(
       { id: `agent-${now}-u`, role: 'user', content, timestamp: now },
@@ -330,8 +364,10 @@ async function submitAgentChat(text: string): Promise<boolean> {
     const chatId = agentChatIds.get(session.id) ?? `studio-${session.id}-${now}`
     agentChatIds.set(session.id, chatId)
 
-    closeNewChatPage()
-    await router.push({ name: 'hermes.session', params: { sessionId: session.id } })
+    if (!currentSession) {
+      closeNewChatPage()
+      await router.push({ name: 'hermes.session', params: { sessionId: session.id } })
+    }
 
     try {
       const variables = Object.fromEntries(
@@ -389,46 +425,21 @@ function handleAgentDrawerToggle(value: boolean) {
 }
 
 /**
- * 分享链接一般指向 FastGPT 本体（:3000，带 `X-Frame-Options: DENY`），iframe 要换到
- * 宿主机上去头反代的同一条路径；没配分享渠道时退回登录态的 `?appId=` 页。
- */
-function toAgentEmbedUrl(agent: FastGptAgent): string {
-  const raw = agent.shareUrl?.trim() ?? ''
-  if (raw) {
-    try {
-      const url = new URL(raw)
-      return `${FASTGPT_EMBED_BASE}${url.pathname}${url.search}`
-    } catch {
-      /* 不是绝对地址就退回 appId 那条路。 */
-    }
-  }
-  return agent.appId ? `${FASTGPT_EMBED_BASE}/chat?appId=${encodeURIComponent(agent.appId)}` : ''
-}
-
-/**
- * 详情弹层里的主按钮：不跳路由，把分享页塞进弹窗里，关掉/返回都还停在当前场景页，
- * 当前对话上下文不丢。真拿不到地址时才退回原来那条路由页。
+ * 详情弹层里的主按钮：在 Studio 原生会话中打开，不跳外部 FastGPT。
  */
 function openAgentInStudio(agent: FastGptAgent | null) {
   if (!agent) return
-  const url = toAgentEmbedUrl(agent)
-  if (!url) {
-    closeAgentDetail()
-    void router.push({
-      name: 'hermes.fastgpt',
-      query: {
-        appId: agent.appId,
-        name: agent.name,
-        scene: agent.sceneLabel,
-        ...(agent.shareUrl ? { share: agent.shareUrl } : {}),
-      },
-    })
-    return
-  }
-  agentEmbedUrl.value = url
-  agentEmbedFailed.value = false
-  agentEmbedTipHidden.value = false
-  agentEmbedFrameKey.value += 1
+  closeAgentDetail()
+
+  // The primary action must stay inside Studio. Open the native new-chat page
+  // with this agent selected; the external FastGPT page remains a secondary
+  // action via openFastGptAgent().
+  if (activeChatAppId.value !== 'btit') selectChatApp('btit')
+  if (activeChatSceneId.value !== agent.sceneId) selectChatScene(agent.sceneId)
+  activeAgentCard.value = null
+  void toggleAgentCard(agent)
+  if (!showNewChatPage.value) openNewChatPage()
+  void nextTick(() => chatInputRef.value?.focusComposer?.())
 }
 
 function reloadAgentEmbed() {
@@ -457,10 +468,30 @@ function openFastGptAgent(agent: FastGptAgent | null, target: 'chat' | 'manage' 
  * （useI18n 在 setup 更后面才执行），放在 setup 顶层会撞 TDZ。挂到 mounted 里
  * 注册，此时 i18n 已就绪，且首屏想直接带出卡片也能用 immediate 的那一次求值。
  */
+function restoreAgentForActiveSession() {
+  if (showNewChatPage.value) return
+  const sessionId = chatStore.activeSessionId
+  if (!sessionId) return
+  const appId = sessionAgentIds.value[sessionId]
+  if (!appId) {
+    if (activeAgentCard.value) exitAgentChat()
+    return
+  }
+  if (activeAgentCard.value?.appId === appId) return
+  const agent = sceneAgents.value.find(item => item.appId === appId)
+  if (agent) void toggleAgentCard(agent)
+}
+
 onMounted(() => {
   void loadFastGptAgents()
   // 同上：watch 注册时会先求值一次 getter，放到 mounted 里才不会撞 locale 的 TDZ。
-  watch(sceneAgents, agents => dropAgentIfOutOfScene(agents))
+  watch(sceneAgents, agents => {
+    dropAgentIfOutOfScene(agents)
+    restoreAgentForActiveSession()
+  })
+  watch([() => chatStore.activeSessionId, showNewChatPage], () => {
+    void nextTick(restoreAgentForActiveSession)
+  })
 });
 
 /** id 传 null 就是退出应用：清掉偏好，首页回到默认的三域切换。 */
@@ -4061,9 +4092,57 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
               :model-expanded="showSessionModelPicker && !sessionModelIsDraft && sessionModelSessionId === chatStore.activeSessionId"
               :initial-text="initialComposerText"
               :persist-draft="composerPersistDraft"
+              :send-disabled="activeAgentCard ? agentChatBusy : undefined"
+              :submit="activeAgentCard ? submitAgentChat : undefined"
               @model-click="handleHeaderModelClick"
               @voice-click="openRealtimeVoice"
-            />
+            >
+              <template #toolbar-agents>
+                <NPopover v-if="sceneAgents.length > 0" v-model:show="agentPickerOpen" trigger="click"
+                  placement="top-start" :show-arrow="false">
+                  <template #trigger>
+                    <button type="button" class="agent-picker-trigger"
+                      :class="{ 'is-active': Boolean(activeAgentCard) }"
+                      :aria-label="t('chat.agentsPicker')" :aria-expanded="agentPickerOpen">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="4" y="8" width="16" height="12" rx="3" />
+                        <path d="M12 8V5M9 14h.01M15 14h.01M9.5 17h5" />
+                      </svg>
+                      <span class="agent-picker-trigger-label">
+                        {{ activeAgentCard ? activeAgentCard.short : t('chat.agentsPicker') }}
+                      </span>
+                      <svg class="toolbar-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+                  </template>
+                  <div class="agent-picker">
+                    <div class="agent-picker-head">
+                      <span class="agent-picker-title">{{ t('chat.agentsPickerTitle') }}</span>
+                      <span class="agent-picker-count">{{ sceneAgents.length }}</span>
+                    </div>
+                    <div class="agent-picker-list">
+                      <button v-for="agent in sceneAgents" :key="agent.appId" type="button"
+                        class="agent-picker-item" :class="{ 'is-active': activeAgentCard?.appId === agent.appId }"
+                        :title="agent.name" @click="selectAgentFromPicker(agent)">
+                        <span class="agent-picker-icon" :style="{ background: agent.tint }" aria-hidden="true">
+                          {{ agent.short.slice(0, 1) }}</span>
+                        <span class="agent-picker-text">
+                          <span class="agent-picker-name">{{ agent.short }}</span>
+                          <span class="agent-picker-desc">{{ agent.desc }}</span>
+                        </span>
+                      </button>
+                    </div>
+                    <button v-if="activeAgentCard" type="button" class="agent-picker-clear"
+                      @click="exitAgentChat(); agentPickerOpen = false">
+                      {{ t('chat.agentsPickerClear') }}
+                    </button>
+                  </div>
+                </NPopover>
+              </template>
+            </ChatInput>
             </template>
           </div>
           <OutlinePanel

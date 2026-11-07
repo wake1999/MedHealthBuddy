@@ -5,13 +5,14 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NAlert, NButton, NDrawer, NDrawerContent, NDropdown, NEmpty, NInput, NModal, NSelect, NSwitch, NTag, useDialog, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 
-import { toggleEkkoSkill } from '@/api/ekko/skills'
+import { createEkkoSkillLocal, toggleEkkoSkill } from '@/api/ekko/skills'
 import SkillDetail from '@/components/hermes/skills/SkillDetail.vue'
 import SkillImportModal from '@/components/hermes/skills/SkillImportModal.vue'
 import {
   createSkillCategory,
   deleteSkillApi,
   deleteSkillCategory,
+  exportSkillApi,
   fetchInstalledSkillTargets,
   fetchSkillCategories,
   fetchSkills,
@@ -58,6 +59,11 @@ const source = ref('')
 const category = ref('')
 const activeTab = ref<MarketTab>('discover')
 const showImport = ref(false)
+const showCreate = ref(false)
+const newSkillName = ref('')
+const newSkillCategory = ref('')
+const newSkillContent = ref('')
+const creatingSkill = ref(false)
 const detail = ref<MarketSkill | null>(null)
 const toggling = ref<Set<string>>(new Set())
 const removing = ref<Set<string>>(new Set())
@@ -775,6 +781,7 @@ async function uninstall(skill: MarketSkill) {
 function rowActions(skill: MarketSkill) {
   const actions: Array<{ key: string; label: string; disabled?: boolean }> = [
     { key: 'detail', label: t('skillMarket.detail') },
+    { key: 'export', label: t('skillMarket.export') },
   ]
   // Built-in skills ship with the app; an uninstall action is not applicable,
   // so omit it instead of showing a permanently disabled menu item.
@@ -793,7 +800,58 @@ function onRowAction(skill: MarketSkill, key: string) {
     detail.value = skill
     return
   }
+  if (key === 'export') {
+    void downloadSkill(skill)
+    return
+  }
   if (key === 'uninstall') confirmUninstall(skill)
+}
+
+/** Export and import are the share boundary: both directions use the same ZIP. */
+async function downloadSkill(skill: MarketSkill) {
+  try {
+    const blob = await exportSkillApi(skill.category, skill.name, skill.agent)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${skill.name}.zip`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+  }
+}
+
+async function createLocalSkill() {
+  const name = newSkillName.value.trim()
+  const content = newSkillContent.value.trim()
+  if (!name) {
+    message.warning(t('skillMarket.createNameRequired'))
+    return
+  }
+  if (!content) {
+    message.warning(t('skillMarket.createContentRequired'))
+    return
+  }
+  creatingSkill.value = true
+  try {
+    await createEkkoSkillLocal({
+      name,
+      content,
+      ...(newSkillCategory.value ? { category: newSkillCategory.value } : {}),
+    })
+    showCreate.value = false
+    newSkillName.value = ''
+    newSkillCategory.value = ''
+    newSkillContent.value = ''
+    activeTab.value = 'installed'
+    await loadLocal(true)
+    message.success(t('skillMarket.createSuccess'))
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
+  } finally {
+    creatingSkill.value = false
+  }
 }
 
 function confirmUninstall(skill: MarketSkill) {
@@ -834,6 +892,9 @@ onUnmounted(() => {
         <div class="header-actions">
           <NButton size="small" quaternary :loading="loading || marketLoading" @click="refreshAll">
             {{ t('skillMarket.refresh') }}
+          </NButton>
+          <NButton size="small" secondary @click="showCreate = true">
+            {{ t('skillMarket.create') }}
           </NButton>
           <NButton size="small" type="primary" @click="showImport = true">
             <template #icon>
@@ -1120,6 +1181,37 @@ onUnmounted(() => {
     </div>
 
     <SkillImportModal v-if="showImport" @close="showImport = false" @saved="handleImported" />
+
+    <NModal
+      v-model:show="showCreate"
+      preset="card"
+      class="market-dialog"
+      style="width: 520px"
+      :title="t('skillMarket.createTitle')"
+    >
+      <div class="market-dialog__body">
+        <p class="market-dialog__hint">{{ t('skillMarket.createHint') }}</p>
+        <label class="market-dialog__label">{{ t('skillMarket.createName') }}</label>
+        <NInput v-model:value="newSkillName" :placeholder="t('skillMarket.createNamePlaceholder')" />
+        <label class="market-dialog__label">{{ t('skillMarket.createCategory') }}</label>
+        <NInput v-model:value="newSkillCategory" clearable :placeholder="t('skillMarket.createCategoryPlaceholder')" />
+        <label class="market-dialog__label">{{ t('skillMarket.createContent') }}</label>
+        <NInput
+          v-model:value="newSkillContent"
+          type="textarea"
+          :autosize="{ minRows: 10, maxRows: 20 }"
+          :placeholder="t('skillMarket.createContentPlaceholder')"
+        />
+      </div>
+      <template #footer>
+        <div class="market-dialog__footer">
+          <NButton size="small" @click="showCreate = false">{{ t('common.cancel') }}</NButton>
+          <NButton size="small" type="primary" :loading="creatingSkill" @click="createLocalSkill">
+            {{ t('common.confirm') }}
+          </NButton>
+        </div>
+      </template>
+    </NModal>
 
     <NDrawer v-model:show="showDetail" width="var(--studio-drawer-width)" placement="right">
       <NDrawerContent v-if="detail" :title="detail.name" closable>

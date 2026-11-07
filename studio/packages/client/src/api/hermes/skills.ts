@@ -1,4 +1,4 @@
-import { request, getBaseUrlValue, getApiKey, getActiveProfileName } from '../client'
+import { request, requestBlob, getBaseUrlValue, getApiKey, getActiveProfileName } from '../client'
 import { fetchAgentAvailabilitySnapshot } from '../agent-status'
 
 export type SkillSource = 'builtin' | 'hub' | 'local' | 'external'
@@ -178,6 +178,17 @@ function encodeSkillPath(path: string): string {
 export async function fetchSkillContent(skillPath: string, target: SkillTarget = 'hermes'): Promise<string> {
   const res = await request<{ content: string }>(`/api/hermes/skills/${encodeSkillPath(skillPath)}${targetQuery(target)}`)
   return res.content
+}
+
+/** Download one skill as a portable ZIP for sharing or backup. */
+export async function exportSkillApi(
+  category: string,
+  skill: string,
+  target: SkillTarget = 'hermes',
+): Promise<Blob> {
+  return requestBlob(
+    `/api/hermes/skills/${encodeURIComponent(category)}/${encodeURIComponent(skill)}/export${targetQuery(target)}`,
+  )
 }
 
 export async function saveSkillContent(

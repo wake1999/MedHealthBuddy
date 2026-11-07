@@ -246,6 +246,12 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 /hermes/prompt-templates
 ```
 
+技能生命周期与外部暴露的完整说明见：
+
+```text
+studio/docs/skill-lifecycle.md
+```
+
 ![技能市场](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/skill-market.png)
 
 ![提示词模板](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/prompt-templates.png)

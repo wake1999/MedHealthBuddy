@@ -10,9 +10,14 @@ ekkoSkillRoutes.get('/api/ekko/skills', ctrl.list)
 ekkoSkillRoutes.get('/api/ekko/skills/external-directories', requireSuperAdmin, ctrl.externalDirectories)
 ekkoSkillRoutes.put('/api/ekko/skills/external-directories', requireSuperAdmin, ctrl.saveExternalDirectories)
 ekkoSkillRoutes.post('/api/ekko/skills/import', requireSuperAdmin, ctrl.importSkill)
+// Authenticated users may author a skill in their own Profile. The existing
+// super-admin create route remains available for managed/admin workflows.
+ekkoSkillRoutes.post('/api/ekko/skills/create-local', ctrl.create)
 ekkoSkillRoutes.get('/api/ekko/skills/:name/files', requireSuperAdmin, ctrl.files)
 ekkoSkillRoutes.get('/api/ekko/skills/:name/file', requireSuperAdmin, ctrl.file)
 ekkoSkillRoutes.put('/api/ekko/skills/:name/toggle', requireSuperAdmin, ctrl.toggle)
+// Read-only prompt contract for trusted local clients and MCP prompts.
+ekkoSkillRoutes.get('/api/ekko/skills/:name/prompt', ctrl.prompt)
 ekkoSkillRoutes.get('/api/ekko/skills/:name', requireSuperAdmin, ctrl.detail)
 ekkoSkillRoutes.post('/api/ekko/skills', requireSuperAdmin, ctrl.create)
 ekkoSkillRoutes.put('/api/ekko/skills/:name', requireSuperAdmin, ctrl.update)

@@ -138,6 +138,27 @@ export async function importSkill(ctx: Context): Promise<void> {
   }
 }
 
+/**
+ * Read-only contract used by MCP prompts and other trusted clients.
+ * It deliberately excludes filesystem paths and management-only metadata.
+ */
+export async function prompt(ctx: Context): Promise<void> {
+  try {
+    const skill = await getEkkoSkill(requestedProfile(ctx), String(ctx.params.name || ''))
+    ctx.body = {
+      ok: true,
+      prompt: {
+        name: skill.name,
+        description: skill.description,
+        category: skill.category,
+        content: skill.content,
+      },
+    }
+  } catch (error) {
+    errorResponse(ctx, error)
+  }
+}
+
 export async function create(ctx: Context): Promise<void> {
   const body = (ctx.request.body || {}) as Record<string, unknown>
   if (typeof body.name !== 'string' || typeof body.content !== 'string') {

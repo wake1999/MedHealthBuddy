@@ -27,6 +27,18 @@ export async function fetchEkkoSkill(name: string): Promise<EkkoSkillDetail> {
   return response.skill
 }
 
+export async function createEkkoSkillLocal(input: {
+  name: string
+  content: string
+  category?: string
+}): Promise<EkkoSkillDetail> {
+  const response = await request<{ ok: boolean; skill: EkkoSkillDetail }>('/api/ekko/skills/create-local', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return response.skill
+}
+
 export async function createEkkoSkill(input: {
   name: string
   content: string

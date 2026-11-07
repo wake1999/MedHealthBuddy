@@ -2272,6 +2272,38 @@ async function callTool(name, args = {}, signal) {
 }
 
 const pendingInteractions = new Map()
+async function skillPrompts() {
+  const payload = await request('/api/ekko/skills')
+  const skills = Array.isArray(payload?.skills) ? payload.skills : []
+  return skills.map(skill => ({
+    name: String(skill.name),
+    description: String(skill.description || `Skill: ${skill.name}`),
+    arguments: [
+      {
+        name: 'input',
+        description: 'Optional user context appended to the skill instructions.',
+        required: false,
+      },
+    ],
+  }))
+}
+
+async function skillPrompt(name, args = {}) {
+  const payload = await request(`/api/ekko/skills/${encodeURIComponent(name)}/prompt`)
+  const prompt = payload?.prompt
+  if (!prompt || typeof prompt.content !== 'string') {
+    throw new Error(`Skill prompt not found: ${name}`)
+  }
+  const input = typeof args.input === 'string' ? args.input.trim() : ''
+  const text = input
+    ? `${prompt.content}\n\n---\n\nUser input:\n${input}`
+    : prompt.content
+  return {
+    description: String(prompt.description || ''),
+    messages: [{ role: 'user', content: { type: 'text', text } }],
+  }
+}
+
 async function handle(message) {
   if (message?.method === 'notifications/cancelled') {
     pendingInteractions.get(message.params?.requestId)?.abort()
@@ -2287,13 +2319,28 @@ async function handle(message) {
           id: message.id,
           result: {
             protocolVersion: message.params?.protocolVersion || '2024-11-05',
-            capabilities: { tools: {} },
+            capabilities: { tools: {}, prompts: {} },
             serverInfo: { name: SERVER_NAME, version: VERSION, toolset: ACTIVE_TOOLSET },
             instructions: serverInstructions(),
           },
         }
       case 'tools/list':
         return { jsonrpc: '2.0', id: message.id, result: { tools: visibleTools() } }
+      case 'prompts/list':
+        return {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: { prompts: await skillPrompts() },
+        }
+      case 'prompts/get':
+        return {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: await skillPrompt(
+            String(message.params?.name || ''),
+            message.params?.arguments || {},
+          ),
+        }
       case 'tools/call': {
         const resolvedName = resolveToolName(message.params?.name)
         const abort = resolvedName === 'ekko_studio_clarify' || resolvedName?.startsWith('ekko_studio_browser_') ? new AbortController() : undefined

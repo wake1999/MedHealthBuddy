@@ -923,6 +923,49 @@ export async function toggleBatch(ctx: any) {
   }
 }
 
+/**
+ * Download one skill as a portable ZIP. This is the sharing boundary: the same
+ * archive can be imported again through `POST /api/hermes/skills/import`.
+ */
+export async function exportSkill(ctx: any) {
+  const category = String(ctx.params?.category || '')
+  const skill = String(ctx.params?.skill || '')
+  if (!category || !skill || !isValidSkillName(category) || !isValidSkillName(skill)) {
+    ctx.status = 400
+    ctx.body = { error: 'Invalid category or skill name' }
+    return
+  }
+
+  const directory = await resolveSkillDirForTarget(ctx, category, skill)
+  if (!directory) {
+    ctx.status = 404
+    ctx.body = { error: `Skill not found: ${category}/${skill}` }
+    return
+  }
+
+  try {
+    const zip = new AdmZip()
+    const appendDirectory = async (current: string, prefix: string): Promise<void> => {
+      for (const entry of await readdir(current, { withFileTypes: true })) {
+        if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === '.DS_Store') continue
+        const fullPath = join(current, entry.name)
+        if (entry.isDirectory()) {
+          await appendDirectory(fullPath, `${prefix}${entry.name}/`)
+        } else if (entry.isFile()) {
+          zip.addFile(`${prefix}${entry.name}`, await readFile(fullPath))
+        }
+      }
+    }
+    await appendDirectory(directory, '')
+    ctx.set('Content-Type', 'application/zip')
+    ctx.set('Content-Disposition', `attachment; filename="${encodeURIComponent(skill)}.zip"`)
+    ctx.body = zip.toBuffer()
+  } catch (error: any) {
+    ctx.status = 500
+    ctx.body = { error: `Failed to export skill: ${error.message}` }
+  }
+}
+
 export async function listFiles(ctx: any) {
   const { category, skill } = ctx.params
   try {

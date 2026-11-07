@@ -15,6 +15,7 @@ skillRoutes.delete('/api/hermes/skills/categories/:category', ctrl.deleteCategor
 skillRoutes.put('/api/hermes/skills/toggle', ctrl.toggle)
 skillRoutes.put('/api/hermes/skills/toggle-batch', ctrl.toggleBatch)
 skillRoutes.put('/api/hermes/skills/pin', ctrl.pin_)
+skillRoutes.post('/api/hermes/skills/create', ctrl.createSkill)
 skillRoutes.post('/api/hermes/skills/import', ctrl.importSkill)
 skillRoutes.get('/api/hermes/skills-market/search', marketCtrl.search)
 skillRoutes.post('/api/hermes/skills-market/install', marketCtrl.install)

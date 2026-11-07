@@ -5,10 +5,11 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NAlert, NButton, NDrawer, NDrawerContent, NDropdown, NEmpty, NInput, NModal, NSelect, NSwitch, NTag, useDialog, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 
-import { createEkkoSkillLocal, toggleEkkoSkill } from '@/api/ekko/skills'
+import { toggleEkkoSkill } from '@/api/ekko/skills'
 import SkillDetail from '@/components/hermes/skills/SkillDetail.vue'
-import SkillImportModal from '@/components/hermes/skills/SkillImportModal.vue'
+import SkillAddModal from '@/components/hermes/skills/SkillAddModal.vue'
 import {
+  createSkillApi,
   createSkillCategory,
   deleteSkillApi,
   deleteSkillCategory,
@@ -16,6 +17,7 @@ import {
   fetchInstalledSkillTargets,
   fetchSkillCategories,
   fetchSkills,
+  importSkill,
   toggleSkill,
   toggleSkillsBatch,
   type SkillCategory,
@@ -58,12 +60,7 @@ const query = ref('')
 const source = ref('')
 const category = ref('')
 const activeTab = ref<MarketTab>('discover')
-const showImport = ref(false)
-const showCreate = ref(false)
-const newSkillName = ref('')
-const newSkillCategory = ref('')
-const newSkillContent = ref('')
-const creatingSkill = ref(false)
+const showAdd = ref(false)
 const detail = ref<MarketSkill | null>(null)
 const toggling = ref<Set<string>>(new Set())
 const removing = ref<Set<string>>(new Set())
@@ -822,36 +819,18 @@ async function downloadSkill(skill: MarketSkill) {
   }
 }
 
-async function createLocalSkill() {
-  const name = newSkillName.value.trim()
-  const content = newSkillContent.value.trim()
-  if (!name) {
-    message.warning(t('skillMarket.createNameRequired'))
-    return
-  }
-  if (!content) {
-    message.warning(t('skillMarket.createContentRequired'))
-    return
-  }
-  creatingSkill.value = true
-  try {
-    await createEkkoSkillLocal({
-      name,
-      content,
-      ...(newSkillCategory.value ? { category: newSkillCategory.value } : {}),
-    })
-    showCreate.value = false
-    newSkillName.value = ''
-    newSkillCategory.value = ''
-    newSkillContent.value = ''
-    activeTab.value = 'installed'
-    await loadLocal(true)
-    message.success(t('skillMarket.createSuccess'))
-  } catch (error) {
-    message.error(error instanceof Error ? error.message : String(error))
-  } finally {
-    creatingSkill.value = false
-  }
+async function importSkillInto(files: File[], category: string | undefined, target: SkillTarget) {
+  return importSkill(files, category, target)
+}
+
+async function createSkillInto(name: string, content: string, category: string, target: SkillTarget) {
+  await createSkillApi(name, content, category, target)
+}
+
+function handleAddSaved() {
+  showAdd.value = false
+  activeTab.value = 'installed'
+  void loadLocal(true)
 }
 
 function confirmUninstall(skill: MarketSkill) {
@@ -866,11 +845,6 @@ function confirmUninstall(skill: MarketSkill) {
 
 async function refreshAll() {
   await Promise.all([loadLocal(true), activeTab.value === 'discover' ? loadMarket(true, true) : Promise.resolve()])
-}
-
-function handleImported() {
-  showImport.value = false
-  void loadLocal(true)
 }
 
 onMounted(async () => {
@@ -893,19 +867,14 @@ onUnmounted(() => {
           <NButton size="small" quaternary :loading="loading || marketLoading" @click="refreshAll">
             {{ t('skillMarket.refresh') }}
           </NButton>
-          <NButton size="small" secondary @click="showCreate = true">
-            {{ t('skillMarket.create') }}
-          </NButton>
-          <NButton size="small" type="primary" @click="showImport = true">
+          <NButton size="small" type="primary" @click="showAdd = true">
             <template #icon>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
+                <path d="M12 5v14M5 12h14" />
               </svg>
             </template>
-            {{ t('skillMarket.install') }}
+            {{ t('skills.addTitle') }}
           </NButton>
         </div>
       </header>
@@ -1180,38 +1149,15 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <SkillImportModal v-if="showImport" @close="showImport = false" @saved="handleImported" />
-
-    <NModal
-      v-model:show="showCreate"
-      preset="card"
-      class="market-dialog"
-      style="width: 520px"
-      :title="t('skillMarket.createTitle')"
-    >
-      <div class="market-dialog__body">
-        <p class="market-dialog__hint">{{ t('skillMarket.createHint') }}</p>
-        <label class="market-dialog__label">{{ t('skillMarket.createName') }}</label>
-        <NInput v-model:value="newSkillName" :placeholder="t('skillMarket.createNamePlaceholder')" />
-        <label class="market-dialog__label">{{ t('skillMarket.createCategory') }}</label>
-        <NInput v-model:value="newSkillCategory" clearable :placeholder="t('skillMarket.createCategoryPlaceholder')" />
-        <label class="market-dialog__label">{{ t('skillMarket.createContent') }}</label>
-        <NInput
-          v-model:value="newSkillContent"
-          type="textarea"
-          :autosize="{ minRows: 10, maxRows: 20 }"
-          :placeholder="t('skillMarket.createContentPlaceholder')"
-        />
-      </div>
-      <template #footer>
-        <div class="market-dialog__footer">
-          <NButton size="small" @click="showCreate = false">{{ t('common.cancel') }}</NButton>
-          <NButton size="small" type="primary" :loading="creatingSkill" @click="createLocalSkill">
-            {{ t('common.confirm') }}
-          </NButton>
-        </div>
-      </template>
-    </NModal>
+    <SkillAddModal
+      v-if="showAdd"
+      :agents="installAgentOptions"
+      :categories="categoryOptions"
+      :import-handler="importSkillInto"
+      :create-handler="createSkillInto"
+      @close="showAdd = false"
+      @saved="handleAddSaved"
+    />
 
     <NDrawer v-model:show="showDetail" width="var(--studio-drawer-width)" placement="right">
       <NDrawerContent v-if="detail" :title="detail.name" closable>

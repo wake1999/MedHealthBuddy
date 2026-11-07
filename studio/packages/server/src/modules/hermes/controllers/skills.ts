@@ -390,9 +390,14 @@ async function findSkillDirByName(rootDir: string, skillName: string, visited = 
 
 async function findSkillDirInRoot(rootDir: string, category: string, skillName: string): Promise<string | null> {
   if (category === 'misc') {
-    const skillDir = join(rootDir, skillName)
-    const skillMd = await safeReadFile(join(skillDir, 'SKILL.md'))
-    return skillMd !== null ? skillDir : null
+    // Older writers used a literal `misc/` folder; current writers put misc
+    // skills directly at the root. Accept both so existing installs stay
+    // editable/exportable.
+    for (const skillDir of [join(rootDir, skillName), join(rootDir, 'misc', skillName)]) {
+      const skillMd = await safeReadFile(join(skillDir, 'SKILL.md'))
+      if (skillMd !== null) return skillDir
+    }
+    return null
   }
   return findSkillDirByName(join(rootDir, category), skillName)
 }
@@ -920,6 +925,48 @@ export async function toggleBatch(ctx: any) {
   } catch (err: any) {
     ctx.status = 500
     ctx.body = { error: err.message }
+  }
+}
+
+/** Create a local skill in the selected agent tree. */
+export async function createSkill(ctx: any) {
+  const body = (ctx.request.body || {}) as { name?: unknown; content?: unknown; category?: unknown }
+  const name = String(body.name || '').trim()
+  const content = String(body.content || '')
+  const category = String(body.category || '').trim() || 'misc'
+  if (!isValidSkillName(name) || !isValidSkillName(category)) {
+    ctx.status = 400
+    ctx.body = { error: 'Invalid skill or category name' }
+    return
+  }
+  if (!content.trim()) {
+    ctx.status = 400
+    ctx.body = { error: 'Skill content is required' }
+    return
+  }
+
+  const skillsDir = requestTargetSkillsDir(ctx)
+  // `misc` is the convention for skills stored directly at the skills root.
+  const targetDir = category === 'misc' ? join(skillsDir, name) : join(skillsDir, category, name)
+  if (!isPathWithin(targetDir, skillsDir)) {
+    ctx.status = 400
+    ctx.body = { error: 'Resolved skill path escapes the skills directory' }
+    return
+  }
+  if (await pathExists(targetDir)) {
+    ctx.status = 409
+    ctx.body = { error: `Skill already exists: ${name}` }
+    return
+  }
+
+  try {
+    await mkdir(targetDir, { recursive: true })
+    await writeFile(join(targetDir, 'SKILL.md'), content, 'utf-8')
+    ctx.status = 201
+    ctx.body = { name, category, target: requestSkillTarget(ctx) }
+  } catch (error: any) {
+    ctx.status = 500
+    ctx.body = { error: `Failed to create skill: ${error.message}` }
   }
 }
 
@@ -1580,7 +1627,8 @@ export async function importSkill(ctx: any) {
     ctx.status = error.status || 500; ctx.body = { error: error.message }; return
   }
   await mkdir(skillsDir, { recursive: true })
-  const targetRoot = category ? join(skillsDir, category) : skillsDir
+  // `misc` is the flat/root bucket used by the reader and delete paths.
+  const targetRoot = category && category !== 'misc' ? join(skillsDir, category) : skillsDir
 
   // Provenance for conflict detection (cannot shadow builtin/hub)
   const bundledManifest = readBundledManifest(await safeReadFile(join(skillsDir, '.bundled_manifest')))

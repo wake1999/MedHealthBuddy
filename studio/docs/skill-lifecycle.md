@@ -9,8 +9,8 @@
 | 能力 | 状态 | 入口 / 实现 |
 |---|---|---|
 | 第三方导入：技能市场安装 | 已实现 | 技能市场 → 安装 → 选择 Agent/分类 |
-| 第三方导入：ZIP / 文件夹 | 已实现 | `POST /api/hermes/skills/import`；`SkillImportModal` |
-| 用户自行构建 | 已实现 | 技能市场 → 新建技能；`POST /api/ekko/skills/create-local` |
+| 第三方导入：ZIP / 文件夹 | 已实现 | 添加技能 → 安装技能包；`POST /api/hermes/skills/import` |
+| 用户自行构建 | 已实现 | 添加技能 → 新建技能；`POST /api/hermes/skills/create` |
 | 编辑已有本地技能 | 已实现 | `SkillDetail` → 编辑；`PUT /api/ekko/skills/:name` |
 | 技能启停 | 已实现 | 技能市场开关；Ekko/Hermes 配置 |
 | 技能导出 / 分享 | 已实现 | 已安装技能行 → 导出 / 分享；`GET /api/hermes/skills/:category/:skill/export` |
@@ -38,6 +38,15 @@
 也支持把本地 ZIP 或整个文件夹导入：
 
 ```text
+技能市场 → 添加技能
+→ 安装技能包
+→ 选择目标 Agent 和目录
+→ POST /api/hermes/skills/import?target=<agent>
+```
+
+也可以继续使用独立导入弹窗：
+
+```text
 SkillImportModal
 → POST /api/hermes/skills/import
 或 Ekko：POST /api/ekko/skills/import
@@ -48,16 +57,16 @@ SkillImportModal
 入口：
 
 ```text
-技能市场 → 新建技能
+技能市场 → 添加技能 → 新建技能
 ```
 
 实现：
 
 ```text
-POST /api/ekko/skills/create-local
+POST /api/hermes/skills/create?target=<agent>
 ```
 
-写入当前 Profile 的 MedHealthBuddy Agent 技能目录。普通登录用户只能写入自己的 Profile，不经过超级管理员创建接口。
+写入所选 Agent 的目录；普通登录用户只能写入自己的 Profile，不经过超级管理员创建接口。`target=ekko`、`target=hermes` 等均可在同一弹窗中选择。
 
 SKILL.md 必须包含：
 
@@ -193,8 +202,9 @@ skill.share:<name>
 第三方 ZIP 导入                 已有实现
 普通用户创建本地技能            201
 管理员创建本地技能              201
-技能列表可见                    200
-只读 prompt                     200
+创建到 ekko target              201 / 列表可见
+创建到 hermes target            201 / 列表可见
+ZIP 导入到 ekko target          200 / 列表可见
 导出 ZIP                        200 / application/zip
 删除测试技能                    200
 MCP prompts/list                31 个技能

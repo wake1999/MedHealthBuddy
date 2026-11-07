@@ -291,6 +291,18 @@ export async function deleteSkillApi(category: string, name: string, target: Ski
   await request(`/api/hermes/skills/${c}/${n}${targetQuery(target)}`, { method: 'DELETE' })
 }
 
+export async function createSkillApi(
+  name: string,
+  content: string,
+  category = 'misc',
+  target: SkillTarget = 'hermes',
+): Promise<void> {
+  await request(`/api/hermes/skills/create${targetQuery(target)}`, {
+    method: 'POST',
+    body: JSON.stringify({ name, content, category }),
+  })
+}
+
 /**
  * Import one or more files (a single .zip OR a folder of files with relative paths).
  * For folder uploads, the caller should pass File objects whose `webkitRelativePath`

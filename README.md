@@ -230,6 +230,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 主要特性：
 
 - 技能市场浏览、搜索和安装
+- 统一“添加技能”入口：安装 ZIP/文件夹或新建技能，均支持选择目标 Agent 和目录
 - Skill Bundle 导入、导出和启停
 - 内置技能与用户技能分离
 - 技能使用统计

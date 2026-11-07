@@ -95,7 +95,7 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 - 快速提示词和提示词模板胶囊
 - 本地 Profile 隔离
 
-![单聊与多智能体对话](./docs/screenshots/chat.png)
+![单聊与多智能体对话](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/chat.png)
 
 ### 2. 群聊与共享会话
 
@@ -109,7 +109,7 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 - 共享会话只读访问
 - 群聊与单聊共用 Agent、模型和工具能力
 
-![群聊与共享会话（空状态）](./docs/screenshots/group-chat.png)
+![群聊与共享会话（空状态）](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/group-chat.png)
 
 ### 3. 科研工作台
 
@@ -173,15 +173,15 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 
 可查看完整架构图：
 
-![科研工作台模块关系](studio/docs/architecture/research-workbench-modules.png)
+![科研工作台模块关系](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/studio/docs/architecture/research-workbench-modules.png)
 
-![研究运行自动化流程](studio/docs/architecture/research-automation-flow.png)
+![研究运行自动化流程](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/studio/docs/architecture/research-automation-flow.png)
 
-![科研工作台总览](./docs/screenshots/research-overview.png)
+![科研工作台总览](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/research-overview.png)
 
-![Research Run 与审批](./docs/screenshots/research-runs.png)
+![Research Run 与审批](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/research-runs.png)
 
-![文献库](./docs/screenshots/research-papers.png)
+![文献库](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/research-papers.png)
 
 ### 4. 工作流、任务与看板
 
@@ -196,9 +196,9 @@ MedHealthBuddy 面向文献驱动的研究、实验执行、论文草稿和 Agen
 - 项目看板与任务状态流转
 - 工作流结果可回到聊天或科研项目
 
-![可视化工作流（空状态）](./docs/screenshots/workflow.png)
+![可视化工作流（空状态）](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/workflow.png)
 
-![定时任务与运行历史](./docs/screenshots/jobs-kanban.png)
+![定时任务与运行历史](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/jobs-kanban.png)
 
 ### 5. 编码 Agent
 
@@ -221,7 +221,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - Agent 配置页、MCP 配置和运行时状态
 - 不同 Agent 共用会话历史与文件面板
 
-![编码 Agent 管理](./docs/screenshots/coding-agents.png)
+![编码 Agent 管理](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/coding-agents.png)
 
 ### 6. 技能、技能市场与提示词模板
 
@@ -246,9 +246,9 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 /hermes/prompt-templates
 ```
 
-![技能市场](./docs/screenshots/skill-market.png)
+![技能市场](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/skill-market.png)
 
-![提示词模板](./docs/screenshots/prompt-templates.png)
+![提示词模板](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/prompt-templates.png)
 
 ### 7. 模型、API Relay 与可观测性
 
@@ -265,9 +265,9 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - 技能调用统计
 - 超级管理员性能面板
 
-![模型与 Provider 管理](./docs/screenshots/models.png)
+![模型与 Provider 管理](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/models.png)
 
-![用量统计](./docs/screenshots/usage.png)
+![用量统计](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/usage.png)
 
 ### 8. 连接、设备与浏览器
 
@@ -284,7 +284,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - MCU / ESP32-C3 设备接入
 - 通知渠道与外部连接配置
 
-![设备互联](./docs/screenshots/connections.png)
+![设备互联](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/connections.png)
 
 ### 9. 记忆、旅程与桌宠
 
@@ -297,7 +297,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - Petdex / Desktop Pet：桌宠与 Agent 个性化
 - 主题定制和多语言
 
-![Petdex 宠物](./docs/screenshots/memory-petdex.png)
+![Petdex 宠物](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/memory-petdex.png)
 
 ### 10. 账户、Profile、权限与设置
 
@@ -313,7 +313,7 @@ Qwen Code / Kimi Code / CodeBuddy / Qoder / GitHub Copilot / ZCode
 - 主题、语言、语音、STT/TTS 设置
 - 版本预览和系统设置
 
-![角色与模块权限](./docs/screenshots/settings-rbac.png)
+![角色与模块权限](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/settings-rbac.png)
 
 ### 11. 桌面应用
 
@@ -343,7 +343,7 @@ start-studio-local.cmd      → start-studio.cmd local
 start-studio-desktop.cmd    → start-studio.cmd remote
 ```
 
-![MedHealthBuddy 桌面应用](./docs/screenshots/desktop.png)
+![MedHealthBuddy 桌面应用](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/desktop.png)
 
 ### 12. 远程连接器
 
@@ -365,7 +365,7 @@ Studio 兼容服务
 - 入口为 `start-remote-connector.cmd`
 - `start-desktop.cmd` 作为兼容包装保留
 
-![远程连接器](./docs/screenshots/remote-connector.png)
+![远程连接器](https://cdn.jsdelivr.net/gh/wake1999/MedHealthBuddy@main/docs/screenshots/remote-connector.png)
 
 ### 13. CLI、MCP 与扩展
 
@@ -691,7 +691,7 @@ studio/LICENSE
 
 ## 截图资源清单
 
-截图统一放在 `docs/screenshots/`，当前使用 1440×900 的真实运行画面；空状态截图保留真实页面，不用占位图。
+截图统一放在 `docs/screenshots/`，当前使用 1440×900 的真实运行画面；GitHub 页面通过 jsDelivr CDN 加载，避免 `raw.githubusercontent.com` 重定向失败。
 
 | 文件 | 模块 | 建议画面 |
 |---|---|---|

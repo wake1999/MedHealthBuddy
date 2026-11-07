@@ -23,3 +23,24 @@ studio/packages/desktop/release-*/
 # must never be committed or uploaded by the source deploy script.
 studio/packages/desktop/translation-runtime/
 .translation-plugin-build/
+.translation-plugin-installed-backup/
+
+# Local tooling, one-off snapshots, backups and test installs.
+.electron-dist-cache/
+.skill-import/
+.hermes-agent-backup-*/
+.upstream-*/
+.push-v2-clean/
+.npm-test/
+.npm-home/
+.hermes-sync/
+.hermes-sync.tgz
+.tmp-*
+.cloud-*.png
+.login-*.png
+.roles-*.png
+.probe*
+.startup-*
+.refresh-log.txt
+.translate-server.*
+texput.log

@@ -320,10 +320,11 @@ const visibleInsertTemplates = computed(() =>
 )
 
 /**
- * The shelf belongs to the new-session composer, like the reference product, and
- * shows on both surfaces — which categories appear is the manager's call.
+ * The shelf belongs to the new-session composer. Once a session has messages,
+ * the composer stays clean; only instruction chips attached to that session
+ * may remain visible.
  */
-const showPromptTemplateShelf = computed(() => true)
+const showPromptTemplateShelf = computed(() => props.draft)
 
 /** The insert template the draft currently holds, if any: the shelf picks one at a time. */
 const appliedInsertTemplateIds = computed(
@@ -1884,7 +1885,7 @@ function openAttachmentPreview(attachment: Attachment) {
         @mousedown="startResize"
         @dblclick="resetTextareaHeight"
       ></div>
-      <div v-if="activeInstructionTemplates.length > 0" class="prompt-template-chips">
+      <div v-if="showPromptTemplateShelf && activeInstructionTemplates.length > 0" class="prompt-template-chips">
         <button
           v-for="template in activeInstructionTemplates"
           :key="template.id"

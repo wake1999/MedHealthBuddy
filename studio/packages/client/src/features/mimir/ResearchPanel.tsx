@@ -20,7 +20,7 @@ import type { ResearchTab } from './store.ts'
 import type { ResearchKey } from './locales.ts'
 import { arrowTab, trapFocusIndex } from './focus.ts'
 import { cleanProjectTitle, nextSelectionAfterDelete } from './project-form.ts'
-import { failureCopy } from './view-common.ts'
+import { failureCopy, filterPapers } from './view-common.ts'
 import type { ResearchFailureView } from './controller.ts'
 import { readSidebarFolded, SIDEBAR_FOLD_STORAGE_KEY, sidebarFoldStorageValue } from './sidebar-fold.ts'
 import { readStorageFlag, readStorageValue, storageFlagValue, writeStorageValue } from './storage.ts'
@@ -518,7 +518,10 @@ export function ResearchPanel({
   // The overview's stat chips read whatever the other views already fetched;
   // a view not yet loaded (or belonging to another project) shows a dash.
   const overviewStats = {
-    papers: papers.status === 'ready' ? papers.list.length : null,
+    papers: papers.status === 'ready'
+      ? filterPapers(papers.list, null, selectedProjectId)
+        .filter(paper => !(paper.tags || []).includes('fixture')).length
+      : null,
     experiments: experiments !== null && experiments.projectId === selectedProjectId && experiments.status === 'ready'
       ? experiments.list.length
       : null,

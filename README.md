@@ -4,6 +4,33 @@ MedHealthBuddy 是一个本地优先的科研工作台，面向文献驱动的�
 
 > 仅用于科研与工程验证，不用于临床诊断、治疗或医疗决策。自动抽取、自动判定和统计结果都需要人工复核。
 
+## 启动入口
+
+当前 Studio 桌面应用统一使用：
+
+```text
+start-studio.cmd            本地模式（默认）
+start-studio.cmd local      本地模式
+start-studio.cmd remote     SSH 隧道连接远程 Studio
+```
+
+本地模式也可以打开应用内的“设备管理”，添加远程 Studio 服务并切换，不需要单独重启。
+
+兼容入口仍然保留：
+
+```text
+start-studio-local.cmd      → start-studio.cmd local
+start-studio-desktop.cmd    → start-studio.cmd remote
+```
+
+根目录 `packages/desktop` 是独立的**远程连接器**，通过系统 SSH 连接服务器上的 DSH、Hermes 或其他兼容服务；入口为：
+
+```text
+start-remote-connector.cmd
+```
+
+`start-desktop.cmd` 作为兼容包装保留。
+
 ## 当前能力
 
 ### Research Run

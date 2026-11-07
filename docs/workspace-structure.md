@@ -4,7 +4,7 @@
 
 ## 1. 审查范围
 
-本次审查覆盖工作空间根目录、`studio/` 当前产品 monorepo、`packages/` 旧版桌面壳、文档、启动脚本、构建输出、备份和本地运行数据。
+本次审查覆盖工作空间根目录、`studio/` 当前产品 monorepo、`packages/` 远程连接器、文档、启动脚本、构建输出、备份和本地运行数据。
 
 审查方式：
 
@@ -50,7 +50,7 @@
 ### 保留的“看似重复”
 
 - `studio/packages/ekko-agent/skills/.../references/workbench-api.md`：两个技能包各自需要自包含引用，保留
-- `packages/`（根目录）：旧版桌面壳源码，和 `studio/packages/` 不是逐文件复制；保留为 legacy
+- `packages/`（根目录）：独立的远程连接器源码，通过 SSH 连接服务器的 DSH / Hermes / Studio，和 `studio/packages/` 不是逐文件复制；保留
 - `studio/docs/` 与 `docs/`：分别保存产品内部文档和仓库级运维文档，不合并
 
 ## 4. 保留内容
@@ -70,8 +70,10 @@
 | `.electron-dist-cache/` | 本地 Electron 运行时，启动脚本使用 |
 | `studio/packages/desktop/release/` | 当前桌面运行/打包输出 |
 | `node_modules/`、`studio/node_modules/` | 依赖，保留以避免重新安装 |
-| `packages/`、`start-desktop.cmd` | 旧版桌面壳，legacy 保留 |
-| `start-studio-local.cmd`、`start-studio-desktop.cmd` | 当前产品启动入口 |
+| `packages/`、`start-remote-connector.cmd` | 远程连接器，通过 SSH 连接 DSH / Hermes / Studio |
+| `start-studio.cmd` | 当前 Studio 桌面统一入口，支持 `local` / `remote` |
+| `start-studio-local.cmd`、`start-studio-desktop.cmd` | 兼容包装入口 |
+| `start-desktop.cmd` | 远程连接器的兼容包装入口 |
 
 ## 5. 目标结构
 
@@ -92,7 +94,7 @@ MedHealthBuddy/
 │   ├── scripts/                    # 构建与开发脚本
 │   └── dist/                       # 构建产物（Git 忽略）
 │
-├── packages/                       # 旧版桌面壳（legacy）
+├── packages/                       # 远程连接器（SSH → DSH/Hermes/Studio）
 ├── docs/                           # 仓库级文档
 │   ├── screenshots/
 │   └── workspace-structure.md
@@ -100,9 +102,11 @@ MedHealthBuddy/
 ├── data/                           # 本地运行数据（不提交）
 ├── .electron-dist-cache/           # Electron 运行时缓存（Git 忽略）
 │
-├── start-studio-local.cmd          # 本地模式启动
-├── start-studio-desktop.cmd        # 远程模式启动
-├── start-desktop.cmd               # 旧版桌面启动
+├── start-studio.cmd                # 统一入口：local / remote
+├── start-studio-local.cmd          # 兼容包装：local
+├── start-studio-desktop.cmd        # 兼容包装：remote
+├── start-remote-connector.cmd      # 远程连接器入口
+├── start-desktop.cmd               # 兼容包装：remote connector
 ├── deploy-studio.ps1               # 源码同步
 ├── connect-from-mac.sh             # 连接脚本
 ├── README.md
@@ -114,7 +118,7 @@ MedHealthBuddy/
 
 以下动作会改变路径，建议单独开分支执行，并同步修改快捷方式和脚本：
 
-1. 将旧版 `packages/` 移到 `legacy/desktop-shell/`。
+1. 将根目录远程连接器 `packages/` 迁移到 `connectors/remote/`，并同步 `start-remote-connector.cmd`。
 2. 将安装包和构建输出统一放到 `artifacts/`。
 3. 将 Electron 缓存统一放到 `tools/electron-runtime/`。
 4. 将根目录启动脚本收进 `scripts/launchers/`，并重做开始菜单快捷方式。

@@ -2,7 +2,7 @@
   "name": "medhealthbuddy-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "A thin Windows desktop shell (MedHealthBuddy) for a DSH that runs on a server over system ssh.",
+  "description": "MedHealthBuddy remote connector: a thin Electron shell for DSH/Hermes/Studio services reachable over system SSH.",
   "type": "module",
   "main": "src/main/index.js",
   "scripts": {

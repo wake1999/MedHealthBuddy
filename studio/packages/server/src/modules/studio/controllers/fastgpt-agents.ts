@@ -10,6 +10,7 @@ import {
   type FastGptAgentSeed,
   type FastGptRemoteApp,
 } from '../infrastructure/fastgpt/agent-catalog'
+import { agentServiceFor, type AgentServiceConfig } from '../infrastructure/fastgpt/agent-services'
 
 /**
  * 首页场景下的 FastGPT 智能体卡片。
@@ -127,14 +128,100 @@ interface ChatTurnInput {
   content: string
 }
 
+/** Per-session conversation ids returned by the BTIT service gateway. */
+const serviceConversationIds = new Map<string, number>()
+
+function serviceReplyText(payload: any): string {
+  if (typeof payload?.reply === 'string') return payload.reply
+  if (typeof payload?.message?.content === 'string') return payload.message.content
+  if (typeof payload?.content === 'string') return payload.content
+  return ''
+}
+
+async function chatViaAgentService(
+  ctx: any,
+  service: AgentServiceConfig,
+  messages: ChatTurnInput[],
+  body: any,
+): Promise<void> {
+  const message = [...messages].reverse().find(item => item.role === 'user')?.content || messages[messages.length - 1].content
+  const conversationKey = String(body.chatId || '').trim() || `studio-${service.appId}-${Date.now()}`
+  const conversationId = serviceConversationIds.get(conversationKey)
+  const variables = body.variables && typeof body.variables === 'object' ? body.variables : {}
+
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), 180000)
+  const res = ctx.res
+  ctx.respond = false
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  })
+  let closed = false
+  res.on('close', () => {
+    closed = true
+    abort.abort()
+  })
+  const send = (payload: unknown) => {
+    if (!closed) res.write(`data: ${JSON.stringify(payload)}\n\n`)
+  }
+
+  try {
+    const upstream = await fetch(service.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${service.key}`,
+      },
+      body: JSON.stringify({
+        message,
+        ...(conversationId !== undefined ? { conversationId } : {}),
+        variables,
+        metadata: { source: 'studio', appId: service.appId },
+      }),
+      signal: abort.signal,
+    })
+    const raw = await upstream.text()
+    if (!upstream.ok) {
+      let detail = raw
+      try { detail = JSON.parse(raw)?.detail || raw } catch { /* plain text */ }
+      send({ error: `${service.slug} error ${upstream.status}: ${String(detail).slice(0, 300)}` })
+      return
+    }
+    let payload: any = null
+    try { payload = JSON.parse(raw) } catch { /* keep null */ }
+    const reply = serviceReplyText(payload)
+    if (!reply.trim()) {
+      send({ error: `${service.slug} returned an empty reply` })
+      return
+    }
+    const nextConversation = payload?.conversation?.id ?? payload?.conversationId
+    const numericConversation = Number(nextConversation)
+    if (Number.isFinite(numericConversation)) {
+      serviceConversationIds.set(conversationKey, numericConversation)
+    }
+    send({ delta: reply })
+  } catch (error: any) {
+    send({ error: `${service.slug} unreachable: ${error?.message || 'unknown'}` })
+  } finally {
+    clearTimeout(timer)
+    if (!closed) {
+      send({ done: true })
+      res.end()
+    }
+  }
+}
+
 /**
  * POST `/api/studio/fastgpt-agents/chat`
  *
- * 在 Studio 会话里直接跟某个 FastGPT 智能体对话：把上游 `/api/v2/chat/completions`
- * 的 SSE 事件收敛成 `data: {"delta":"..."}`，客户端只处理文本增量。
+ * 在 Studio 会话里直接跟某个智能体对话。BTIT 5090 服务返回普通 JSON，
+ * 这里统一转换成客户端已有的 SSE `{delta}` 协议；没有配置服务的应用继续
+ * 走原来的 FastGPT `/api/v2/chat/completions`。
  *
- * 用服务端持有的团队级 API Key 代理，浏览器永远拿不到 FastGPT 凭据；`chatId` 由
- * 客户端按 Studio 会话生成并复用，这样多轮对话的上下文留在 FastGPT 侧。
+ * 服务密钥只在服务端读取，浏览器永远拿不到。
  */
 export async function chat(ctx: any) {
   const body = ctx.request?.body ?? {}
@@ -147,6 +234,12 @@ export async function chat(ctx: any) {
   if (!appId || messages.length === 0) {
     ctx.status = 400
     ctx.body = { error: 'appId and messages are required' }
+    return
+  }
+
+  const service = agentServiceFor(appId)
+  if (service) {
+    await chatViaAgentService(ctx, service, messages, body)
     return
   }
 

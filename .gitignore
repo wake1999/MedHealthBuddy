@@ -44,3 +44,6 @@ studio/packages/desktop/translation-runtime/
 .refresh-log.txt
 .translate-server.*
 texput.log
+
+# Server-side BTIT agent service credentials (local and cloud only).
+agent-service-keys.json

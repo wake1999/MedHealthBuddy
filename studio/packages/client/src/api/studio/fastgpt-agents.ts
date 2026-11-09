@@ -32,6 +32,8 @@ export interface FastGptAgent {
   readonly shareUrl: string
   /** 已接入 Studio 服务网关时返回服务 slug；有值时不再跳旧 FastGPT。 */
   readonly serviceSlug?: string
+  /** 免登录会话页；Studio 内嵌与浏览器打开共用。 */
+  readonly chatPageUrl?: string
   /** 该智能体自带的预设提示词；空数组时回落到场景级提示词。 */
   readonly prompts?: readonly { label: string; text: string }[]
 }

@@ -1355,6 +1355,8 @@ export default {
     agentsSource: '来源',
     agentsSuggest: '建议提问',
     agentsAppId: '应用 ID',
+    agentsServiceGateway: '服务网关',
+    agentsServiceId: '服务 ID',
     agentsReload: '重新加载',
     agentsBack: '返回',
     agentsEmbedFailed: '页面没能加载，检查内嵌反代是否在运行，或改用浏览器打开。',

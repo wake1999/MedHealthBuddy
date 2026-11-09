@@ -65,6 +65,13 @@ export function agentServiceSlug(appId: string): string | null {
   return AGENT_SERVICE_SLUGS[appId] ?? null
 }
 
+export function agentServiceChatPageUrl(appId: string): string | null {
+  const slug = agentServiceSlug(appId)
+  if (!slug) return null
+  const webBase = SERVICE_BASE_URL.replace(/\/api\/services\/?$/, '')
+  return `${webBase}/chat.html?agent=${encodeURIComponent(slug)}`
+}
+
 export function agentServiceFor(appId: string): AgentServiceConfig | null {
   const slug = AGENT_SERVICE_SLUGS[appId]
   if (!slug) return null

@@ -70,9 +70,30 @@ STUDIO_AGENT_SERVICE_KEYS_FILE=/path/to/agent-service-keys.json
 
 `.gitignore` 已忽略 `agent-service-keys.json`。云端文件权限应保持 `600`。
 
+## 免登录会话页
+
+每个服务型智能体还会返回：
+
+```text
+http://36.140.151.191:5090/chat.html?agent=<slug>
+```
+
+卡片的两个按钮共用这个地址：
+
+- **在 Studio 中打开**：在详情弹层内嵌 `chat.html`
+- **在浏览器打开**：新窗口打开同一个 `chat.html`
+
+Studio 的 CSP 通过 `STUDIO_AGENT_CHAT_FRAME_ORIGINS` 控制允许内嵌的来源，默认只放行：
+
+```text
+http://36.140.151.191:5090
+```
+
+注意：当前实际测试 `chat.html` 会显示“登录后开始对话”，并不是匿名可聊状态；如果要真正免登录，需要服务端开启匿名会话，或提供带匿名令牌的链接。
+
 ## 代理行为
 
-服务型智能体的卡片主按钮直接创建原生 Studio 会话，不再打开新建对话草稿页；由于 `serviceSlug` 已由服务端返回，卡片详情会隐藏旧的 FastGPT“在浏览器打开”入口，避免误跳旧会话。
+服务型智能体的卡片通过 `chatPageUrl` 打开免登录会话页；服务端聊天代理保留作为无页面场景的备用通道。
 
 Studio 前端仍然只调用：
 

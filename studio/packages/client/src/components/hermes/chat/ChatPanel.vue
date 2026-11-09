@@ -429,9 +429,18 @@ function handleAgentDrawerToggle(value: boolean) {
  */
 function openAgentInStudio(agent: FastGptAgent | null) {
   if (!agent) return
+  if (agent.chatPageUrl) {
+    // The BTIT service ships a no-login conversation page; embed that exact
+    // page so "在 Studio 中打开" and the browser action share one URL.
+    agentEmbedUrl.value = agent.chatPageUrl
+    agentEmbedFailed.value = false
+    agentEmbedTipHidden.value = true
+    agentEmbedFrameKey.value += 1
+    return
+  }
   closeAgentDetail()
 
-  // Enter a real native session, not the new-chat draft with the carousel.
+  // Non-service agents keep the original native-session fallback.
   if (activeChatAppId.value !== 'btit') selectChatApp('btit')
   if (activeChatSceneId.value !== agent.sceneId) selectChatScene(agent.sceneId)
   activeAgentCard.value = null
@@ -457,14 +466,14 @@ function reloadAgentEmbed() {
 function openAgentExternal() {
   const agent = agentDetail.value
   if (!agent) return
-  const url = agent.shareUrl?.trim() || agent.chatUrl
+  const url = agent.chatPageUrl?.trim() || agent.shareUrl?.trim() || agent.chatUrl
   if (!url) return
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function openFastGptAgent(agent: FastGptAgent | null, target: 'chat' | 'manage' = 'chat') {
   if (!agent) return
-  const url = target === 'chat' ? agent.chatUrl : agent.manageUrl
+  const url = agent.chatPageUrl?.trim() || (target === 'chat' ? agent.chatUrl : agent.manageUrl)
   if (!url) return
   window.open(url, '_blank', 'noopener,noreferrer')
 }
@@ -4060,11 +4069,14 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 
                       <div class="agent-sheet-meta">
                         <span class="agent-sheet-meta-item">
-                          <span class="agent-sheet-meta-label">{{ t('chat.agentsSource') }}</span>FastGPT
+                          <span class="agent-sheet-meta-label">{{ t('chat.agentsSource') }}</span>
+                          {{ agentDetail.chatPageUrl ? t('chat.agentsServiceGateway') : 'FastGPT' }}
                         </span>
                         <span class="agent-sheet-meta-item">
-                          <span class="agent-sheet-meta-label">{{ t('chat.agentsAppId') }}</span>
-                          <code>{{ agentDetail.appId }}</code>
+                          <span class="agent-sheet-meta-label">
+                            {{ agentDetail.chatPageUrl ? t('chat.agentsServiceId') : t('chat.agentsAppId') }}
+                          </span>
+                          <code>{{ agentDetail.serviceSlug || agentDetail.appId }}</code>
                         </span>
                       </div>
 
@@ -4073,8 +4085,7 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                           @click="openAgentInStudio(agentDetail)">
                           {{ t('chat.agentsOpen') }}
                         </NButton>
-                        <NButton v-if="!agentDetail.serviceSlug" quaternary size="large"
-                          @click="openFastGptAgent(agentDetail)">
+                        <NButton quaternary size="large" @click="openFastGptAgent(agentDetail)">
                           {{ t('chat.agentsOpenExternal') }}
                         </NButton>
                       </div>

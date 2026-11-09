@@ -1355,6 +1355,8 @@ export default {
     agentsSource: 'Source',
     agentsSuggest: 'Suggested prompts',
     agentsAppId: 'App ID',
+    agentsServiceGateway: 'Service gateway',
+    agentsServiceId: 'Service ID',
     agentsReload: 'Reload',
     agentsBack: 'Back',
     agentsEmbedFailed: 'The page did not load. Check the embed proxy, or open it in a browser.',

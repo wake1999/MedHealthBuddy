@@ -157,6 +157,17 @@ function isEmbeddedDocument(ctx: Context): boolean {
     && ctx.path === '/api/studio/research/paper-pdf'
 }
 
+/** Origins explicitly allowed as embedded agent conversation pages. */
+function agentChatFrameOrigins(): string {
+  const raw = String(
+    process.env.STUDIO_AGENT_CHAT_FRAME_ORIGINS || 'http://36.140.151.191:5090',
+  ).trim()
+  const origins = raw.split(/[\s,]+/)
+    .map(normalizeOrigin)
+    .filter((origin): origin is string => Boolean(origin))
+  return [...new Set(origins)].join(' ')
+}
+
 export function securityHeaders(): Middleware {
   return async (ctx, next) => {
     const embedded = isEmbeddedDocument(ctx)
@@ -175,7 +186,7 @@ export function securityHeaders(): Middleware {
         "default-src 'self'",
         "base-uri 'self'",
         "object-src 'none'",
-        "frame-src 'self' blob:",
+        `frame-src 'self' blob: ${agentChatFrameOrigins()}`,
         "frame-ancestors 'none'",
         "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline'",

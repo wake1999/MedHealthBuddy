@@ -61,6 +61,10 @@ function readServiceKeys(): Record<string, string> {
   }
 }
 
+export function agentServiceSlug(appId: string): string | null {
+  return AGENT_SERVICE_SLUGS[appId] ?? null
+}
+
 export function agentServiceFor(appId: string): AgentServiceConfig | null {
   const slug = AGENT_SERVICE_SLUGS[appId]
   if (!slug) return null

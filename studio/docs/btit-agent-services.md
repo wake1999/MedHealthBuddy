@@ -72,6 +72,8 @@ STUDIO_AGENT_SERVICE_KEYS_FILE=/path/to/agent-service-keys.json
 
 ## 代理行为
 
+服务型智能体的卡片主按钮直接创建原生 Studio 会话，不再打开新建对话草稿页；由于 `serviceSlug` 已由服务端返回，卡片详情会隐藏旧的 FastGPT“在浏览器打开”入口，避免误跳旧会话。
+
 Studio 前端仍然只调用：
 
 ```text

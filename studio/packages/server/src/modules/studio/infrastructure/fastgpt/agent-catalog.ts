@@ -7,6 +7,8 @@
  * 名称/简介以 FastGPT 为准，映射不到场景的应用不会出现在卡片里。
  */
 
+import { agentServiceSlug } from './agent-services'
+
 export interface FastGptAgentSeed {
   appId: string
   sceneId: string
@@ -293,6 +295,8 @@ export interface FastGptAgentView {
   manageUrl: string
   /** 免登录分享链接；空串表示这个智能体还没建分享渠道。 */
   shareUrl: string
+  /** 已接入 Studio 服务网关时返回服务 slug。 */
+  serviceSlug?: string
   /** 该智能体的预设提示词；选中后替换场景级胶囊。 */
   prompts: readonly { label: string; text: string }[]
 }
@@ -343,6 +347,7 @@ export function fastGptAgentView(seed: FastGptAgentSeed, baseUrl: string): FastG
     chatUrl: `${baseUrl}/chat?appId=${encodeURIComponent(seed.appId)}`,
     manageUrl: `${baseUrl}/dashboard/agent?appId=${encodeURIComponent(seed.appId)}`,
     shareUrl: resolveShareUrl(seed, baseUrl),
+    ...(agentServiceSlug(seed.appId) ? { serviceSlug: agentServiceSlug(seed.appId)! } : {}),
     prompts: FASTGPT_AGENT_PROMPTS[seed.appId] ?? [],
   }
 }

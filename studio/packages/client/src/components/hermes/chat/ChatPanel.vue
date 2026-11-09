@@ -431,14 +431,20 @@ function openAgentInStudio(agent: FastGptAgent | null) {
   if (!agent) return
   closeAgentDetail()
 
-  // The primary action must stay inside Studio. Open the native new-chat page
-  // with this agent selected; the external FastGPT page remains a secondary
-  // action via openFastGptAgent().
+  // Enter a real native session, not the new-chat draft with the carousel.
   if (activeChatAppId.value !== 'btit') selectChatApp('btit')
   if (activeChatSceneId.value !== agent.sceneId) selectChatScene(agent.sceneId)
   activeAgentCard.value = null
   void toggleAgentCard(agent)
-  if (!showNewChatPage.value) openNewChatPage()
+
+  const session = chatStore.newChat({
+    profile: newChatProfile.value,
+    source: 'builtin_agent',
+    agent: 'ekko-agent',
+  })
+  rememberAgentForSession(session.id, agent)
+  if (showNewChatPage.value) closeNewChatPage()
+  void router.push({ name: 'hermes.session', params: { sessionId: session.id } })
   void nextTick(() => chatInputRef.value?.focusComposer?.())
 }
 
@@ -4067,7 +4073,8 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
                           @click="openAgentInStudio(agentDetail)">
                           {{ t('chat.agentsOpen') }}
                         </NButton>
-                        <NButton quaternary size="large" @click="openFastGptAgent(agentDetail)">
+                        <NButton v-if="!agentDetail.serviceSlug" quaternary size="large"
+                          @click="openFastGptAgent(agentDetail)">
                           {{ t('chat.agentsOpenExternal') }}
                         </NButton>
                       </div>
@@ -4081,7 +4088,30 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
               ref="messageListRef"
               :approval-portal-to-body="showRealtimeVoice"
               scroll-scope="chat"
+              :empty-state-agent="activeAgentCard?.short"
             />
+            <div v-if="activeAgentCard" class="active-agent-composer-head">
+              <div class="new-chat-agent-banner" role="status">
+                <span class="new-chat-agent-banner-icon" :style="{ background: activeAgentCard.tint }" aria-hidden="true">
+                  {{ activeAgentCard.short.slice(0, 1) }}</span>
+                <span class="new-chat-agent-banner-text">
+                  {{ t('chat.agentsComposerActive', { name: activeAgentCard.short }) }}
+                </span>
+                <span class="new-chat-agent-banner-hint">{{ t('chat.agentsComposerHint') }}</span>
+                <button type="button" class="new-chat-agent-banner-exit" @click="exitAgentChat">
+                  {{ t('chat.agentsComposerExit') }}
+                </button>
+              </div>
+              <div v-if="activeAgentVars.length" class="new-chat-agent-vars">
+                <label v-for="item in activeAgentVars" :key="item.key" class="new-chat-agent-var">
+                  <span class="new-chat-agent-var-label">
+                    {{ item.label || item.key }}<em v-if="item.required" class="new-chat-agent-var-req">*</em>
+                  </span>
+                  <input v-model="activeAgentVarValues[item.key]" type="text" class="new-chat-agent-var-input"
+                    :placeholder="item.description || item.key" spellcheck="false" />
+                </label>
+              </div>
+            </div>
             <ChatInput
               ref="chatInputRef"
               :template-domain="activeTemplateDomain"
@@ -4788,6 +4818,10 @@ function handleSessionModelSelect(selection: { model: string; provider: string }
 .new-chat-agent.is-active .new-chat-agent-info { color: $accent-primary; opacity: 1; }
 
 /* 输入框上方的对话指示条：谁在接消息、怎么退出，一眼看清。 */
+.active-agent-composer-head {
+  padding: 0 12px;
+}
+
 .new-chat-agent-banner {
   display: flex;
   align-items: center;

@@ -35,9 +35,11 @@ import { groupCompletedToolsByRun } from "./tool-run-grouping";
 const props = withDefaults(defineProps<{
   approvalPortalToBody?: boolean
   scrollScope?: string
+  emptyStateAgent?: string
 }>(), {
   approvalPortalToBody: false,
   scrollScope: "chat",
+  emptyStateAgent: '',
 })
 
 const chatStore = useChatStore();
@@ -201,12 +203,15 @@ const userProfileAvatar = computed(() => activeSessionProfile.value?.avatar || n
 
 const emptyState = computed(() => {
   const agent = assistantAgent.value;
+  const label = props.emptyStateAgent.trim();
   return {
     logo: agent.src,
-    alt: agent.label,
-    text: agent.label === "Hermes"
-      ? t("chat.emptyState")
-      : t("chat.emptyStateAgent", { agent: agent.label }),
+    alt: label || agent.label,
+    text: label
+      ? t("chat.emptyStateAgent", { agent: label })
+      : agent.label === "Hermes"
+        ? t("chat.emptyState")
+        : t("chat.emptyStateAgent", { agent: agent.label }),
   };
 });
 

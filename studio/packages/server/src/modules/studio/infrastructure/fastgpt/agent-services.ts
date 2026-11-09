@@ -34,19 +34,25 @@ const AGENT_SERVICE_SLUGS: Record<string, string> = {
 
 const SERVICE_BASE_URL = 'http://36.140.151.191:5090/api/services'
 
-function serviceKeysFile(): string {
-  const configured = String(process.env.STUDIO_AGENT_SERVICE_KEYS_FILE || '').trim()
-  if (configured) return configured
-  const stateDir = String(
+function stateDirectory(): string {
+  return String(
     process.env.HERMES_WEBUI_STATE_DIR
       || process.env.HERMES_WEB_UI_HOME
       || join(process.cwd(), 'data', 'hermes-web-ui'),
   ).trim()
-  return join(stateDir, 'agent-service-keys.json')
 }
 
-function readServiceKeys(): Record<string, string> {
-  const path = serviceKeysFile()
+function serviceKeysFile(): string {
+  const configured = String(process.env.STUDIO_AGENT_SERVICE_KEYS_FILE || '').trim()
+  return configured || join(stateDirectory(), 'agent-service-keys.json')
+}
+
+function chatPageKeysFile(): string {
+  const configured = String(process.env.STUDIO_AGENT_CHAT_KEYS_FILE || '').trim()
+  return configured || join(stateDirectory(), 'agent-chat-keys.json')
+}
+
+function readStringMap(path: string): Record<string, string> {
   if (!existsSync(path)) return {}
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf-8'))
@@ -61,6 +67,14 @@ function readServiceKeys(): Record<string, string> {
   }
 }
 
+function readServiceKeys(): Record<string, string> {
+  return readStringMap(serviceKeysFile())
+}
+
+function readChatPageKeys(): Record<string, string> {
+  return readStringMap(chatPageKeysFile())
+}
+
 export function agentServiceSlug(appId: string): string | null {
   return AGENT_SERVICE_SLUGS[appId] ?? null
 }
@@ -69,7 +83,10 @@ export function agentServiceChatPageUrl(appId: string): string | null {
   const slug = agentServiceSlug(appId)
   if (!slug) return null
   const webBase = SERVICE_BASE_URL.replace(/\/api\/services\/?$/, '')
-  return `${webBase}/chat.html?agent=${encodeURIComponent(slug)}`
+  const key = readChatPageKeys()[appId]
+  const query = new URLSearchParams({ agent: slug })
+  if (key) query.set('key', key)
+  return `${webBase}/chat.html?${query.toString()}`
 }
 
 export function agentServiceFor(appId: string): AgentServiceConfig | null {

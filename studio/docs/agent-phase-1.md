@@ -138,8 +138,12 @@ Lead 才可继续委派            通过
 无确认通道失败关闭           通过
 会话级审批复用               通过
 单次运行专家预算             通过
+结构化专家报告               通过
+专家评测夹具                 通过
+并行专家团队                 通过
+工具注册回归                 26 passed
 运行时回归测试               65 passed
-新增专家测试                 16 passed
+新增专家测试                 25 passed
 ekko-agent 类型检查          通过
 ```
 
@@ -150,18 +154,21 @@ ekko-agent 类型检查          通过
 - 每个父 Run 最多 3 个直接专家委派
 - 单个子 Agent 最长 10 分钟
 - 单个子 Agent 最多 120k input+output token
-- 子 Agent 结果包含 `specialist` 和 `allowed_tools`
+- 子 Agent 结果包含 `specialist`、`allowed_tools`、`report`
+- 专家回复支持结构化 JSON 报告：`summary/findings/uncertainties/sources/needsReview`
 - 子 Agent 事件包含 `specialist`，侧栏会显示专家角色
 - 顶层确认新增“本次会话允许”，同一会话 12 小时内不再重复询问
+- 专家策略评测夹具 `tests/fixtures/specialist-evals.json`
+- 专家团队弹窗支持“在聊天中使用”，预填专家调用指令
+- 专家模型策略支持 `STUDIO_SPECIALIST_MODELS` 环境变量
+- 新增 `delegate_team`：一次确认后最多并行 3 个独立专家任务
 
-尚未实现：
+边界：
 
-- 会话审批持久化（当前是进程内存，重启后失效）
-- 专家角色级评测集
-- 手动选择专家立即调用
-- 专家级模型策略
-- 并行专家团队
-- 可编辑的工具白名单 UI
+- 会话审批是进程内存，重启后失效
+- 评测夹具验证策略，不是医疗回答质量基准
+- “在聊天中使用”会打开带指令的聊天，不会绕过模型直接执行
+- 并行团队只允许顶层发起，子专家不能继续组队
 
 ## 后续阶段
 

@@ -24,6 +24,7 @@ import {
 import { fetchRuntimeVersionStatus, type RuntimeVersionStatus } from '@/api/hermes/runtime-versions'
 import HermesDataDirectoryHint from '@/components/hermes/HermesDataDirectoryHint.vue'
 import AgentSpecialistsModal from '@/components/hermes/agents/AgentSpecialistsModal.vue'
+import type { AgentSpecialist } from '@/api/ekko/specialists'
 import VersionManagementModal from '@/components/layout/VersionManagementModal.vue'
 import { useAppStore } from '@/stores/hermes/app'
 import { useChatStore } from '@/stores/hermes/chat'
@@ -223,6 +224,14 @@ function openAiHelpDrawer(agent: CodingAgentCard, operation: AgentManagementOper
 
 function openGeneralAiHelpDrawer() {
   startAiHelpChat(t('agentManager.aiHelpGeneralPrompt'))
+}
+
+function useSpecialist(specialist: AgentSpecialist) {
+  specialistsVisible.value = false
+  startAiHelpChat(t('agentManager.specialistsUsePrompt', {
+    name: specialist.labelZh,
+    role: specialist.id,
+  }))
 }
 
 function offerAiHelp(id: CodingAgentId, operation: AgentManagementOperation, error: string) {
@@ -626,7 +635,7 @@ onUnmounted(() => {
       </div>
 
     <VersionManagementModal v-model:show="runtimeManagerVisible" />
-    <AgentSpecialistsModal v-model:show="specialistsVisible" />
+    <AgentSpecialistsModal v-model:show="specialistsVisible" @use="useSpecialist" />
 
     <NDrawer
       v-model:show="hermesCliDetailsVisible"

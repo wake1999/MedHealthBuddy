@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { NAlert, NModal, NSpin, NTag } from 'naive-ui'
+import { NAlert, NButton, NModal, NSpin, NTag } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { fetchAgentSpecialists, type AgentSpecialistCatalog } from '@/api/ekko/specialists'
+import { fetchAgentSpecialists, type AgentSpecialist, type AgentSpecialistCatalog } from '@/api/ekko/specialists'
 
 const props = defineProps<{ show: boolean }>()
-const emit = defineEmits<{ (e: 'update:show', value: boolean): void }>()
+const emit = defineEmits<{
+  (e: 'update:show', value: boolean): void
+  (e: 'use', specialist: AgentSpecialist): void
+}>()
 const { t, locale } = useI18n()
 
 const loading = ref(false)
@@ -53,15 +56,23 @@ watch(() => props.show, visible => {
               </strong>
               <code class="specialist-id">{{ specialist.id }}</code>
             </div>
-            <NTag :type="specialist.canDelegate ? 'warning' : 'default'" size="small" :bordered="false">
-              {{ specialist.canDelegate
-                ? t('agentManager.specialistsCanDelegate')
-                : t('agentManager.specialistsNoDelegate') }}
-            </NTag>
+            <div class="specialist-head-actions">
+              <NTag :type="specialist.canDelegate ? 'warning' : 'default'" size="small" :bordered="false">
+                {{ specialist.canDelegate
+                  ? t('agentManager.specialistsCanDelegate')
+                  : t('agentManager.specialistsNoDelegate') }}
+              </NTag>
+              <NButton size="tiny" secondary @click="emit('use', specialist)">
+                {{ t('agentManager.specialistsUse') }}
+              </NButton>
+            </div>
           </div>
           <p class="specialist-desc">
             {{ locale.startsWith('zh') ? specialist.descriptionZh : specialist.description }}
           </p>
+          <div v-if="specialist.preferredModel" class="specialist-model">
+            {{ t('agentManager.specialistsModel') }}: <code>{{ specialist.preferredModel }}</code>
+          </div>
           <div class="specialist-tools">
             <span class="specialist-tools-label">{{ t('agentManager.specialistsTools') }}</span>
             <NTag
@@ -112,6 +123,12 @@ watch(() => props.show, visible => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.specialist-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .specialist-name {

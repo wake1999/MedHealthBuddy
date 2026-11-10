@@ -8,6 +8,7 @@ export interface AgentSpecialist {
   descriptionZh: string
   allowedTools: string[]
   canDelegate: boolean
+  preferredModel?: string
 }
 
 export interface AgentSpecialistCatalog {

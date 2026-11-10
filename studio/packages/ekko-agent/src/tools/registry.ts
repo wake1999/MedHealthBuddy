@@ -10,6 +10,7 @@ import { createBrowserTools } from './browser'
 import { createClarificationToolProvider } from './clarify'
 import { CodeExecTool, type CodeExecToolOptions } from './code-exec'
 import { createDelegationTools } from './delegation'
+import { createDelegationTeamTool } from './delegation-team'
 import { createFileTools } from './files'
 import { createImageTools } from './images'
 import { createMcpToolProvider } from './mcp'
@@ -123,6 +124,7 @@ export function createDefaultToolRegistry(options: DefaultToolRegistryOptions = 
     ...createTerminalTools({ timeoutMs: options.executionTimeoutMs }),
     ...createBrowserTools(),
     ...createDelegationTools(),
+    createDelegationTeamTool(),
     ...(options.recovery ? createRecoveryTools(options.recovery) : []),
     ...createSkillTools(options.skillDirectory, {
       externalSkillDirectories: options.externalSkillDirectories,

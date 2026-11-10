@@ -37,8 +37,10 @@ import {
   DEFAULT_SUBTASK_MAX_TOKENS,
   DEFAULT_SUBTASK_MAX_WALL_TIME_MS,
   canDelegateAtDepth,
+  extractSpecialistReport,
   isToolAllowedForRun,
   medHealthSpecialistPrompt,
+  specialistReportInstruction,
   withinSpecialistBudget,
 } from '../orchestration/specialists'
 import type {
@@ -1635,6 +1637,9 @@ export class AgentRuntime {
         }
       }
       const summary = subtaskSummary(output, status)
+      const report = request.specialist
+        ? extractSpecialistReport(output, request.specialist)
+        : null
       emit({
         type: 'subagent.complete',
         runId: parentRunId,
@@ -1644,6 +1649,7 @@ export class AgentRuntime {
         specialist: request.specialist,
         background,
         status,
+        structured: Boolean(report),
         summary,
         output,
         outputTail: output.slice(-SUBTASK_OUTPUT_TAIL_CHARS),
@@ -1664,6 +1670,8 @@ export class AgentRuntime {
         subagent_id: subagentId,
         specialist: request.specialist,
         allowed_tools: request.allowedTools,
+        structured: Boolean(report),
+        report,
         status,
         summary,
         output,
@@ -1973,6 +1981,7 @@ function appendStructuredData(
 function subtaskPrompt(request: AgentTaskRequest): string {
   return [
     medHealthSpecialistPrompt(request.specialist),
+    request.specialist ? specialistReportInstruction(request.specialist) : '',
     `Complete this delegated task independently:\n${request.goal}`,
     request.context ? `Relevant context:\n${request.context}` : '',
     'Return a concise result that the parent agent can use directly.',

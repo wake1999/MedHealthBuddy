@@ -9,6 +9,7 @@ import type {
 import {
   MEDHEALTH_SPECIALISTS,
   getMedHealthSpecialist,
+  specialistPreferredModel,
 } from '../orchestration/specialists'
 import { DEFAULT_CLARIFICATION_TIMEOUT_MS } from '../config'
 
@@ -97,7 +98,7 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
 
     const mode = normalizeMode(input.mode)
     if (!mode) return failure('delegate_task mode must be foreground or background.')
-    const model = typeof input.model === 'string' ? input.model.trim() : ''
+    const requestedModel = typeof input.model === 'string' ? input.model.trim() : ''
     const specialist = typeof input.specialist === 'string' ? input.specialist.trim() : ''
     const specialistDefinition = specialist ? getMedHealthSpecialist(specialist) : null
     if (specialist && !specialistDefinition) {
@@ -140,7 +141,9 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
       ...(typeof input.context === 'string' && input.context.trim()
         ? { context: input.context.trim() }
         : {}),
-      ...(model ? { model } : {}),
+      ...(requestedModel || specialistPreferredModel(specialist)
+        ? { model: requestedModel || specialistPreferredModel(specialist) }
+        : {}),
       ...(specialist ? { specialist } : {}),
       ...(specialistDefinition ? { allowedTools: specialistDefinition.allowedTools } : {}),
     }

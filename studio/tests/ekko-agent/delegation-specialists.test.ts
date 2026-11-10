@@ -3,6 +3,7 @@ import { DelegateTaskTool } from '../../packages/ekko-agent/src/tools/delegation
 import {
   MEDHEALTH_SPECIALISTS,
   canDelegateAtDepth,
+  extractSpecialistReport,
   getMedHealthSpecialist,
   isToolAllowedForRun,
   medHealthSpecialistPrompt,
@@ -125,6 +126,38 @@ describe('MedHealth specialist delegation', () => {
     expect(withinSpecialistBudget(3, 3)).toBe(true)
     expect(withinSpecialistBudget(4, 3)).toBe(false)
     expect(withinSpecialistBudget(0, 0)).toBe(false)
+  })
+
+  it('extracts a structured specialist report without inventing one', () => {
+    const report = extractSpecialistReport(
+      [
+        'Prose summary.',
+        '```json',
+        JSON.stringify({
+          summary: 'Two studies support the claim.',
+          findings: [{ text: 'Effect observed', evidence: 'Table 2', source: 'PMID 1' }],
+          uncertainties: ['Small sample'],
+          sources: ['PMID 1'],
+          needsReview: true,
+        }),
+        '```',
+      ].join('\n'),
+      'evidence-reviewer',
+    )
+    expect(report).toMatchObject({
+      role: 'evidence-reviewer',
+      summary: 'Two studies support the claim.',
+      uncertainties: ['Small sample'],
+      sources: ['PMID 1'],
+      needsReview: true,
+    })
+    expect(report?.findings[0]).toEqual({
+      text: 'Effect observed',
+      evidence: 'Table 2',
+      source: 'PMID 1',
+    })
+    expect(extractSpecialistReport('Plain prose only.', 'evidence-reviewer')).toBeNull()
+    expect(extractSpecialistReport('```json\n{bad json}\n```', 'evidence-reviewer')).toBeNull()
   })
 
   it('enforces the specialist tool allowlist', () => {

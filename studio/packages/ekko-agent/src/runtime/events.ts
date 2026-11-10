@@ -36,6 +36,7 @@ export type AgentRuntimeEvent =
       specialist?: string
       background: boolean
       status: 'completed' | 'failed' | 'interrupted'
+      structured?: boolean
       summary: string
       output: string
       outputTail: string

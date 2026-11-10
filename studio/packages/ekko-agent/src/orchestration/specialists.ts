@@ -20,6 +20,21 @@ export const DEFAULT_MAX_SPECIALISTS_PER_RUN = 3
 export const DEFAULT_SUBTASK_MAX_WALL_TIME_MS = 10 * 60 * 1000
 export const DEFAULT_SUBTASK_MAX_TOKENS = 120_000
 
+export interface SpecialistFinding {
+  text: string
+  evidence?: string
+  source?: string
+}
+
+export interface SpecialistReport {
+  role: string
+  summary: string
+  findings: SpecialistFinding[]
+  uncertainties: string[]
+  sources: string[]
+  needsReview: boolean
+}
+
 export interface MedHealthSpecialistDefinition {
   id: MedHealthSpecialistId
   label: string
@@ -27,6 +42,8 @@ export interface MedHealthSpecialistDefinition {
   description: string
   descriptionZh: string
   instructions: string
+  /** Optional model policy, resolved by the host environment. */
+  preferredModel?: string
   /**
    * Tool allowlist for the delegated child. An empty array means no tools.
    * `delegate_task` is intentionally present only on research-lead, which is
@@ -184,6 +201,26 @@ export function getMedHealthSpecialist(id: string | undefined | null): MedHealth
   return key ? SPECIALIST_BY_ID.get(key) ?? null : null
 }
 
+/**
+ * Optional host policy: STUDIO_SPECIALIST_MODELS='{"statistician":"provider/model"}'.
+ * Undefined keeps the parent model, preserving the current behavior.
+ */
+export function specialistPreferredModel(id: string | undefined | null): string | undefined {
+  const role = getMedHealthSpecialist(id)
+  if (!role) return undefined
+  const configured = role.preferredModel?.trim()
+  if (configured) return configured
+  const raw = String(process.env.STUDIO_SPECIALIST_MODELS || '').trim()
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const value = parsed[role.id]
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function medHealthSpecialistPrompt(id: string | undefined | null): string {
   const specialist = getMedHealthSpecialist(id)
   if (!specialist) return ''
@@ -222,6 +259,81 @@ export function isToolAllowedForRun(
   if (allowedTools && !allowedTools.includes(toolName)) return false
   if (toolName !== 'delegate_task') return true
   return canDelegateAtDepth(depth, maxDepth, allowedTools)
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeFinding(value: unknown): SpecialistFinding | null {
+  if (typeof value === 'string') {
+    const text = value.trim()
+    return text ? { text } : null
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const item = value as Record<string, unknown>
+  const text = stringValue(item.text) || stringValue(item.claim) || stringValue(item.finding)
+  if (!text) return null
+  return {
+    text,
+    ...(stringValue(item.evidence) ? { evidence: stringValue(item.evidence) } : {}),
+    ...(stringValue(item.source) ? { source: stringValue(item.source) } : {}),
+  }
+}
+
+function normalizeSource(value: unknown): string {
+  if (typeof value === 'string') return value.trim()
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ''
+  const item = value as Record<string, unknown>
+  return stringValue(item.url) || stringValue(item.title) || stringValue(item.id)
+}
+
+/**
+ * Extract the optional machine-readable report from a specialist reply.
+ * Plain text remains valid; the caller gets `null` instead of a fabricated
+ * report when the child did not follow the JSON contract.
+ */
+export function extractSpecialistReport(output: string, role: string): SpecialistReport | null {
+  const fenced = output.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]
+  const candidate = fenced ?? output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1)
+  if (!candidate || !candidate.trim().startsWith('{')) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(candidate.trim())
+  } catch {
+    return null
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+  const raw = parsed as Record<string, unknown>
+  const findings = Array.isArray(raw.findings)
+    ? raw.findings.map(normalizeFinding).filter((item): item is SpecialistFinding => Boolean(item))
+    : []
+  const uncertainties = Array.isArray(raw.uncertainties)
+    ? raw.uncertainties.map(stringValue).filter(Boolean)
+    : []
+  const sources = Array.isArray(raw.sources)
+    ? raw.sources.map(normalizeSource).filter(Boolean)
+    : []
+  const summary = stringValue(raw.summary) || stringValue(raw.answer)
+  if (!summary && findings.length === 0 && uncertainties.length === 0) return null
+  return {
+    role,
+    summary,
+    findings,
+    uncertainties,
+    sources,
+    needsReview: raw.needsReview === true || raw.needs_review === true,
+  }
+}
+
+export function specialistReportInstruction(role: string): string {
+  return [
+    `When you finish as ${role}, include one fenced \`json\` report after the prose:`,
+    '```json',
+    '{"summary":"...","findings":[{"text":"...","evidence":"...","source":"..."}],"uncertainties":["..."],"sources":["..."],"needsReview":true}',
+    '```',
+    'Do not invent sources. If no structured report is possible, omit the fence rather than fabricating one.',
+  ].join('\n')
 }
 
 export function specialistCatalogPrompt(): string {

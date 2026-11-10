@@ -1,0 +1,34 @@
+[
+  {
+    "id": "reviewer-terminal-denied",
+    "role": "evidence-reviewer",
+    "tool": "terminal_exec",
+    "depth": 1,
+    "expectedAllowed": false
+  },
+  {
+    "id": "steward-terminal-allowed",
+    "role": "data-steward",
+    "tool": "terminal_exec",
+    "depth": 1,
+    "expectedAllowed": true
+  },
+  {
+    "id": "lead-delegates-once",
+    "role": "research-lead",
+    "depth": 1,
+    "expectedCanDelegate": true
+  },
+  {
+    "id": "specialist-cannot-delegate",
+    "role": "evidence-reviewer",
+    "depth": 1,
+    "expectedCanDelegate": false
+  },
+  {
+    "id": "depth-limit",
+    "role": "research-lead",
+    "depth": 2,
+    "expectedCanDelegate": false
+  }
+]

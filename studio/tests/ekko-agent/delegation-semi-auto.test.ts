@@ -36,7 +36,22 @@ describe('semi-automatic specialist delegation', () => {
             }],
           }
         }
-        if (call === 2) return { content: 'child evidence result' }
+        if (call === 2) {
+          return {
+            content: [
+              'Evidence reviewed.',
+              '```json',
+              JSON.stringify({
+                summary: 'One study supports the claim.',
+                findings: [{ text: 'Effect observed', source: 'PMID 1' }],
+                uncertainties: ['Small sample'],
+                sources: ['PMID 1'],
+                needsReview: true,
+              }),
+              '```',
+            ].join('\n'),
+          }
+        }
         return { content: 'final synthesis' }
       },
       stream: async function* stream() { /* unused */ },
@@ -65,6 +80,11 @@ describe('semi-automatic specialist delegation', () => {
     if (start?.type === 'subagent.start') {
       expect(start.specialist).toBe('evidence-reviewer')
     }
-    expect(events.some(event => event.type === 'subagent.complete')).toBe(true)
+    const complete = events.find(event => event.type === 'subagent.complete')
+    expect(complete?.type).toBe('subagent.complete')
+    if (complete?.type === 'subagent.complete') {
+      expect(complete.structured).toBe(true)
+      expect(complete.specialist).toBe('evidence-reviewer')
+    }
   })
 })

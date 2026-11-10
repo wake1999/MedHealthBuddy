@@ -6,6 +6,7 @@ import {
   getMedHealthSpecialist,
   isToolAllowedForRun,
   medHealthSpecialistPrompt,
+  withinSpecialistBudget,
 } from '../../packages/ekko-agent/src/orchestration/specialists'
 
 describe('MedHealth specialist delegation', () => {
@@ -54,6 +55,28 @@ describe('MedHealth specialist delegation', () => {
     expect(delegateTask).not.toHaveBeenCalled()
   })
 
+  it('reuses a session-scoped approval without prompting again', async () => {
+    const delegateTask = vi.fn().mockResolvedValue({ ok: true, content: 'reviewed' })
+    const requestUserClarification = vi.fn().mockResolvedValue('本次会话允许')
+    const tool = new DelegateTaskTool()
+    const context = {
+      sessionId: 'session-approval-test',
+      delegateTask,
+      requestUserClarification,
+    }
+    await tool.execute(
+      { goal: 'Audit once', mode: 'foreground', specialist: 'evidence-reviewer' },
+      context,
+    )
+    await tool.execute(
+      { goal: 'Audit twice', mode: 'foreground', specialist: 'evidence-reviewer' },
+      context,
+    )
+
+    expect(requestUserClarification).toHaveBeenCalledOnce()
+    expect(delegateTask).toHaveBeenCalledTimes(2)
+  })
+
   it('fails closed when a top-level specialist has no confirmation channel', async () => {
     const delegateTask = vi.fn()
     const tool = new DelegateTaskTool()
@@ -95,6 +118,13 @@ describe('MedHealth specialist delegation', () => {
     expect(canDelegateAtDepth(1, 2, lead?.allowedTools)).toBe(true)
     expect(canDelegateAtDepth(1, 2, reviewer?.allowedTools)).toBe(false)
     expect(canDelegateAtDepth(2, 2, lead?.allowedTools)).toBe(false)
+  })
+
+  it('enforces the per-run specialist budget', () => {
+    expect(withinSpecialistBudget(1, 3)).toBe(true)
+    expect(withinSpecialistBudget(3, 3)).toBe(true)
+    expect(withinSpecialistBudget(4, 3)).toBe(false)
+    expect(withinSpecialistBudget(0, 0)).toBe(false)
   })
 
   it('enforces the specialist tool allowlist', () => {

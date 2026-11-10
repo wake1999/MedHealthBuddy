@@ -148,6 +148,7 @@ export interface SubagentStream {
   taskIndex: number
   taskCount: number
   goal?: string
+  specialist?: string
   model?: string
   status: SubagentStreamStatus
   startedAt: number
@@ -254,6 +255,7 @@ export function reduceSubagentStream(
   const incomingTaskIndex = Number((evt as any).task_index)
   const incomingTaskCount = Number((evt as any).task_count)
   const goal = String((evt as any).goal || '').trim()
+  const specialist = String((evt as any).specialist || '').trim()
   const model = String((evt as any).model || '').trim()
   const summary = String((evt as any).summary || '').trim()
   const rawText = String(evt.text || evt.preview || '')
@@ -365,6 +367,7 @@ export function reduceSubagentStream(
     taskIndex: Number.isFinite(incomingTaskIndex) ? incomingTaskIndex : current?.taskIndex || 0,
     taskCount: Number.isFinite(incomingTaskCount) && incomingTaskCount > 0 ? incomingTaskCount : current?.taskCount || 1,
     goal: goal || current?.goal,
+    specialist: specialist || current?.specialist,
     model: model || current?.model,
     status: nextStatus,
     startedAt: current?.startedAt || subagentEventTimestamp((evt as any).started_at || timestamp),

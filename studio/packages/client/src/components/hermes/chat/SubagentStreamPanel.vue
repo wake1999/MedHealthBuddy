@@ -200,6 +200,9 @@ onBeforeUnmount(stopElapsedTimer)
           <span>{{ t('subagent.title') }}</span>
           <span v-if="taskPosition" class="subagent-task-position">{{ taskPosition }}</span>
         </div>
+        <div v-if="stream?.specialist" class="subagent-specialist" dir="auto">
+          {{ t('subagent.specialist') }}: <code>{{ stream.specialist }}</code>
+        </div>
         <div class="subagent-stream-title" dir="auto">{{ stream?.goal || t('subagent.noGoal') }}</div>
         <div v-if="metrics.length" class="subagent-stream-metrics">
           <span v-for="metric in metrics" :key="metric.key">{{ metric.value }}</span>
@@ -335,6 +338,18 @@ onBeforeUnmount(stopElapsedTimer)
   font-weight: 600;
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.subagent-specialist {
+  margin-top: 4px;
+  color: $text-muted;
+  font-size: 11px;
+  line-height: 1.4;
+
+  code {
+    font-family: var(--font-mono, monospace);
+    color: $text-secondary;
+  }
 }
 
 .subagent-stream-metrics {

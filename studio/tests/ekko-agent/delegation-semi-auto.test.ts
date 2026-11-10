@@ -58,9 +58,13 @@ describe('semi-automatic specialist delegation', () => {
     })
 
     expect(requestUserClarification).toHaveBeenCalledOnce()
-    expect(requestUserClarification.mock.calls[0][0].choices).toEqual(['调用专家', '取消'])
+    expect(requestUserClarification.mock.calls[0][0].choices).toEqual(['调用专家', '本次会话允许', '取消'])
     expect(result.output.content).toBe('final synthesis')
-    expect(events.some(event => event.type === 'subagent.start')).toBe(true)
+    const start = events.find(event => event.type === 'subagent.start')
+    expect(start?.type).toBe('subagent.start')
+    if (start?.type === 'subagent.start') {
+      expect(start.specialist).toBe('evidence-reviewer')
+    }
     expect(events.some(event => event.type === 'subagent.complete')).toBe(true)
   })
 })

@@ -86,6 +86,12 @@ export interface AgentRuntimeOptions {
   subtaskMaxSteps?: number
   /** Maximum delegation tree depth; 1 is the old one-level behavior, 2 enables lead -> specialist. */
   maxDelegationDepth?: number
+  /** Maximum direct specialist calls per parent run. */
+  maxSpecialistsPerRun?: number
+  /** Maximum wall-clock time for one delegated child. */
+  subtaskMaxWallTimeMs?: number
+  /** Maximum input+output tokens for one delegated child. */
+  subtaskMaxTokens?: number
   toolContext?: AgentToolContext
   modelDefaults?: Omit<ModelRequest, 'messages' | 'tools' | 'stream'>
   contextKey?: string

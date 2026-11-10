@@ -16,6 +16,9 @@ export type MedHealthSpecialistId =
   | 'data-steward'
 
 export const DEFAULT_MAX_DELEGATION_DEPTH = 2
+export const DEFAULT_MAX_SPECIALISTS_PER_RUN = 3
+export const DEFAULT_SUBTASK_MAX_WALL_TIME_MS = 10 * 60 * 1000
+export const DEFAULT_SUBTASK_MAX_TOKENS = 120_000
 
 export interface MedHealthSpecialistDefinition {
   id: MedHealthSpecialistId
@@ -204,6 +207,10 @@ export function canDelegateAtDepth(
   if (depth === 0) return true
   return depth < Math.max(1, Math.floor(maxDepth))
     && Boolean(allowedTools?.includes('delegate_task'))
+}
+
+export function withinSpecialistBudget(used: number, max: number): boolean {
+  return Number.isFinite(used) && Number.isFinite(max) && max > 0 && used <= Math.floor(max)
 }
 
 export function isToolAllowedForRun(

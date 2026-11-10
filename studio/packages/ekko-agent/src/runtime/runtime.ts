@@ -32,9 +32,14 @@ import { workspaceToolAssetDirectory } from '../tools/workspace-temp'
 import type { AgentRuntimeEvent } from './events'
 import { buildSystemPrompt } from './system-prompt'
 import {
+  DEFAULT_MAX_DELEGATION_DEPTH,
+  DEFAULT_MAX_SPECIALISTS_PER_RUN,
+  DEFAULT_SUBTASK_MAX_TOKENS,
+  DEFAULT_SUBTASK_MAX_WALL_TIME_MS,
   canDelegateAtDepth,
   isToolAllowedForRun,
   medHealthSpecialistPrompt,
+  withinSpecialistBudget,
 } from '../orchestration/specialists'
 import type {
   AgentRuntimeBoundaryInterruptRequest,
@@ -192,6 +197,10 @@ export class AgentRuntime {
   private readonly backgroundDelegationEnabled: boolean
   private readonly subtaskMaxSteps: number
   private readonly maxDelegationDepth: number
+  private readonly maxSpecialistsPerRun: number
+  private readonly subtaskMaxWallTimeMs: number
+  private readonly subtaskMaxTokens: number
+  private readonly delegationCounts = new Map<string, number>()
   private readonly defaultContextKey?: string
   private readonly memory?: AgentRuntimeOptions['memory']
   private readonly skillReview?: SkillReviewService
@@ -245,7 +254,19 @@ export class AgentRuntime {
     )
     this.maxDelegationDepth = Math.max(
       1,
-      Math.min(3, Math.floor(options.maxDelegationDepth ?? 2)),
+      Math.min(3, Math.floor(options.maxDelegationDepth ?? DEFAULT_MAX_DELEGATION_DEPTH)),
+    )
+    this.maxSpecialistsPerRun = Math.max(
+      1,
+      Math.floor(options.maxSpecialistsPerRun ?? DEFAULT_MAX_SPECIALISTS_PER_RUN),
+    )
+    this.subtaskMaxWallTimeMs = Math.max(
+      1_000,
+      Math.floor(options.subtaskMaxWallTimeMs ?? DEFAULT_SUBTASK_MAX_WALL_TIME_MS),
+    )
+    this.subtaskMaxTokens = Math.max(
+      1_000,
+      Math.floor(options.subtaskMaxTokens ?? DEFAULT_SUBTASK_MAX_TOKENS),
     )
     this.defaultContextKey = options.contextKey
     this.memory = options.memory
@@ -1387,10 +1408,29 @@ export class AgentRuntime {
     emit: (event: AgentRuntimeEvent) => void,
     onBackgroundStarted?: (subagentId: string) => void,
   ): Promise<AgentToolResult> {
+    const used = (this.delegationCounts.get(parentRunId) || 0) + 1
+    if (!withinSpecialistBudget(used, this.maxSpecialistsPerRun)) {
+      return {
+        ok: false,
+        content: `Specialist budget exceeded: this run allows at most ${this.maxSpecialistsPerRun} delegated tasks.`,
+        error: 'Specialist budget exceeded.',
+        data: { maxSpecialistsPerRun: this.maxSpecialistsPerRun },
+      }
+    }
+    this.delegationCounts.set(parentRunId, used)
+
     const subagentId = randomUUID()
     const background = request.mode === 'background'
     const startedAt = Date.now()
     const controller = new AbortController()
+    let wallTimeExceeded = false
+    let tokenBudgetExceeded = false
+    let childTokens = 0
+    const wallTimer = setTimeout(() => {
+      wallTimeExceeded = true
+      controller.abort()
+    }, this.subtaskMaxWallTimeMs)
+    wallTimer.unref?.()
     let resolveContinuationContext!: (context: EkkoBackgroundContinuationContext | null) => void
     const continuationContextReady = new Promise<EkkoBackgroundContinuationContext | null>((resolve) => {
       resolveContinuationContext = resolve
@@ -1407,6 +1447,7 @@ export class AgentRuntime {
       runId: parentRunId,
       subagentId,
       goal: request.goal,
+      specialist: request.specialist,
       background,
       model: request.model ?? parentInput.model ?? parentInput.modelDefaults?.model ?? this.modelDefaults?.model,
       startedAt,
@@ -1535,6 +1576,11 @@ export class AgentRuntime {
               cacheReadTokens += event.usage.cacheReadTokens || 0
               cacheWriteTokens += event.usage.cacheWriteTokens || 0
               reasoningTokens += event.usage.reasoningTokens || 0
+              childTokens = inputTokens + outputTokens
+              if (childTokens > this.subtaskMaxTokens && !controller.signal.aborted) {
+                tokenBudgetExceeded = true
+                controller.abort()
+              }
               if (typeof event.usage.costUsd === 'number' && Number.isFinite(event.usage.costUsd) && event.usage.costUsd >= 0) {
                 costUsd += event.usage.costUsd
                 pricedCalls++
@@ -1561,10 +1607,18 @@ export class AgentRuntime {
           error = output || `Subtask stopped with ${child.output.finishReason}.`
         }
       } catch (childError) {
-        status = controller.signal.aborted || isAbortError(childError) ? 'interrupted' : 'failed'
-        error = childError instanceof Error ? childError.message : String(childError)
+        if (wallTimeExceeded || tokenBudgetExceeded) {
+          status = 'failed'
+          error = wallTimeExceeded
+            ? `Subtask exceeded the ${Math.round(this.subtaskMaxWallTimeMs / 1000)}s wall-time budget.`
+            : `Subtask exceeded the ${this.subtaskMaxTokens} token budget.`
+        } else {
+          status = controller.signal.aborted || isAbortError(childError) ? 'interrupted' : 'failed'
+          error = childError instanceof Error ? childError.message : String(childError)
+        }
         output = error
       } finally {
+        clearTimeout(wallTimer)
         parentInput.signal?.removeEventListener('abort', abortChild)
         this.modelContexts.delete(childContextKey)
       }
@@ -1587,6 +1641,7 @@ export class AgentRuntime {
         childRunId,
         subagentId,
         goal: request.goal,
+        specialist: request.specialist,
         background,
         status,
         summary,
@@ -1607,6 +1662,8 @@ export class AgentRuntime {
         runtime: 'ekko',
         mode: request.mode,
         subagent_id: subagentId,
+        specialist: request.specialist,
+        allowed_tools: request.allowedTools,
         status,
         summary,
         output,

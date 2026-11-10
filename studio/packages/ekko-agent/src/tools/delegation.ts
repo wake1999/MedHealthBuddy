@@ -20,6 +20,31 @@ export interface DelegateTaskInput extends Record<string, unknown> {
   specialist?: string
 }
 
+const SESSION_APPROVAL_TTL_MS = 12 * 60 * 60 * 1000
+const sessionSpecialistApprovals = new Map<string, number>()
+
+function sessionApprovalKey(context: AgentToolContext, specialist: string): string | null {
+  const sessionId = String(context.sessionId || '').trim()
+  return sessionId ? `${sessionId}\u0000${specialist}` : null
+}
+
+function hasSessionApproval(context: AgentToolContext, specialist: string): boolean {
+  const key = sessionApprovalKey(context, specialist)
+  if (!key) return false
+  const approvedAt = sessionSpecialistApprovals.get(key)
+  if (!approvedAt) return false
+  if (Date.now() - approvedAt > SESSION_APPROVAL_TTL_MS) {
+    sessionSpecialistApprovals.delete(key)
+    return false
+  }
+  return true
+}
+
+function rememberSessionApproval(context: AgentToolContext, specialist: string): void {
+  const key = sessionApprovalKey(context, specialist)
+  if (key) sessionSpecialistApprovals.set(key, Date.now())
+}
+
 export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
   readonly definition = {
     name: 'delegate_task',
@@ -83,25 +108,29 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
     // the user. Once a research lead has been approved, its bounded nested
     // delegations do not interrupt the user again.
     if (specialistDefinition && (context.delegationDepth || 0) === 0) {
-      if (!context.requestUserClarification) {
-        return failure('Specialist delegation requires user confirmation, but clarification is unavailable.')
-      }
-      const question = [
-        `建议调用专家「${specialistDefinition.labelZh}」：${specialistDefinition.descriptionZh}`,
-        '确认后会委派一个隔离子 Agent，使用该角色的工具白名单完成任务。',
-        '是否继续？',
-      ].join('\n')
-      const answer = await context.requestUserClarification({
-        clarifyId: randomUUID(),
-        question,
-        choices: ['调用专家', '取消'],
-        timeoutMs: DEFAULT_CLARIFICATION_TIMEOUT_MS,
-      })
-      const normalized = String(answer || '').trim()
-      if (normalized !== '调用专家') {
-        return failure(normalized === '取消'
-          ? '用户取消了本次专家委派。'
-          : `专家委派未获确认：${normalized || '用户未响应'}`)
+      if (!hasSessionApproval(context, specialist)) {
+        if (!context.requestUserClarification) {
+          return failure('Specialist delegation requires user confirmation, but clarification is unavailable.')
+        }
+        const question = [
+          `建议调用专家「${specialistDefinition.labelZh}」：${specialistDefinition.descriptionZh}`,
+          '确认后会委派一个隔离子 Agent，使用该角色的工具白名单完成任务。',
+          '是否继续？',
+        ].join('\n')
+        const answer = await context.requestUserClarification({
+          clarifyId: randomUUID(),
+          question,
+          choices: ['调用专家', '本次会话允许', '取消'],
+          timeoutMs: DEFAULT_CLARIFICATION_TIMEOUT_MS,
+        })
+        const normalized = String(answer || '').trim()
+        if (normalized === '本次会话允许') {
+          rememberSessionApproval(context, specialist)
+        } else if (normalized !== '调用专家') {
+          return failure(normalized === '取消'
+            ? '用户取消了本次专家委派。'
+            : `专家委派未获确认：${normalized || '用户未响应'}`)
+        }
       }
     }
 

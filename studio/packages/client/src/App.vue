@@ -164,7 +164,8 @@ const usesPageSidebar = computed(() =>
 const hidesShellSidebar = computed(
   () =>
     route.name === "hermes.promptTemplates" ||
-    route.name === "hermes.skillMarket",
+    route.name === "hermes.skillMarket" ||
+    route.name === "hermes.experts",
 );
 const usesHermesConfigSidebar = computed(
   () => route.meta?.hermesConfig === true && !hidesShellSidebar.value,

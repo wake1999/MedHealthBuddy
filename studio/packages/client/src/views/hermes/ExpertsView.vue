@@ -87,13 +87,13 @@ onMounted(load)
       <header class="page-header experts-header">
         <div>
           <h2 class="header-title">{{ t('experts.title') }}</h2>
-          <p class="experts-subtitle">{{ t('experts.subtitle') }}</p>
         </div>
         <span class="experts-count">{{ t('experts.enabledCount', { enabled: enabledCount, total: specialists.length }) }}</span>
       </header>
     </PageHeader>
 
     <div class="experts-body">
+      <p class="experts-intro">{{ t('experts.subtitle') }}</p>
       <NAlert v-if="failed" type="error" :bordered="false">{{ t('experts.loadFailed') }}</NAlert>
       <div v-else class="experts-grid">
         <article
@@ -181,10 +181,12 @@ onMounted(load)
   gap: 16px;
 }
 
-.experts-subtitle {
-  margin: 5px 0 0;
+.experts-intro {
+  max-width: 1280px;
+  margin: 0 0 14px;
   color: var(--text-secondary);
   font-size: 13px;
+  line-height: 1.6;
 }
 
 .experts-count {

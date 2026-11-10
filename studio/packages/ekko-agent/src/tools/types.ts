@@ -74,6 +74,8 @@ export interface AgentToolContext {
   modelName?: string
   skillMutationSource?: 'foreground' | 'background-review'
   delegationDepth?: number
+  /** Explicit per-run tool allowlist. Undefined means the normal registry. */
+  allowedToolNames?: readonly string[]
   delegateTask?: AgentTaskDelegate
 }
 
@@ -85,8 +87,10 @@ export interface AgentTaskRequest {
   mode: AgentTaskMode
   /** Runs the subagent on a different model within the same provider. */
   model?: string
-  /** Optional static specialist role; cannot spawn another specialist. */
+  /** Optional static specialist role; cannot spawn arbitrary specialists. */
   specialist?: string
+  /** Tool allowlist derived from the specialist role. */
+  allowedTools?: readonly string[]
 }
 
 export type AgentTaskDelegate = (request: AgentTaskRequest) => Promise<AgentToolResult>

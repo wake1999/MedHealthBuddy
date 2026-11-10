@@ -84,6 +84,8 @@ export interface AgentRuntimeOptions {
   backgroundDelegationEnabled?: boolean
   /** Maximum step budget for each delegated subagent. */
   subtaskMaxSteps?: number
+  /** Maximum delegation tree depth; 1 is the old one-level behavior, 2 enables lead -> specialist. */
+  maxDelegationDepth?: number
   toolContext?: AgentToolContext
   modelDefaults?: Omit<ModelRequest, 'messages' | 'tools' | 'stream'>
   contextKey?: string

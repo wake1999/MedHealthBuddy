@@ -72,7 +72,8 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
     if (!mode) return failure('delegate_task mode must be foreground or background.')
     const model = typeof input.model === 'string' ? input.model.trim() : ''
     const specialist = typeof input.specialist === 'string' ? input.specialist.trim() : ''
-    if (specialist && !getMedHealthSpecialist(specialist)) {
+    const specialistDefinition = specialist ? getMedHealthSpecialist(specialist) : null
+    if (specialist && !specialistDefinition) {
       return failure(`Unknown MedHealth specialist role: ${specialist}`)
     }
     const request: AgentTaskRequest = {
@@ -83,6 +84,7 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
         : {}),
       ...(model ? { model } : {}),
       ...(specialist ? { specialist } : {}),
+      ...(specialistDefinition ? { allowedTools: specialistDefinition.allowedTools } : {}),
     }
     return context.delegateTask(request)
   }

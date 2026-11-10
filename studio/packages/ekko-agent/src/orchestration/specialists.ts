@@ -2,11 +2,12 @@
  * Controlled specialist roles for the MedHealthBuddy research agent.
  *
  * This is deliberately a static catalog, not an AgentOS-style emergent
- * specialist factory. A role changes the focus and review rubric of a
- * delegated task; it cannot install tools, spawn further agents, or bypass
+ * specialist factory. A role changes the focus and tool boundary of a
+ * delegated task; it cannot install tools, spawn arbitrary agents, or bypass
  * the parent approval/tool policy.
  */
 export type MedHealthSpecialistId =
+  | 'research-lead'
   | 'literature-scout'
   | 'evidence-reviewer'
   | 'protocol-designer'
@@ -19,9 +20,53 @@ export interface MedHealthSpecialistDefinition {
   label: string
   description: string
   instructions: string
+  /**
+   * Tool allowlist for the delegated child. An empty array means no tools.
+   * `delegate_task` is intentionally present only on research-lead, which is
+   * what makes the hierarchy a controlled two-level tree.
+   */
+  allowedTools: readonly string[]
 }
 
+const BROWSER_TOOLS = [
+  'browser_navigate',
+  'browser_snapshot',
+  'browser_click',
+  'browser_type',
+  'browser_scroll',
+  'browser_back',
+  'browser_press',
+  'browser_get_images',
+  'browser_vision',
+  'browser_console',
+] as const
+
+const COMMON_RESEARCH_TOOLS = [
+  'read_file',
+  'view_image',
+  'skill_view',
+  'update_plan',
+  'clarify',
+] as const
+
 export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
+  {
+    id: 'research-lead',
+    label: 'Research lead',
+    description: 'Plan a small evidence team, delegate bounded specialist tasks, and merge the findings.',
+    instructions: [
+      'Act as the lead for a bounded research task.',
+      'Break the task into at most three specialist assignments with explicit evidence requirements.',
+      'Use delegate_task only for a genuinely separable subproblem; do not delegate the same task repeatedly.',
+      'Reconcile disagreements between specialists and return the final synthesis with unresolved uncertainty.',
+      'Do not make clinical recommendations; surface decisions that require investigator review.',
+    ].join('\n'),
+    allowedTools: [
+      ...COMMON_RESEARCH_TOOLS,
+      ...BROWSER_TOOLS,
+      'delegate_task',
+    ],
+  },
   {
     id: 'literature-scout',
     label: 'Literature scout',
@@ -32,6 +77,7 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
       'Never invent a citation, DOI, PMID, or finding. Mark unverified metadata explicitly.',
       'Do not make clinical recommendations.',
     ].join('\n'),
+    allowedTools: [...COMMON_RESEARCH_TOOLS, ...BROWSER_TOOLS],
   },
   {
     id: 'evidence-reviewer',
@@ -43,6 +89,7 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
       'Flag contradictions and missing denominators; propose the minimum evidence needed to resolve them.',
       'Do not make clinical recommendations or silently repair missing citations.',
     ].join('\n'),
+    allowedTools: [...COMMON_RESEARCH_TOOLS, ...BROWSER_TOOLS],
   },
   {
     id: 'protocol-designer',
@@ -54,6 +101,7 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
       'Call out ethical, regulatory, and data-governance questions rather than deciding them.',
       'Do not produce patient-specific eligibility decisions or treatment advice.',
     ].join('\n'),
+    allowedTools: [...COMMON_RESEARCH_TOOLS, 'write_file'],
   },
   {
     id: 'statistician',
@@ -65,6 +113,13 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
       'Distinguish pre-specified analyses from exploratory analyses.',
       'Do not claim causality from observational associations without an explicit causal design.',
     ].join('\n'),
+    allowedTools: [
+      ...COMMON_RESEARCH_TOOLS,
+      'write_file',
+      'code_exec',
+      'script.py',
+      'script.mjs',
+    ],
   },
   {
     id: 'medical-writer',
@@ -76,6 +131,7 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
       'Use a structured scientific style; distinguish results, interpretation, and limitations.',
       'Do not add citations or clinical recommendations that are not present in the source material.',
     ].join('\n'),
+    allowedTools: [...COMMON_RESEARCH_TOOLS, 'write_file'],
   },
   {
     id: 'data-steward',
@@ -87,6 +143,14 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
       'Keep raw patient data local unless an approved workflow explicitly permits transfer.',
       'Do not infer diagnoses or re-identify individuals.',
     ].join('\n'),
+    allowedTools: [
+      ...COMMON_RESEARCH_TOOLS,
+      'write_file',
+      'code_exec',
+      'script.py',
+      'script.mjs',
+      'terminal_exec',
+    ],
   },
 ]
 
@@ -107,6 +171,32 @@ export function medHealthSpecialistPrompt(id: string | undefined | null): string
     specialist.instructions,
     'Stay within this role. Return evidence and uncertainty to the parent agent; do not make final clinical decisions.',
   ].join('\n\n')
+}
+
+/**
+ * A child may delegate only when the run is still below the configured depth
+ * limit AND the role's allowlist explicitly includes delegate_task.
+ */
+export function canDelegateAtDepth(
+  depth: number,
+  maxDepth: number,
+  allowedTools: readonly string[] | undefined,
+): boolean {
+  if (!Number.isFinite(depth) || !Number.isFinite(maxDepth)) return false
+  if (depth === 0) return true
+  return depth < Math.max(1, Math.floor(maxDepth))
+    && Boolean(allowedTools?.includes('delegate_task'))
+}
+
+export function isToolAllowedForRun(
+  toolName: string,
+  depth: number,
+  maxDepth: number,
+  allowedTools: readonly string[] | undefined,
+): boolean {
+  if (allowedTools && !allowedTools.includes(toolName)) return false
+  if (toolName !== 'delegate_task') return true
+  return canDelegateAtDepth(depth, maxDepth, allowedTools)
 }
 
 export function specialistCatalogPrompt(): string {

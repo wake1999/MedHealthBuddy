@@ -31,7 +31,11 @@ import {
 import { workspaceToolAssetDirectory } from '../tools/workspace-temp'
 import type { AgentRuntimeEvent } from './events'
 import { buildSystemPrompt } from './system-prompt'
-import { medHealthSpecialistPrompt } from '../orchestration/specialists'
+import {
+  canDelegateAtDepth,
+  isToolAllowedForRun,
+  medHealthSpecialistPrompt,
+} from '../orchestration/specialists'
 import type {
   AgentRuntimeBoundaryInterruptRequest,
   AgentRuntimeBoundaryInterruptResult,
@@ -187,6 +191,7 @@ export class AgentRuntime {
   private readonly toolFailureRecoveryThreshold: number
   private readonly backgroundDelegationEnabled: boolean
   private readonly subtaskMaxSteps: number
+  private readonly maxDelegationDepth: number
   private readonly defaultContextKey?: string
   private readonly memory?: AgentRuntimeOptions['memory']
   private readonly skillReview?: SkillReviewService
@@ -237,6 +242,10 @@ export class AgentRuntime {
     this.subtaskMaxSteps = Math.max(
       1,
       Math.floor(options.subtaskMaxSteps ?? DEFAULT_AGENT_SUBTASK_MAX_STEPS),
+    )
+    this.maxDelegationDepth = Math.max(
+      1,
+      Math.min(3, Math.floor(options.maxDelegationDepth ?? 2)),
     )
     this.defaultContextKey = options.contextKey
     this.memory = options.memory
@@ -1084,11 +1093,17 @@ export class AgentRuntime {
     signal: AbortSignal | undefined = input.signal,
   ): ModelRequest {
     const modelDefaults = input.modelDefaults ?? this.modelDefaults
+    const depth = input.toolContext?.delegationDepth ?? this.toolContext?.delegationDepth ?? 0
+    const allowedTools = input.toolContext?.allowedToolNames
     const toolDefinitions = this.toolsEnabled
-      ? this.tools.definitions().filter(definition => (
-          (input.toolContext?.delegationDepth ?? this.toolContext?.delegationDepth ?? 0) === 0 ||
-          definition.name !== 'delegate_task'
-        )).map(definition => this.backgroundDelegationFor(input) === false
+      ? this.tools.definitions()
+        .filter(definition => isToolAllowedForRun(
+          definition.name,
+          depth,
+          this.maxDelegationDepth,
+          allowedTools,
+        ))
+        .map(definition => this.backgroundDelegationFor(input) === false
           ? foregroundOnlyDelegateTaskDefinition(definition)
           : definition)
       : []
@@ -1241,6 +1256,22 @@ export class AgentRuntime {
       toolName: toolCall.name,
       arguments: toolCall.arguments,
     })
+
+    const depth = context?.delegationDepth ?? this.toolContext?.delegationDepth ?? 0
+    if (!isToolAllowedForRun(toolCall.name, depth, this.maxDelegationDepth, context?.allowedToolNames)) {
+      const message = `Tool not allowed for this delegated role: ${toolCall.name}`
+      const result: AgentToolResult = { ok: false, content: message, error: message }
+      emit({
+        type: 'tool.failed',
+        runId,
+        step,
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        result,
+        durationMs: Date.now() - startedAt,
+      })
+      return result
+    }
 
     try {
       throwIfAborted(signal)
@@ -1398,7 +1429,12 @@ export class AgentRuntime {
       let output = ''
       let error: string | undefined
       try {
-        const child = await this.run({
+        const parentDepth = parentInput.toolContext?.delegationDepth
+          ?? this.toolContext?.delegationDepth
+          ?? 0
+        const childDepth = parentDepth + 1
+        const allowedToolNames = request.allowedTools
+        const childInput: AgentRuntimeRunInput = {
           messages: [{
             role: 'user',
             content: subtaskPrompt(request),
@@ -1416,7 +1452,8 @@ export class AgentRuntime {
           toolContext: {
             ...(parentInput.toolContext ?? this.toolContext),
             signal: controller.signal,
-            delegationDepth: (parentInput.toolContext?.delegationDepth ?? this.toolContext?.delegationDepth ?? 0) + 1,
+            delegationDepth: childDepth,
+            allowedToolNames,
             delegateTask: undefined,
           },
           model: request.model ?? parentInput.model,
@@ -1505,7 +1542,19 @@ export class AgentRuntime {
               }
             }
           },
-        })
+        }
+        if (canDelegateAtDepth(childDepth, this.maxDelegationDepth, allowedToolNames)) {
+          childInput.toolContext = {
+            ...childInput.toolContext,
+            delegateTask: (nested) => this.delegateTask(
+              nested,
+              childInput,
+              childRunId || parentRunId,
+              emit,
+            ),
+          }
+        }
+        const child = await this.run(childInput)
         output = child.output.content || ''
         if (child.output.finishReason === 'max_steps') {
           status = 'failed'

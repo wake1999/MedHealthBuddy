@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { DelegateTaskTool } from '../../packages/ekko-agent/src/tools/delegation'
 import {
   MEDHEALTH_SPECIALISTS,
+  canDelegateAtDepth,
   getMedHealthSpecialist,
+  isToolAllowedForRun,
   medHealthSpecialistPrompt,
 } from '../../packages/ekko-agent/src/orchestration/specialists'
 
@@ -32,6 +34,7 @@ describe('MedHealth specialist delegation', () => {
       goal: 'Audit the evidence table',
       mode: 'foreground',
       specialist: 'evidence-reviewer',
+      allowedTools: getMedHealthSpecialist('evidence-reviewer')?.allowedTools,
     })
   })
 
@@ -54,5 +57,22 @@ describe('MedHealth specialist delegation', () => {
     expect(prompt).toContain('Do not make clinical recommendations')
     expect(prompt).toContain('do not make final clinical decisions')
     expect(getMedHealthSpecialist('missing-role')).toBeNull()
+  })
+
+  it('allows only the research lead to delegate at the second level', () => {
+    const lead = getMedHealthSpecialist('research-lead')
+    const reviewer = getMedHealthSpecialist('evidence-reviewer')
+    expect(canDelegateAtDepth(0, 2, undefined)).toBe(true)
+    expect(canDelegateAtDepth(1, 2, lead?.allowedTools)).toBe(true)
+    expect(canDelegateAtDepth(1, 2, reviewer?.allowedTools)).toBe(false)
+    expect(canDelegateAtDepth(2, 2, lead?.allowedTools)).toBe(false)
+  })
+
+  it('enforces the specialist tool allowlist', () => {
+    const reviewer = getMedHealthSpecialist('evidence-reviewer')
+    const steward = getMedHealthSpecialist('data-steward')
+    expect(isToolAllowedForRun('terminal_exec', 1, 2, reviewer?.allowedTools)).toBe(false)
+    expect(isToolAllowedForRun('terminal_exec', 1, 2, steward?.allowedTools)).toBe(true)
+    expect(isToolAllowedForRun('delegate_task', 1, 2, reviewer?.allowedTools)).toBe(false)
   })
 })

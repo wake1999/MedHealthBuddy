@@ -24,14 +24,15 @@ studio/packages/ekko-agent/src/orchestration/specialists.ts
 
 角色：
 
-| 角色 | 用途 |
-|---|---|
-| `literature-scout` | 检索和筛选文献，输出可追溯证据表 |
-| `evidence-reviewer` | 审查证据质量、偏倚和不确定性 |
-| `protocol-designer` | 起草研究方案组件，标记需人工确认的决策 |
-| `statistician` | 统计设计、假设、样本量和敏感性分析 |
-| `medical-writer` | 基于已核实材料撰写科研草稿 |
-| `data-steward` | 数据 schema、质量、来源和 PHI 边界 |
+| 角色 | 用途 | 可委派 |
+|---|---|---|
+| `research-lead` | 规划小团队、拆分任务并汇总证据 | 是，仅此角色 |
+| `literature-scout` | 检索和筛选文献，输出可追溯证据表 | 否 |
+| `evidence-reviewer` | 审查证据质量、偏倚和不确定性 | 否 |
+| `protocol-designer` | 起草研究方案组件，标记需人工确认的决策 | 否 |
+| `statistician` | 统计设计、假设、样本量和敏感性分析 | 否 |
+| `medical-writer` | 基于已核实材料撰写科研草稿 | 否 |
+| `data-steward` | 数据 schema、质量、来源和 PHI 边界 | 否 |
 
 ### 2. `delegate_task` 支持角色
 
@@ -48,11 +49,34 @@ studio/packages/ekko-agent/src/orchestration/specialists.ts
 约束：
 
 - 只接受静态角色目录中的 ID
-- 子 Agent 不能再委派（现有递归保护保留）
-- 角色只影响任务提示和审查视角
+- 最多两层：父 Agent → `research-lead` → 专家
+- 只有 `research-lead` 的 allowlist 包含 `delegate_task`
+- 第二层专家不能再委派
+- 角色只影响任务提示、审查视角和工具白名单
 - 最终结论仍由父 Agent 负责
 - 不执行动态生成的专家代码
 - 不绕过现有工具授权、审批和记忆策略
+
+### 3. 角色级工具白名单
+
+每个专家有独立的工具 allowlist。运行时同时做两层限制：
+
+1. 模型请求里不展示未授权工具；
+2. 即使模型绕过 schema 调用，也会在执行前被拒绝。
+
+例如：
+
+```text
+evidence-reviewer 不允许 terminal_exec
+data-steward 允许 terminal_exec
+只有 research-lead 允许 delegate_task
+```
+
+默认最大委派深度：
+
+```ts
+maxDelegationDepth = 2
+```
 
 ### 3. 角色提示词
 
@@ -71,7 +95,13 @@ studio/packages/ekko-agent/src/orchestration/specialists.ts
 合法角色传递给运行时         通过
 非法角色被拒绝               通过
 角色提示词包含临床边界       通过
-单元测试                     4 passed
+两层委派深度限制             通过
+Lead 才可继续委派            通过
+角色工具白名单               通过
+运行时模型工具列表过滤       通过
+白名单外工具执行拦截         通过
+运行时回归测试               65 passed
+新增测试                     10 passed
 ekko-agent 类型检查          通过
 ```
 
@@ -80,7 +110,6 @@ ekko-agent 类型检查          通过
 第一阶段暂不包含：
 
 - 技能市场中的角色选择 UI
-- 每个角色的独立工具白名单
 - 角色预算/最大委派次数
 - 角色级评估集和回归基准
 - 动态专家生成

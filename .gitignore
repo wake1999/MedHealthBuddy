@@ -48,3 +48,4 @@ texput.log
 # Server-side BTIT agent service credentials (local and cloud only).
 agent-service-keys.json
 agent-chat-keys.json
+agent-specialist-settings.json

@@ -589,6 +589,7 @@ export default {
     profiles: '配置',
     plugins: '插件',
     skillMarket: '技能市场',
+    experts: '专家',
     mcp: 'MCP',
     petdex: '宠物',
     skills: '技能',
@@ -2335,6 +2336,22 @@ export default {
   },
 
   // 技能市场
+  experts: {
+    title: '专家',
+    subtitle: '手动选择 MedHealthBuddy 专家，并控制每个专家当前是否可用。',
+    enabledCount: '已启用 {enabled}/{total}',
+    enabled: '已启用',
+    disabled: '已禁用',
+    available: '当前可用',
+    unavailable: '已禁用，不可调用',
+    enabledToast: '已启用专家「{name}」',
+    disabledToast: '已禁用专家「{name}」',
+    loadFailed: '专家目录加载失败',
+    use: '在聊天中使用',
+    usePrompt: '请优先调用专家「{name}」({role}) 处理以下任务，并在执行前向我确认：\n\n',
+    chatTitle: '使用专家',
+  },
+
   skillMarket: {
     title: '技能市场',
     refresh: '刷新',

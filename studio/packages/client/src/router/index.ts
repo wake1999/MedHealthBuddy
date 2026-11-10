@@ -163,6 +163,11 @@ const router = createRouter({
       component: () => import('@/views/hermes/SkillMarketView.vue'),
     },
     {
+      path: '/hermes/experts',
+      name: 'hermes.experts',
+      component: () => import('@/views/hermes/ExpertsView.vue'),
+    },
+    {
       path: '/hermes/petdex',
       name: 'hermes.petdex',
       component: () => import('@/views/hermes/PetdexView.vue'),

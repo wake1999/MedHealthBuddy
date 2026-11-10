@@ -160,6 +160,35 @@ describe('MedHealth specialist delegation', () => {
     expect(extractSpecialistReport('```json\n{bad json}\n```', 'evidence-reviewer')).toBeNull()
   })
 
+  it('rejects a disabled specialist before delegation', async () => {
+    const { mkdtemp, rm } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { setSpecialistEnabled } = await import('../../packages/ekko-agent/src/orchestration/specialist-settings')
+    const dir = await mkdtemp(join(tmpdir(), 'medhealth-specialists-'))
+    const previous = process.env.HERMES_WEBUI_STATE_DIR
+    process.env.HERMES_WEBUI_STATE_DIR = dir
+    try {
+      setSpecialistEnabled('evidence-reviewer', false)
+      const delegateTask = vi.fn()
+      const result = await new DelegateTaskTool().execute(
+        { goal: 'Audit', mode: 'foreground', specialist: 'evidence-reviewer' },
+        {
+          sessionId: 'disabled-specialist-test',
+          delegateTask,
+          requestUserClarification: async () => '调用专家',
+        },
+      )
+      expect(result.ok).toBe(false)
+      expect(result.error).toMatch(/disabled/)
+      expect(delegateTask).not.toHaveBeenCalled()
+    } finally {
+      if (previous === undefined) delete process.env.HERMES_WEBUI_STATE_DIR
+      else process.env.HERMES_WEBUI_STATE_DIR = previous
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('enforces the specialist tool allowlist', () => {
     const reviewer = getMedHealthSpecialist('evidence-reviewer')
     const steward = getMedHealthSpecialist('data-steward')

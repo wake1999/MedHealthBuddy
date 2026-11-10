@@ -10,6 +10,7 @@ import {
   specialistPreferredModel,
 } from '../orchestration/specialists'
 import { DEFAULT_CLARIFICATION_TIMEOUT_MS } from '../config'
+import { isSpecialistEnabled } from '../orchestration/specialist-settings'
 
 const MAX_TEAM_TASKS = 3
 
@@ -74,6 +75,9 @@ export class DelegateTeamTool implements AgentTool<DelegateTeamInput> {
       const definition = getMedHealthSpecialist(specialist)
       if (!goal) return failure('Every delegate_team task needs a non-empty goal.')
       if (!definition) return failure(`Unknown MedHealth specialist role: ${specialist}`)
+      if (!isSpecialistEnabled(specialist)) {
+        return failure(`MedHealth specialist is disabled: ${specialist}`)
+      }
       prepared.push({ task: { ...task, goal }, definition })
     }
 

@@ -590,6 +590,7 @@ export default {
     skills: 'Skills',
     plugins: 'Plugins',
     skillMarket: 'Skill market',
+    experts: 'Experts',
     mcp: 'MCP',
     petdex: 'Pets',
     memory: 'Memory',
@@ -2289,6 +2290,22 @@ export default {
   },
 
   // Skill market
+  experts: {
+    title: 'Experts',
+    subtitle: 'Manually choose a MedHealthBuddy specialist and control whether it is available.',
+    enabledCount: '{enabled}/{total} enabled',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    available: 'Available',
+    unavailable: 'Disabled and unavailable',
+    enabledToast: 'Enabled expert "{name}"',
+    disabledToast: 'Disabled expert "{name}"',
+    loadFailed: 'Failed to load the expert catalog',
+    use: 'Use in chat',
+    usePrompt: 'Prefer the {name} specialist ({role}) for this task, and ask me before delegating:\n\n',
+    chatTitle: 'Use expert',
+  },
+
   skillMarket: {
     title: 'Skill market',
     refresh: 'Refresh',

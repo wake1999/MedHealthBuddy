@@ -9,6 +9,7 @@ export interface AgentSpecialist {
   allowedTools: string[]
   canDelegate: boolean
   preferredModel?: string
+  enabled: boolean
 }
 
 export interface AgentSpecialistCatalog {
@@ -18,4 +19,11 @@ export interface AgentSpecialistCatalog {
 
 export async function fetchAgentSpecialists(): Promise<AgentSpecialistCatalog> {
   return request<AgentSpecialistCatalog>('/api/ekko/agent/specialists')
+}
+
+export async function setAgentSpecialistEnabled(id: string, enabled: boolean): Promise<void> {
+  await request(`/api/ekko/agent/specialists/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  })
 }

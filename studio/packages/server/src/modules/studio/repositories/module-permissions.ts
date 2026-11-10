@@ -14,6 +14,7 @@ export const USER_MODULES = [
   'connections',
   'agents',
   'skillMarket',
+  'experts',
   'promptTemplates',
   'models',
   'usage',

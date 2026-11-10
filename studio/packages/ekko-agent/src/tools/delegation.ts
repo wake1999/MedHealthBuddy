@@ -12,6 +12,7 @@ import {
   specialistPreferredModel,
 } from '../orchestration/specialists'
 import { DEFAULT_CLARIFICATION_TIMEOUT_MS } from '../config'
+import { isSpecialistEnabled } from '../orchestration/specialist-settings'
 
 export interface DelegateTaskInput extends Record<string, unknown> {
   goal: string
@@ -103,6 +104,9 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
     const specialistDefinition = specialist ? getMedHealthSpecialist(specialist) : null
     if (specialist && !specialistDefinition) {
       return failure(`Unknown MedHealth specialist role: ${specialist}`)
+    }
+    if (specialist && !isSpecialistEnabled(specialist)) {
+      return failure(`MedHealth specialist is disabled: ${specialist}`)
     }
 
     // Semi-automatic policy: a top-level specialist call must be confirmed by

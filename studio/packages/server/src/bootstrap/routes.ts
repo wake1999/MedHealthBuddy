@@ -74,6 +74,7 @@ import { ekkoMemoryRoutes } from '../modules/ekko/routes/memory'
 import { ekkoSkillRoutes } from '../modules/ekko/routes/skills'
 import { ekkoMcpRoutes } from '../modules/ekko/routes/mcp'
 import { ekkoConfigRoutes } from '../modules/ekko/routes/config'
+import { ekkoSpecialistRoutes } from '../modules/ekko/routes/specialists'
 import { petdexPublicRoutes, petdexRoutes } from '../modules/studio/routes/petdex'
 import { petRoutes } from '../modules/studio/routes/pets'
 import { legacyAppApiCompatibility } from '../modules/studio/middleware/legacy-app-api'
@@ -127,6 +128,7 @@ export function registerRoutes(app: any, authMiddleware: Array<(ctx: Context, ne
   app.use(ekkoSkillRoutes.routes())
   app.use(ekkoMcpRoutes.routes())
   app.use(ekkoConfigRoutes.routes())
+  app.use(ekkoSpecialistRoutes.routes())
   app.use(skillRoutes.routes())
   app.use(skillBundleRoutes.routes())
   app.use(pluginRoutes.routes())

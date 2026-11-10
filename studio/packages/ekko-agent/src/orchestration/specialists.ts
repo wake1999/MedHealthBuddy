@@ -15,10 +15,14 @@ export type MedHealthSpecialistId =
   | 'medical-writer'
   | 'data-steward'
 
+export const DEFAULT_MAX_DELEGATION_DEPTH = 2
+
 export interface MedHealthSpecialistDefinition {
   id: MedHealthSpecialistId
   label: string
+  labelZh: string
   description: string
+  descriptionZh: string
   instructions: string
   /**
    * Tool allowlist for the delegated child. An empty array means no tools.
@@ -53,7 +57,9 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
   {
     id: 'research-lead',
     label: 'Research lead',
+    labelZh: '研究负责人',
     description: 'Plan a small evidence team, delegate bounded specialist tasks, and merge the findings.',
+    descriptionZh: '规划小规模证据团队，拆分任务并汇总结论。',
     instructions: [
       'Act as the lead for a bounded research task.',
       'Break the task into at most three specialist assignments with explicit evidence requirements.',
@@ -70,7 +76,9 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
   {
     id: 'literature-scout',
     label: 'Literature scout',
+    labelZh: '文献侦察',
     description: 'Find and screen literature, then return a traceable evidence table.',
+    descriptionZh: '检索和筛选文献，输出可追溯证据表。',
     instructions: [
       'Focus on search strategy, inclusion/exclusion criteria, and source traceability.',
       'Return a compact evidence table with title, year, study type, population, key finding, limitation, and identifier (DOI/PMID/URL).',
@@ -82,7 +90,9 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
   {
     id: 'evidence-reviewer',
     label: 'Evidence reviewer',
+    labelZh: '证据审查',
     description: 'Critically appraise evidence quality and identify uncertainty.',
+    descriptionZh: '审查证据质量、偏倚和不确定性。',
     instructions: [
       'Audit the supplied claims and citations for provenance, consistency, and risk of bias.',
       'Separate direct evidence, indirect evidence, assumptions, and unsupported statements.',
@@ -94,7 +104,9 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
   {
     id: 'protocol-designer',
     label: 'Protocol designer',
+    labelZh: '方案设计',
     description: 'Draft research protocol components for human review.',
+    descriptionZh: '起草研究方案组件，标记需人工复核的决策。',
     instructions: [
       'Focus on PICO/PECO, eligibility criteria, endpoints, visit schedule, and operational feasibility.',
       'Label every draft decision as a proposal requiring investigator review.',
@@ -106,7 +118,9 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
   {
     id: 'statistician',
     label: 'Statistician',
+    labelZh: '统计设计',
     description: 'Design analysis plans and check statistical assumptions.',
+    descriptionZh: '设计统计方案、检查假设和敏感性分析。',
     instructions: [
       'Focus on estimands, analysis populations, missing-data handling, sample size, and sensitivity analyses.',
       'State assumptions and the consequences of violating them.',
@@ -124,7 +138,9 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
   {
     id: 'medical-writer',
     label: 'Medical writer',
+    labelZh: '医学写作',
     description: 'Turn verified material into a structured research draft.',
+    descriptionZh: '基于已核实材料撰写结构化科研草稿。',
     instructions: [
       'Write only from supplied evidence and clearly mark gaps.',
       'Keep claims proportional to the evidence and preserve citation traceability.',
@@ -136,7 +152,9 @@ export const MEDHEALTH_SPECIALISTS: readonly MedHealthSpecialistDefinition[] = [
   {
     id: 'data-steward',
     label: 'Data steward',
+    labelZh: '数据治理',
     description: 'Review dataset schema, quality, provenance, and PHI boundaries.',
+    descriptionZh: '检查数据 schema、质量、来源和 PHI 边界。',
     instructions: [
       'Focus on schema consistency, missingness, provenance, units, and de-identification.',
       'Identify direct and quasi-identifiers; recommend minimization and access controls.',

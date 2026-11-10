@@ -23,6 +23,7 @@ import {
 } from '@/api/hermes/legacy-data-migration'
 import { fetchRuntimeVersionStatus, type RuntimeVersionStatus } from '@/api/hermes/runtime-versions'
 import HermesDataDirectoryHint from '@/components/hermes/HermesDataDirectoryHint.vue'
+import AgentSpecialistsModal from '@/components/hermes/agents/AgentSpecialistsModal.vue'
 import VersionManagementModal from '@/components/layout/VersionManagementModal.vue'
 import { useAppStore } from '@/stores/hermes/app'
 import { useChatStore } from '@/stores/hermes/chat'
@@ -126,6 +127,7 @@ const agentStatusSnapshot = ref<AgentStatusSnapshot | null>(null)
 const loading = ref(true)
 const loadError = ref('')
 const runtimeManagerVisible = ref(false)
+const specialistsVisible = ref(false)
 const hermesCliDetailsVisible = ref(false)
 const hermesRuntimeStatus = ref<RuntimeVersionStatus | null>(null)
 const aiHelpDrawerVisible = ref(false)
@@ -509,6 +511,9 @@ onUnmounted(() => {
                 </div>
               </header>
               <div class="agent-actions">
+                <NButton secondary size="small" @click="specialistsVisible = true">
+                  {{ t('agentManager.specialistsButton') }}
+                </NButton>
                 <NButton
                   secondary
                   size="small"
@@ -621,6 +626,7 @@ onUnmounted(() => {
       </div>
 
     <VersionManagementModal v-model:show="runtimeManagerVisible" />
+    <AgentSpecialistsModal v-model:show="specialistsVisible" />
 
     <NDrawer
       v-model:show="hermesCliDetailsVisible"

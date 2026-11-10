@@ -17,8 +17,9 @@ describe('MedHealth specialist delegation', () => {
     expect(properties.specialist.enum).toContain('data-steward')
   })
 
-  it('passes a valid specialist role to the runtime delegate', async () => {
+  it('passes a valid specialist role to the runtime delegate after confirmation', async () => {
     const delegateTask = vi.fn().mockResolvedValue({ ok: true, content: 'reviewed' })
+    const requestUserClarification = vi.fn().mockResolvedValue('调用专家')
     const tool = new DelegateTaskTool()
     const result = await tool.execute(
       {
@@ -26,8 +27,10 @@ describe('MedHealth specialist delegation', () => {
         mode: 'foreground',
         specialist: 'evidence-reviewer',
       },
-      { delegateTask },
+      { delegateTask, requestUserClarification },
     )
+
+    expect(requestUserClarification).toHaveBeenCalledOnce()
 
     expect(result).toEqual({ ok: true, content: 'reviewed' })
     expect(delegateTask).toHaveBeenCalledWith({
@@ -36,6 +39,32 @@ describe('MedHealth specialist delegation', () => {
       specialist: 'evidence-reviewer',
       allowedTools: getMedHealthSpecialist('evidence-reviewer')?.allowedTools,
     })
+  })
+
+  it('cancels delegation when the user declines the confirmation', async () => {
+    const delegateTask = vi.fn()
+    const tool = new DelegateTaskTool()
+    const result = await tool.execute(
+      { goal: 'Audit', mode: 'foreground', specialist: 'evidence-reviewer' },
+      { delegateTask, requestUserClarification: async () => '取消' },
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/取消了本次专家委派/)
+    expect(delegateTask).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when a top-level specialist has no confirmation channel', async () => {
+    const delegateTask = vi.fn()
+    const tool = new DelegateTaskTool()
+    const result = await tool.execute(
+      { goal: 'Audit', mode: 'foreground', specialist: 'evidence-reviewer' },
+      { delegateTask },
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/requires user confirmation/)
+    expect(delegateTask).not.toHaveBeenCalled()
   })
 
   it('rejects an unknown specialist role before calling the runtime', async () => {

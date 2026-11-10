@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type {
   AgentTaskMode,
   AgentTaskRequest,
@@ -9,6 +10,7 @@ import {
   MEDHEALTH_SPECIALISTS,
   getMedHealthSpecialist,
 } from '../orchestration/specialists'
+import { DEFAULT_CLARIFICATION_TIMEOUT_MS } from '../config'
 
 export interface DelegateTaskInput extends Record<string, unknown> {
   goal: string
@@ -76,6 +78,33 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
     if (specialist && !specialistDefinition) {
       return failure(`Unknown MedHealth specialist role: ${specialist}`)
     }
+
+    // Semi-automatic policy: a top-level specialist call must be confirmed by
+    // the user. Once a research lead has been approved, its bounded nested
+    // delegations do not interrupt the user again.
+    if (specialistDefinition && (context.delegationDepth || 0) === 0) {
+      if (!context.requestUserClarification) {
+        return failure('Specialist delegation requires user confirmation, but clarification is unavailable.')
+      }
+      const question = [
+        `建议调用专家「${specialistDefinition.labelZh}」：${specialistDefinition.descriptionZh}`,
+        '确认后会委派一个隔离子 Agent，使用该角色的工具白名单完成任务。',
+        '是否继续？',
+      ].join('\n')
+      const answer = await context.requestUserClarification({
+        clarifyId: randomUUID(),
+        question,
+        choices: ['调用专家', '取消'],
+        timeoutMs: DEFAULT_CLARIFICATION_TIMEOUT_MS,
+      })
+      const normalized = String(answer || '').trim()
+      if (normalized !== '调用专家') {
+        return failure(normalized === '取消'
+          ? '用户取消了本次专家委派。'
+          : `专家委派未获确认：${normalized || '用户未响应'}`)
+      }
+    }
+
     const request: AgentTaskRequest = {
       goal,
       mode,

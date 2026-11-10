@@ -5,12 +5,17 @@ import type {
   AgentToolContext,
   AgentToolResult,
 } from './types'
+import {
+  MEDHEALTH_SPECIALISTS,
+  getMedHealthSpecialist,
+} from '../orchestration/specialists'
 
 export interface DelegateTaskInput extends Record<string, unknown> {
   goal: string
   context?: string
   mode?: AgentTaskMode
   model?: string
+  specialist?: string
 }
 
 export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
@@ -22,6 +27,7 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
       'Use background for independent work that may finish after the parent response; progress remains visible to the user.',
       'The subagent inherits the provider, workspace, and tools, but no parent conversation history and cannot delegate recursively.',
       'Pass model to run the subagent on a different model of the same provider; use it when the parent writes and a separate reviewer model audits.',
+      'Pass specialist to apply a static MedHealth research role. Roles are advisory, cannot spawn more agents, and never authorize clinical decisions.',
     ].join(' '),
     parameters: {
       type: 'object',
@@ -43,6 +49,11 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
           type: 'string',
           description: 'Optional model name the subagent runs on, inside the current provider. Omit to inherit the parent model. A reviewer model different from the writer model keeps the review independent.',
         },
+        specialist: {
+          type: 'string',
+          enum: MEDHEALTH_SPECIALISTS.map(item => item.id),
+          description: `Optional static MedHealth specialist role. It scopes the delegated analysis; the parent remains responsible for the final answer. Roles: ${MEDHEALTH_SPECIALISTS.map(item => `${item.id} (${item.description})`).join('; ')}`,
+        },
       },
       required: ['goal', 'mode'],
       additionalProperties: false,
@@ -60,6 +71,10 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
     const mode = normalizeMode(input.mode)
     if (!mode) return failure('delegate_task mode must be foreground or background.')
     const model = typeof input.model === 'string' ? input.model.trim() : ''
+    const specialist = typeof input.specialist === 'string' ? input.specialist.trim() : ''
+    if (specialist && !getMedHealthSpecialist(specialist)) {
+      return failure(`Unknown MedHealth specialist role: ${specialist}`)
+    }
     const request: AgentTaskRequest = {
       goal,
       mode,
@@ -67,6 +82,7 @@ export class DelegateTaskTool implements AgentTool<DelegateTaskInput> {
         ? { context: input.context.trim() }
         : {}),
       ...(model ? { model } : {}),
+      ...(specialist ? { specialist } : {}),
     }
     return context.delegateTask(request)
   }

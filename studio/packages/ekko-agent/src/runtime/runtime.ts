@@ -31,6 +31,7 @@ import {
 import { workspaceToolAssetDirectory } from '../tools/workspace-temp'
 import type { AgentRuntimeEvent } from './events'
 import { buildSystemPrompt } from './system-prompt'
+import { medHealthSpecialistPrompt } from '../orchestration/specialists'
 import type {
   AgentRuntimeBoundaryInterruptRequest,
   AgentRuntimeBoundaryInterruptResult,
@@ -1865,6 +1866,7 @@ function appendStructuredData(
 
 function subtaskPrompt(request: AgentTaskRequest): string {
   return [
+    medHealthSpecialistPrompt(request.specialist),
     `Complete this delegated task independently:\n${request.goal}`,
     request.context ? `Relevant context:\n${request.context}` : '',
     'Return a concise result that the parent agent can use directly.',

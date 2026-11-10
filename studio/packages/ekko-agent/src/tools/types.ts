@@ -85,6 +85,8 @@ export interface AgentTaskRequest {
   mode: AgentTaskMode
   /** Runs the subagent on a different model within the same provider. */
   model?: string
+  /** Optional static specialist role; cannot spawn another specialist. */
+  specialist?: string
 }
 
 export type AgentTaskDelegate = (request: AgentTaskRequest) => Promise<AgentToolResult>
